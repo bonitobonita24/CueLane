@@ -22,10 +22,21 @@ _Not yet scaffolded — Phase 4 Part 8_
 ## Governance
 - docs/PRODUCT.md — complete (written by human)
 - docs/DESIGN.md — complete (HashiCorp aesthetic, prompt 4.8)
-- docs/DECISIONS_LOG.md — initialized (2 entries: HashiCorp aesthetic, dev environment mode)
-- docs/CHANGELOG_AI.md — initialized (empty template)
+- docs/DECISIONS_LOG.md — updated (11 entries: HashiCorp aesthetic, dev environment mode, + 9 Phase 3 locked decisions)
+- docs/CHANGELOG_AI.md — active (Phase 3 entry + Phase 3 continuation entry written)
 - docs/IMPLEMENTATION_MAP.md — this file
-- .cline/STATE.md — initialized by Bootstrap
-- .cline/memory/lessons.md — initialized with WSL2 gotchas
+- .cline/STATE.md — Phase 3 complete; ports assigned (base 41706)
+- .cline/memory/lessons.md — WSL2 gotchas + Edit-before-read fix
 - .cline/memory/agent-log.md — initialized
 - project.memory.md — initialized
+
+## Spec Files (Phase 3 — complete)
+- inputs.yml — v3; slug=cuelane, multi-tenant/subdirectory, xendit, ports.dev.base=41706, docker hub=bonitobonita24/cuelane
+- inputs.schema.json — strict JSON Schema draft-07
+- .env.dev — non-standard ports (base 41706), Turnstile test keys, Xendit ⏳
+- .env.staging — standard ports, APP_IMAGE_TAG=staging-latest, APP_DOMAIN=cuelane-staging.powerbyte.app
+- .env.prod — standard ports, APP_IMAGE_TAG=latest, APP_DOMAIN=cuelane.powerbyte.app, Turnstile LIVE ⏳
+- .env.example — safe committed template (all placeholders)
+- CREDENTIALS.md — AI secrets filled; human ⏳ sections: Docker Hub token, Resend/SMTP, Xendit keys, Turnstile LIVE keys, Komodo UI URL
+- scripts/sync-credentials-to-env.sh — propagates CREDENTIALS.md → env files; chmod +x
+- .cline/handoffs/2026-05-03-phase3-complete-pause.md — pause handoff with resume instructions

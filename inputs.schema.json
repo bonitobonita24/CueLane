@@ -1,0 +1,288 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Spec-Driven Platform V31 — inputs.yml Schema",
+  "description": "Strict JSON Schema for validating inputs.yml",
+  "type": "object",
+  "required": ["app", "apps", "packages", "tech_stack", "tenancy", "auth", "storage", "jobs", "realtime", "email", "turnstile", "subscription_tiers", "environments", "domains", "cors", "docker", "git", "models", "vibe_test", "context7", "accessibility", "security", "ports"],
+  "additionalProperties": false,
+  "properties": {
+    "app": {
+      "type": "object",
+      "required": ["name", "slug", "description", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+      }
+    },
+    "apps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "framework", "port"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "framework": { "type": "string", "enum": ["nextjs", "expo", "node"] },
+          "port": { "type": ["integer", "null"] },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "packages": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "tech_stack": {
+      "type": "object",
+      "required": ["language", "strict_mode", "frontend", "api", "orm", "auth", "database", "cache", "job_queue", "realtime", "email", "ui_library", "css", "monorepo", "package_manager"],
+      "properties": {
+        "language": { "type": "string" },
+        "strict_mode": { "type": "boolean" },
+        "frontend": { "type": "string" },
+        "api": { "type": "string" },
+        "orm": { "type": "string" },
+        "auth": { "type": "string" },
+        "database": { "type": "string" },
+        "cache": { "type": "string" },
+        "storage_dev": { "type": "string" },
+        "storage_prod": { "type": "string" },
+        "job_queue": { "type": "string" },
+        "realtime": { "type": "string" },
+        "email": { "type": "string" },
+        "ui_library": { "type": "string" },
+        "css": { "type": "string" },
+        "monorepo": { "type": "string" },
+        "package_manager": { "type": "string" }
+      }
+    },
+    "tenancy": {
+      "type": "object",
+      "required": ["mode", "routing"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["single", "multi"] },
+        "routing": { "type": "string", "enum": ["subdomain", "subdirectory"] },
+        "tenant_field": { "type": "string" },
+        "shared_data": { "type": "array", "items": { "type": "string" } },
+        "upgrade_path": { "type": "string" }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "required": ["providers", "session_strategy"],
+      "properties": {
+        "providers": { "type": "array", "items": { "type": "string" } },
+        "session_strategy": { "type": "string" },
+        "jwt_fields": { "type": "array", "items": { "type": "string" } },
+        "employee_session": { "type": "string" },
+        "mfa": { "type": "boolean" },
+        "email_verification": { "type": "string" },
+        "password_reset": { "type": "string" }
+      }
+    },
+    "payment": {
+      "type": "object",
+      "properties": {
+        "gateway": { "type": "string" },
+        "region": { "type": "string" },
+        "methods": { "type": "array", "items": { "type": "string" } },
+        "recurring": { "type": "boolean" },
+        "refunds": { "type": "string" },
+        "multi_currency": { "type": "boolean" },
+        "default_currency": { "type": "string" },
+        "webhook_queue": { "type": "boolean" }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "provider_dev": { "type": "string" },
+        "provider_prod": { "type": "string" },
+        "max_file_size_mb": { "type": "integer", "minimum": 1 },
+        "allowed_mime_types": { "type": "array", "items": { "type": "string" } },
+        "randomize_filenames": { "type": "boolean" },
+        "path_pattern": { "type": "string" },
+        "svg_blocked": { "type": "boolean" },
+        "html_blocked": { "type": "boolean" }
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "provider": { "type": "string" },
+        "queues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "retries": { "type": "integer", "minimum": 0 },
+              "backoff": { "type": "string" },
+              "dlq": { "type": "boolean" }
+            }
+          }
+        },
+        "tenant_scoped": { "type": "boolean" },
+        "payload_fields": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "realtime": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "transport": { "type": "string" },
+        "pubsub": { "type": "string" },
+        "channel_pattern": { "type": "string" },
+        "events": { "type": "array", "items": { "type": "string" } },
+        "polling_fallback": { "type": "boolean" }
+      }
+    },
+    "email": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": {
+        "provider": { "type": "string" },
+        "from_name": { "type": "string" },
+        "transactional": { "type": "array", "items": { "type": "string" } },
+        "dev_intercept": { "type": "string" }
+      }
+    },
+    "turnstile": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["managed", "invisible", "checkbox"] },
+        "protected_pages": { "type": "array", "items": { "type": "string" } },
+        "excluded_pages": { "type": "array", "items": { "type": "string" } },
+        "hostname_strategy": { "type": "string" },
+        "widget_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "subscription_tiers": {
+      "type": "object",
+      "properties": {
+        "free": { "type": "object" },
+        "premium": { "type": "object" }
+      }
+    },
+    "environments": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["dev", "staging", "prod"] },
+      "minItems": 1
+    },
+    "domains": {
+      "type": "object",
+      "required": ["dev", "staging", "prod"],
+      "properties": {
+        "dev": { "type": "string" },
+        "staging": { "type": "string" },
+        "prod": { "type": "string" }
+      }
+    },
+    "cors": {
+      "type": "object",
+      "required": ["dev", "staging", "prod"],
+      "properties": {
+        "dev": { "type": "array", "items": { "type": "string" } },
+        "staging": { "type": "array", "items": { "type": "string" } },
+        "prod": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "docker": {
+      "type": "object",
+      "required": ["publish"],
+      "properties": {
+        "publish": { "type": "boolean" },
+        "registry": { "type": "string" },
+        "hub_repo": { "type": "string", "pattern": "^[a-z0-9_-]+/[a-z0-9_-]+$" },
+        "image_name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "build_on_push_to": { "type": "string" },
+        "dev_build": { "type": "boolean" }
+      }
+    },
+    "git": {
+      "type": "object",
+      "required": ["default_branch", "branch_pattern", "commit_style", "squash_merge"],
+      "properties": {
+        "default_branch": { "type": "string" },
+        "branch_pattern": { "type": "string" },
+        "commit_style": { "type": "string", "enum": ["conventional"] },
+        "squash_merge": { "type": "boolean" },
+        "use_worktrees": { "type": "boolean" }
+      }
+    },
+    "models": {
+      "type": "object",
+      "required": ["planning", "execution", "governance"],
+      "properties": {
+        "planning": { "type": "string" },
+        "execution": { "type": "string" },
+        "governance": { "type": "string" }
+      }
+    },
+    "vibe_test": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "context7": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "accessibility": {
+      "type": "object",
+      "required": ["level"],
+      "properties": {
+        "level": { "type": "string", "enum": ["none", "wcag_aa", "wcag_aaa"] }
+      }
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "rate_limits": { "type": "object" },
+        "csrf": { "type": "string" },
+        "audit_events": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ports": {
+      "type": "object",
+      "required": ["dev"],
+      "properties": {
+        "dev": {
+          "type": "object",
+          "required": ["base", "db", "pgbouncer", "redis", "minio", "minio_console", "mailhog_smtp", "mailhog_ui", "pgadmin", "app"],
+          "properties": {
+            "base": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+            "db": { "type": "integer" },
+            "pgbouncer": { "type": "integer" },
+            "redis": { "type": "integer" },
+            "minio": { "type": "integer" },
+            "minio_console": { "type": "integer" },
+            "mailhog_smtp": { "type": "integer" },
+            "mailhog_ui": { "type": "integer" },
+            "pgadmin": { "type": "integer" },
+            "app": { "type": "integer" },
+            "worker": { "type": "integer" },
+            "prisma_studio": { "type": "integer" }
+          }
+        }
+      }
+    }
+  }
+}

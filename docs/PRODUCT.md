@@ -307,7 +307,8 @@ PII stored:       Yes — tenant admin email (registration), employee names + PI
 Financial data:   Yes — subscription billing via Xendit (PCI handled entirely by Xendit — no card numbers stored in CueLane DB. Xendit Philippines Inc regulated by BSP.)
 Health data:      No
 Audit required:   tenant.create, tenant.tier_change, tenant.suspend, ticket.status changes (waiting→serving→completed/skipped/noshow), ticket.transfer events, ticket.returnTo set/cleared, employee login/logout, admin config changes (user/transaction/window CRUD, theme change, printer config change, media mode change), subscription.create, subscription.change, subscription.cancel, subscription.payment_failed, system_ad.create, system_ad.delete, system_ad.enable/disable, tenant_ad.create, tenant_ad.delete, password_reset.requested, password_reset.completed
-GDPR/compliance:  Tenant data export on request. Tenant data deletion on account closure (all tenant-scoped records purged). Employee data scoped to tenant — standard employment data handling. No customer data to export/delete (anonymous walk-ins).
+Data retention:   Ticket history + queue data: 1 year per tenant (archival/purge via future BullMQ cleanup job). Payment/subscription records + audit logs: 7 years (BIR record-keeping compliance). v1: soft retention — keep everything, no auto-purge. Target periods documented for Phase 8+ cleanup job implementation.
+GDPR/compliance:  v1: tenant-level account deletion only — admin requests deletion → 30-day cooling period → all tenant-scoped data purged (company profile, employees, tickets, media, subscriptions). No self-service data export in v1. No per-user data export or granular download in v1. Philippine DPA right-to-erasure satisfied at tenant level. Employee data scoped to tenant — standard employment data handling. No customer data to export/delete (anonymous walk-ins).
 
 ## Security Requirements
 Rate limiting:    public: 30/min | PIN attempts: 10/min with lockout after 5 failures | api: 120/min | upload: 20/min | password reset: 5/hour per email
@@ -402,3 +403,5 @@ Theming approach:   shadcn/ui CSS variables (--primary, --secondary, etc.) — c
 - No queue priority rules beyond PWD/Senior/Pregnant (no VIP tiers, no paid priority)
 - No polling fallback for real-time — WebSocket required
 - No PDF/CSV dashboard export in v1
+- No per-user data export or granular data download (v2 scope)
+- No self-service tenant data export (v2 scope — v1 supports tenant-level deletion only)

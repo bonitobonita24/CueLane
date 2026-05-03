@@ -19,3 +19,17 @@
   (6) WSL2 file permissions: always develop inside WSL2 filesystem (/home/user/) not /mnt/c/.
       Working in /mnt/c/ causes severe pnpm and docker performance issues.
 # ---
+
+## 2026-05-03 — 🟡 Edit tool requires file to be Read in same session before editing
+- Type:      🟡 fix
+- Phase:     Any phase — affects every session
+- Files:     Any file targeted by Edit tool
+- Concepts:  edit-tool, read-first, session-start, claude-code
+- Narrative: The Edit tool rejects writes with "File has not been read yet in this session" if the file
+  was not explicitly Read via the Read tool earlier in the same Claude Code session. This occurs even
+  if the file was read in a prior session. Fix: always call Read on the target file before calling Edit.
+  This pattern hit twice across Phase 3 sessions — CHANGELOG_AI.md in the prior session and STATE.md
+  in this session. Prevention: before any Edit call, verify the file has been read in the current session.
+  The Write tool does NOT have this restriction (it overwrites unconditionally), but Write should only
+  be used for new files or complete rewrites — not for targeted edits.
+# ---
