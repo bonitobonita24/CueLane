@@ -13,7 +13,7 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 
 1. **Company signs up (Platform):** Business owner visits cuelane.powerbyte.app → lands on marketing landing page → clicks "Get Started Free" → creates account (email + password via Auth.js v5) → Cloudflare Turnstile widget verifies human (Managed mode) → enters company name, tagline, branch name → tenant workspace created with Free tier defaults → admin is redirected to their tenant admin panel. Error: duplicate email shows "Account already exists." Invalid company name (empty/too short) is rejected with inline validation. Turnstile failure shows "Verification failed. Please try again."
 
-2. **Tenant admin resets password:** Admin clicks "Forgot Password" on login page → enters registered email → system sends password reset link via Resend → admin clicks link in email → enters new password → redirected to login. Error: unrecognized email shows generic "If this email exists, a reset link has been sent" (anti-enumeration). Expired or already-used reset link shows "This link has expired. Please request a new one."
+2. **Tenant admin resets password:** Admin clicks "Forgot Password" on login page → enters registered email → system sends password reset link via SMTP → admin clicks link in email → enters new password → redirected to login. Error: unrecognized email shows generic "If this email exists, a reset link has been sent" (anti-enumeration). Expired or already-used reset link shows "This link has expired. Please request a new one."
 
 3. **Tenant admin upgrades to Premium:** Admin logs in → Admin Panel → Tenant tab → clicks "Upgrade to Premium" → pricing modal shows Premium features + monthly price → clicks "Continue to Payment" → redirected to Xendit-hosted payment method linking page → completes payment setup (card, GCash, Maya, or other supported Philippine channels) → Xendit sends `recurring.plan.activated` webhook → CueLane flips tenant.tier to premium → all Premium features unlock immediately → admin sees confirmation banner "Your plan has been upgraded to Premium." Error: payment failure shows "Payment could not be processed. Please try a different method." Webhook failure retried via BullMQ exponential backoff (3 retries). If all retries fail → DLQ → admin notified via email to contact support.
 
@@ -187,7 +187,7 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 - **YouTube Embed API**: iframe embed for Big Display entertainment (no API key required)
 - **Valkey pub/sub**: Real-time WebSocket state sync across all connected devices per tenant (Big Display, Kiosk, Employee Stations, Mobile). All ticket state changes propagate instantly via tenant-scoped channels.
 - **Xendit** (production): Payment gateway for Premium tier subscription billing. BSP-regulated, Philippines-first. Supports cards (Visa/Mastercard/JCB), e-wallets (GCash, Maya, GrabPay), online banking (BDO, BPI, Metrobank, UnionBank), over-the-counter (7-Eleven, Cebuana), QR Ph. Subscription billing uses Xendit Subscriptions API: create recurring plan → redirect customer to Xendit-hosted payment method linking page → receive `recurring.plan.activated` webhook → Xendit auto-deducts monthly → receive `recurring.cycle.succeeded` / `recurring.cycle.failed` / `recurring.plan.inactivated` webhooks. No card data stored in CueLane — PCI compliance handled entirely by Xendit. Auth: Basic Auth with secret API key. Node.js SDK: `xendit-node`. Docs: https://docs.xendit.co/apidocs
-- **Resend / SMTP** (production): transactional emails — welcome, tier change confirmation, payment failure warning, password reset link, DLQ failure alert
+- **SMTP** (production): transactional emails — welcome, tier change confirmation, payment failure warning, password reset link, DLQ failure alert. Generic SMTP relay (e.g. SendGrid, AWS SES, Postmark, or self-hosted MTA). Staging and production share one SMTP account. Dev uses local MailHog — no real SMTP credentials required.
 - **Cloudflare Turnstile**: Human verification on all authentication forms. Free tier from Cloudflare. Widget type: Managed. Applied to: tenant signup, tenant admin login, employee PIN login (desktop + mobile), admin PIN login, super-admin login. NOT applied to: Customer Kiosk (shared touchscreen), Big Display (view-only). Docs: https://developers.cloudflare.com/turnstile/
 
 ## File Uploads
@@ -202,7 +202,7 @@ Video processing:     No server-side transcoding — browser plays original via 
 System ads storage:   Global `system-ads/` prefix in MinIO/S3 — not per-tenant. Managed by Super Admin only.
 
 ## Background Jobs
-Queue: `email`       — trigger: tenant signup, tier change, payment failure, password reset → sends transactional email via Resend/SMTP
+Queue: `email`       — trigger: tenant signup, tier change, payment failure, password reset → sends transactional email via SMTP
 Queue: `reports`     — trigger: admin requests report export (future) or scheduled daily summary → generates report data
 Queue: `webhooks`    — trigger: Xendit webhook received → processes subscription lifecycle events (recurring.plan.activated, recurring.plan.inactivated, recurring.cycle.succeeded, recurring.cycle.failed, recurring.cycle.retrying)
 Retry strategy:      Exponential backoff, 3 retries max
