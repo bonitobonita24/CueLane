@@ -37,6 +37,6 @@ _Not yet scaffolded — Phase 4 Part 8_
 - .env.staging — standard ports, APP_IMAGE_TAG=staging-latest, APP_DOMAIN=cuelane-staging.powerbyte.app
 - .env.prod — standard ports, APP_IMAGE_TAG=latest, APP_DOMAIN=cuelane.powerbyte.app, Turnstile LIVE ⏳
 - .env.example — safe committed template (all placeholders)
-- CREDENTIALS.md — AI secrets filled; human ⏳ sections: Docker Hub token, Resend/SMTP, Xendit keys, Turnstile LIVE keys, Komodo UI URL
+- CREDENTIALS.md — AI secrets filled; human ⏳ sections: Docker Hub token, SMTP (Host/Port/Username/Password/From address/From name), Xendit keys, Turnstile LIVE keys, Komodo UI URL
 - scripts/sync-credentials-to-env.sh — propagates CREDENTIALS.md → env files; chmod +x
 - .cline/handoffs/2026-05-03-phase3-complete-pause.md — pause handoff with resume instructions

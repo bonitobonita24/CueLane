@@ -53,12 +53,6 @@ update_env() {
 }
 
 echo ""
-echo "─── Syncing Resend API Key (email provider — staging + prod) ───"
-for env in staging prod; do
-  update_env ".env.${env}" "RESEND_API_KEY" "$(extract_value 'Resend API Key')"
-done
-
-echo ""
 echo "─── Syncing SMTP (staging + prod only — dev uses MailHog) ───"
 for env in staging prod; do
   update_env ".env.${env}" "SMTP_HOST"      "$(extract_value 'SMTP Host')"
@@ -70,15 +64,15 @@ for env in staging prod; do
 done
 
 echo ""
-echo "─── Syncing Xendit (payment gateway) ───"
+echo "─── Syncing Xendit (if payment.gateway: xendit) ───"
 for env in dev; do
-  update_env ".env.${env}" "XENDIT_SECRET_KEY"    "$(extract_value 'Secret API Key (TEST)')"
-  update_env ".env.${env}" "XENDIT_PUBLIC_KEY"    "$(extract_value 'Public API Key (TEST)')"
+  update_env ".env.${env}" "XENDIT_SECRET_KEY"   "$(extract_value 'Secret API Key (TEST)')"
+  update_env ".env.${env}" "XENDIT_PUBLIC_KEY"   "$(extract_value 'Public API Key (TEST)')"
   update_env ".env.${env}" "XENDIT_WEBHOOK_TOKEN" "$(extract_value 'Webhook Verification Token')"
 done
 for env in staging prod; do
-  update_env ".env.${env}" "XENDIT_SECRET_KEY"    "$(extract_value 'Secret API Key (LIVE)')"
-  update_env ".env.${env}" "XENDIT_PUBLIC_KEY"    "$(extract_value 'Public API Key (LIVE)')"
+  update_env ".env.${env}" "XENDIT_SECRET_KEY"   "$(extract_value 'Secret API Key (LIVE)')"
+  update_env ".env.${env}" "XENDIT_PUBLIC_KEY"   "$(extract_value 'Public API Key (LIVE)')"
   update_env ".env.${env}" "XENDIT_WEBHOOK_TOKEN" "$(extract_value 'Webhook Verification Token')"
 done
 
@@ -91,12 +85,6 @@ echo ""
 echo "─── Syncing Komodo ───"
 for env in staging prod; do
   update_env ".env.${env}" "KOMODO_UI_URL" "$(extract_value 'Komodo UI URL')"
-done
-
-echo ""
-echo "─── Syncing Docker Hub credentials ───"
-for env in staging prod; do
-  update_env ".env.${env}" "DOCKERHUB_USERNAME" "$(extract_value 'Username' | head -1)"
 done
 
 echo ""

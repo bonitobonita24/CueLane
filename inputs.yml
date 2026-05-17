@@ -39,7 +39,7 @@ tech_stack:
   storage_prod: s3_or_r2
   job_queue: bullmq
   realtime: websocket_valkey_pubsub
-  email: resend
+  email: smtp
   ui_library: shadcn_ui
   css: tailwind_css
   monorepo: turborepo
@@ -125,7 +125,9 @@ realtime:
   polling_fallback: false
 
 email:
-  provider: resend
+  provider: smtp
+  relay_type: generic        # generic SMTP relay (host + credentials supplied by human)
+  same_account_for_staging_prod: true
   from_name: CueLane
   transactional:
     - email_verification

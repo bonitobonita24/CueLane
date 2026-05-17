@@ -194,3 +194,34 @@ Dev/staging: test keys pre-filled (`1x00000000000000000000AA`)
 Production: real keys required — ⏳ human fills in CREDENTIALS.md before Phase 5
 
 Locked: yes — do not add Turnstile to kiosk or display pages. Those are public customer-facing, bot protection would degrade UX.
+
+---
+
+## 2026-05-17 — Email provider: SMTP (was Resend)
+
+**Decision:** Replace Resend with generic SMTP relay for all transactional email. Same SMTP account used for staging and production.
+
+**What changed:**
+- `inputs.yml` `tech_stack.email`: `resend` → `smtp`
+- `inputs.yml` `email.provider`: `resend` → `smtp`
+- `inputs.yml` `email.relay_type`: new field — `generic` (host + credentials supplied by human)
+- `inputs.yml` `email.same_account_for_staging_prod`: `true`
+- `.env.dev`: removed `RESEND_API_KEY` (dev uses MailHog — `SMTP_HOST=localhost:41711` unchanged)
+- `.env.staging`, `.env.prod`: removed `RESEND_API_KEY` (`SMTP_HOST/PORT/USER/PASSWORD/FROM/FROM_NAME` already present, all ⏳ until human fills)
+- `.env.example`: removed Resend placeholder block
+- `CREDENTIALS.md`: `## 📧 Resend API Key` section replaced with `## 📧 SMTP` section (handled via local script `upgrade-credentials-smtp.sh` per Scenario 34 — agent never reads CREDENTIALS.md content)
+
+**Rationale:**
+- User preference for standard SMTP over provider-specific API
+- "Generic / Custom relay" selected from SMTP provider options — Bonito supplies SMTP host + credentials manually (no Gmail / SendGrid / AWS SES lock-in)
+- Same SMTP account for staging + prod chosen for operational simplicity (single set of credentials to manage)
+- Dev continues using MailHog (Docker-local catch-all) — unchanged
+
+**Reversible:** YES — re-running this swap in the other direction requires reversing the same files. Email content templates do not exist yet (Phase 4 hasn't started), so no application-layer rewrite needed.
+
+**Affected runtime:**
+- BullMQ `email` queue worker (Phase 4 Part 4) will use `nodemailer` (or equivalent) wired to `SMTP_*` env vars
+- No Resend SDK dependency to add to `package.json` later
+- Webhook from email provider (delivery receipts) is now N/A — generic SMTP has no callback API
+
+**Locked:** yes — do not re-introduce Resend without explicit decision change. If a future need for provider-specific features (event webhooks, suppression lists) emerges, revisit via Phase 7 Feature Update.

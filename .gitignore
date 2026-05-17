@@ -16,6 +16,8 @@ build/
 
 # Credentials master list — GITIGNORED FROM STEP 8. NO EXCEPTIONS.
 CREDENTIALS.md
+CREDENTIALS.md.*
+*.bak
 
 # ─── AI Artifacts: Machine-Local Only (never commit) ───
 .specstory/

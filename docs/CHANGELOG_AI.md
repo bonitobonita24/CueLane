@@ -5,6 +5,32 @@ Format: Rule 15 — Agent attribution required on every entry.
 
 ---
 
+## 2026-05-17 — Email provider swap: Resend → SMTP
+
+- Agent:               CLAUDE_CODE
+- Why:                 Human decided to switch from Resend API to standard SMTP relay (generic provider, same account staging + prod). Decision captured in DECISIONS_LOG.md entry "2026-05-17 — Email provider: SMTP (was Resend)".
+- Files added:
+  - `upgrade-credentials-smtp.sh` — local script (Scenario 34 pattern) to swap `## 📧 Resend API Key` section in CREDENTIALS.md for V31 `## 📧 SMTP` section. Atomic backup + section replace. Runs in human terminal — credential values never enter AI context.
+- Files modified:
+  - `inputs.yml` — `tech_stack.email: resend → smtp`; `email.provider: resend → smtp`; added `email.relay_type: generic` + `email.same_account_for_staging_prod: true`
+  - `.env.dev` — removed `# RESEND (email provider — dev uses MailHog, not Resend)` comment + `RESEND_API_KEY` line (MailHog SMTP unchanged)
+  - `.env.staging` — removed `RESEND_API_KEY` line (SMTP_HOST/USER/PASSWORD/FROM/FROM_NAME remain ⏳)
+  - `.env.prod` — removed `RESEND_API_KEY` line (SMTP_HOST/USER/PASSWORD/FROM/FROM_NAME remain ⏳)
+  - `.env.example` — removed Resend placeholder block (`# For staging/prod (Resend):` + `# RESEND_API_KEY=...`)
+  - `docs/DECISIONS_LOG.md` — appended locked decision entry
+  - `docs/IMPLEMENTATION_MAP.md` — updated CREDENTIALS.md note: `Resend/SMTP` → `SMTP`
+  - `docs/CHANGELOG_AI.md` — this entry
+- Files deleted:       none
+- Schema/migrations:   none (Phase 4 has not started — no Prisma models or application code to migrate)
+- Errors encountered:  none
+- Errors resolved:     none
+- Pending human action:
+  1. Edit `docs/PRODUCT.md` lines 16, 190, 205 to replace Resend wording with SMTP (per H4 — PRODUCT.md is human-owned; agent provided exact diffs)
+  2. Run `bash upgrade-credentials-smtp.sh` in terminal to swap the CREDENTIALS.md section structure
+  3. Fill the 6 SMTP fields in CREDENTIALS.md (Host, Port, Username, Password, From address, From name) before Phase 5
+
+---
+
 ## 2026-05-03 — Phase 3 continuation: STATE.md + handoff + pause governance
 
 - Agent:               CLAUDE_CODE
