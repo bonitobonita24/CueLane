@@ -21,6 +21,10 @@
 > - Added 1.8 — **Combined Upgrade: Framework + Planning Assistant** — enforces correct order (framework FIRST, Planning Assistant SECOND) when both upgrades are pending
 > - Added **Planning Assistant Rule 11** — n8n + OpenClaw automation opt-in (signal detection in Step 5, conditional infra in Step 7, conditional Integrations template with workflow table). Zero footprint when not used. Handoff docs: `n8n-handoff.md` + `openclaw-handoff.md` (gitignored)
 > - Added **4.13** — Add Automation to Existing Project (n8n / OpenClaw / Hybrid) — for when you didn't set up automation during initial planning but need it later mid-build or in production
+> - Added **3.19** — Emergency Anti-Thrashing: Fix Autocompact Thrashing in Any Phase — general-purpose prompt for mid-session rescue + proactive scope assessment, works in any phase or situation
+> - Added **3.20** — Memory Governance Baseline (V31.2) — first-time setup for existing Phase 7/8 projects, writes Claude Code memory for zero-cost resume
+> - Added **3.21** — Opus Planning Session (V31.2) — Architect-Execute Model: Opus decomposes tasks, dispatches Sonnet subagents; 30K token budget gate per task
+> - Added **3.22** — Thrashing Recovery (V31.2) — emergency Opus session to decompose interrupted work after thrashing; includes THRASHING status detection
 > - Added **Scenario 34** — CREDENTIALS.md Agent-Proof Upgrade (local shell script pattern for credential file format upgrades that agents cannot read into context)
 > - Expanded `.gitignore` entries across bootstrap, Master Prompt, deploy script — 21 new entries covering third-party AI tools (`.agents/`, `.cursor/`, `.windsurf/`, etc.) + automation handoff docs
 > - **NEW — Interactive HTML version** available at `Prompt_References.html` (same content, browser UI with search, expand/collapse, one-click copy, responsive mobile layout)
@@ -735,6 +739,73 @@ Start Part 8
 ```
 
 Part assignments: (1) Root config · (2) shared + api-client · (3) db (L3/L5/L6) · (4) ui + jobs + storage · (5) Web app · (6) Mobile app if declared · (7) tools + compose + SocratiCode · (8) CI + governance + index
+
+### ⚠ Anti-Thrashing: Module-by-Module Execution (for large apps)
+
+**When:** You hit "Autocompact is thrashing" during any Phase 4 Part — especially Parts 3-6 (tRPC routers + UI pages) and Part 8 (Mobile) on apps with 15+ entities. This means the context window is filling up because Claude Code is reading too many files per turn.
+
+**The fix: scope each session to ONE module instead of the entire Part.**
+
+**For Parts 3-6 (tRPC routers + UI pages):**
+```
+Start Phase 4 Part [N] — [ModuleName] module ONLY.
+
+Rules for this session:
+1. Read ONLY the PRODUCT.md sections for [ModuleName] — do NOT read 
+   the entire PRODUCT.md
+2. Read ONLY the tRPC router / UI files for this module
+3. Read ONLY the Prisma models relevant to this module
+4. Build everything for this module, then run tests
+5. Commit with message: "feat([part-scope]): [ModuleName] [what was built]"
+6. Update STATE.md with "[ModuleName] — DONE"
+7. Do NOT start the next module — session ends here
+
+If you need to reference a shared component or utility, read ONLY that 
+single file — do not read its entire directory.
+```
+
+Then start a fresh session for each remaining module. Example for a 10-module ERP — Part 5 (UI) becomes 8-12 sessions instead of one, each touching 6-12 files max.
+
+**For Part 8 (Mobile — Expo + WatermelonDB + offline sync):**
+
+Part 8 is the heaviest because it mirrors the web app for a different platform. Split it into layers first, then modules:
+
+```
+Session 8a — Expo scaffold + navigation + auth:
+  Start Phase 4 Part 8 — Expo project scaffold ONLY.
+  Set up: project structure, navigation (expo-router), auth flow, 
+  theme provider with DESIGN.md tokens. Do NOT build any screens yet.
+  Commit and stop.
+
+Session 8b — WatermelonDB schema + sync engine:
+  Resume Phase 4 Part 8 — WatermelonDB setup ONLY.
+  Build: WatermelonDB schema (mirror Prisma models for Mobile First 
+  entities only), sync engine with conflict resolution, pull/push 
+  protocol. Do NOT build any screens yet. Commit and stop.
+
+Session 8c — Push notifications:
+  Resume Phase 4 Part 8 — Expo Push notification setup ONLY.
+  Build: push token registration, notification handler, background 
+  handler. Commit and stop.
+
+Session 8d onward — one Mobile First module per session:
+  Resume Phase 4 Part 8 — [ModuleName] mobile screens ONLY.
+  Build ONLY screens classified as "Mobile First" in PRODUCT.md 
+  Mobile Needs table. Mobile Ready pages are already handled by 
+  the responsive web app (Parts 5-6) — skip them here.
+  Read ONLY this module's PRODUCT.md section. Commit and stop.
+```
+
+**Key rule for Part 8:** Not every page gets a native mobile screen. Only pages marked **Mobile First** in the PRODUCT.md Mobile Needs table are built here. **Mobile Ready** pages rely on the responsive web layout from Parts 5-6.
+
+**Resume between module sessions:**
+```
+Resume session. Read STATE.md for current status, then read the latest 
+handoff note in .cline/handoffs/ before doing anything.
+
+Continue Phase 4 Part [N] — next module is [ModuleName].
+Read ONLY PRODUCT.md sections for this module.
+```
 
 ### 1.3.6 — Fill CREDENTIALS.md ⏳ placeholders
 
@@ -1652,7 +1723,10 @@ Pause current work. Before stopping:
 4. Update DECISIONS_LOG.md if any decisions were made
 5. Update IMPLEMENTATION_MAP.md if any new files were created
 6. Append to .cline/memory/lessons.md if any errors were resolved
-7. Do NOT squash-merge or delete any branch
+7. Commit all changes to the current branch with message: 
+   "wip: pause session — [brief description of what was done]"
+8. Do NOT squash-merge into main. Do NOT delete the branch.
+   The branch stays as-is until the next session resumes.
 ```
 
 **To resume later (new Claude Code session):**
@@ -2179,6 +2253,182 @@ code-review-graph status
 **What happens:** Update mode diffs file hashes, re-parses only changed files — usually 1-2 seconds. Build mode does a full Tree-sitter re-parse (~10s for 500 files). Only force a full build if incremental update reports failures. After rebuild, blast-radius queries return to normal accuracy.
 
 > Tip: add `code-review-graph status` to your end-of-week routine. Catches drift before it bites you on a high-stakes Feature Update.
+
+---
+
+## 3.19 — Emergency Anti-Thrashing: Fix Autocompact Thrashing in Any Phase (NEW)
+
+**When to use:** Claude Code hits "Autocompact is thrashing" — the context window fills within 2-3 turns, output becomes incomplete or broken. Works in ANY phase (Phase 4, Phase 7, Phase 8, or any other situation).
+
+**Where:** VS Code — Claude Code terminal (paste directly into the current session or start a fresh session)
+
+**Model context:** Claude Sonnet 4.6 via Claude Code. 200K token context window, but
+autocompact kicks in well before that. Practical working budget is ~120K tokens.
+The SAFE zone is ≤80K tokens of input context — leaving 40K+ for Claude's reasoning
+and output. When a session crosses ~100K input, autocompact starts aggressively
+summarizing earlier turns, and by ~120K it thrashes (rewrites context every turn,
+losing coherence). The 12-file threshold below is calibrated for this model's
+behavior — each file read + governance overhead + PRODUCT.md sections averages
+~6-8K tokens, so 12 files ≈ 80-96K tokens ≈ the edge of the SAFE zone.
+
+### If thrashing is happening RIGHT NOW (mid-session rescue):
+
+```
+STOP. Autocompact is thrashing. Apply anti-thrashing protocol immediately.
+
+You are Claude Sonnet 4.6 with a 200K context window. Autocompact thrashes
+when input context exceeds ~120K tokens. You are past that point now.
+Do NOT read any more files — every file read makes it worse.
+
+1. Do NOT read any more files. Do NOT continue building.
+2. Run /clear if available to free context immediately.
+3. Update STATE.md with exactly what you've completed so far:
+   - Files created/modified (with status: DONE or PARTIAL)
+   - What remains to be built for the current task
+   - Any dependencies the next session needs to know about
+   - Estimated context consumption that caused thrashing (how many files read,
+     how large was PRODUCT.md section, how many governance docs loaded)
+4. Write a handoff note to .cline/handoffs/ with:
+   - Current phase and task
+   - What's done, what's remaining
+   - Any partial code that needs completion
+   - Which PRODUCT.md sections the next session needs (by name, not "all")
+5. Commit all work done so far (even if incomplete — partial progress > lost progress)
+   git add -A && git commit -m "wip: [current-task] — anti-thrashing checkpoint"
+6. STOP. I'll open a new session with narrower scope.
+```
+
+### Starting a new session after thrashing (or preventing it proactively):
+
+```
+Before you start, apply anti-thrashing scope assessment.
+
+Context budget: You are Claude Sonnet 4.6. Your practical working budget is
+~120K tokens. The SAFE zone is ≤80K tokens of input context. Every file you
+read, every governance doc you load, and every PRODUCT.md section you parse
+consumes from this budget. Plan accordingly.
+
+1. List every file you'll need to create or modify for this task
+2. Estimate the token cost:
+   - CLAUDE.md + active .claude/rules/ file: ~5K tokens
+   - Each PRODUCT.md section: ~2-4K tokens
+   - Each existing source file read: ~1-3K tokens
+   - 9 governance docs (lessons.md, CHANGELOG_AI, etc.): ~10-15K total
+   - Your output (code generation): ~2-5K per file written
+   Add it up. If estimated total exceeds 80K → you MUST split.
+3. If the file list exceeds 12 files OR estimated context exceeds 80K:
+   - Group files by module/feature
+   - Report the split plan to me before writing any code:
+     ```
+     ⚠ Scope assessment: [X] files, ~[Y]K estimated tokens.
+     Exceeds 80K SAFE zone. Splitting into sub-sessions:
+       Sub-session 1 — [ModuleName]: [files] (~[N]K tokens)
+       Sub-session 2 — [ModuleName]: [files] (~[N]K tokens)
+     Starting with sub-session 1.
+     ```
+   - Build one module at a time, commit after each, then STOP
+4. Read ONLY the PRODUCT.md sections relevant to the current module
+   — do NOT read the entire PRODUCT.md (a full PRODUCT.md can be 20-40K tokens alone)
+5. Read ONLY the codebase files you'll actually modify
+   — do NOT scan entire directories or read files "for context"
+   — use codebase_search (Rule 17) to find specific symbols instead of opening files
+6. Before committing each module, re-read ONLY its PRODUCT.md section and verify:
+   □ Every user flow is implemented (happy path + error states)
+   □ Every data field is in the schema, router, and UI
+   □ Every permission guard matches the Roles table
+   □ Every validation rule has a matching Zod schema
+   □ Every UI element described exists in the page
+7. After each module: commit, update STATE.md with progress, then STOP.
+   I'll open a new session for the next module.
+
+CRITICAL: This split changes HOW MANY things per session, never WHAT gets built.
+Every feature in PRODUCT.md must be fully implemented. Do not skip or defer
+anything without my explicit approval.
+
+Report the scope assessment now — file count, estimated tokens, do we need to split?
+```
+
+### Quick version (paste-and-go for experienced users):
+
+```
+Anti-thrashing mode (Sonnet 4.6, 120K practical budget, ≤80K SAFE zone).
+Scope assessment first — list all files, estimate token cost.
+If >12 files or >80K tokens, split by module. One module per session.
+Read only relevant PRODUCT.md sections — never the full file.
+Use codebase_search instead of reading files for context.
+Completeness check before each commit. Report the plan before writing code.
+```
+
+> ⚠ **Why this matters:** Thrashing sessions produce the most dangerous bugs — features that LOOK complete in governance docs but are actually missing validations, permission guards, error states, or entire user flows. The completeness check catches this before it becomes invisible tech debt.
+>
+> 💡 **Context budget rule of thumb for Sonnet 4.6:** If you can describe your task scope in under 3 sentences and it touches fewer than 12 files, you're in the SAFE zone. If you need a paragraph to explain the scope, you probably need to split.
+
+---
+
+## 3.20 — Memory Governance Baseline (first-time setup for existing projects) (NEW V31.2)
+
+**Where:** Claude Code (Opus 4.6 recommended)
+**When:** First time using the Memory Governance Layer on a project already in Phase 7/8
+
+```
+Run memory governance baseline (memory-governance.md §5 Step 2).
+Read STATE.md + IMPLEMENTATION_MAP.md + lessons.md.
+Write a Claude Code memory entry capturing: current phase, what's been built,
+top gotchas from lessons.md, locked decisions, and what's next.
+Update STATE.md with TOKEN_ESTIMATE, FILES_TOUCHED, TIER_CLASSIFICATION fields.
+Then decompose my current task using Tiered Decomposition (§1).
+```
+
+> 💡 **One-time per project.** After this baseline, future sessions resume at zero token cost via Claude Code memory instead of re-reading 3 governance docs (~5-10K tokens saved per session).
+
+---
+
+## 3.21 — Opus Planning Session (Phase 4/7/8 task decomposition) (NEW V31.2)
+
+**Where:** Claude Code (Opus 4.6)
+**When:** Starting any Phase 4 Part, Phase 7 Feature Update, or Phase 8 Batch
+
+```
+Use the Architect-Execute Model (memory-governance.md §4).
+Read STATE.md and relevant PRODUCT.md sections.
+Run Tiered Decomposition (§1) on this task.
+If Tier 2-3: decompose into scoped sub-tasks.
+Step 2.5 — Token Budget Gate: estimate tokens required per sub-task.
+  - If ≤30K: dispatch as Sonnet subagent via Agent(model: "sonnet").
+  - If >30K: split further until each task is ≤30K.
+Step 2.5b — Opus Escalation: if a task is genuinely atomic and unsplittable at >30K,
+  dispatch as Agent(model: "opus") as last resort.
+Dispatch approved sub-tasks to Sonnet via Agent(model: "sonnet").
+Review each subagent's output (spec compliance then code quality).
+Run Smart Checkpoint (§2) after all tasks complete.
+```
+
+> 💡 **Why Opus?** Opus excels at reading large context and making decomposition decisions. One Opus planning session saves 3-5 Sonnet sessions from thrashing. Sonnet never reads full PRODUCT.md — it gets pre-scoped task instructions from Opus. The 30K token budget gate prevents Sonnet subagents from thrashing on oversized tasks.
+
+---
+
+## 3.22 — Thrashing Recovery (emergency mid-session rescue) (NEW V31.2)
+
+**Where:** Claude Code (Opus 4.6)
+**When:** You're currently experiencing "Autocompact is thrashing" and need immediate help
+
+**THRASHING detection signs (Opus watches for these):**
+- Agent re-reads the same files it already read earlier in the session
+- Agent produces partial output then stalls or truncates
+- Agent contradicts or undoes its own prior edits
+- Multiple loops with no net progress on STATE.md
+
+```
+I'm experiencing context thrashing. Follow memory-governance.md §5 Thrashing Recovery:
+1. I've already stopped and committed partial work.
+2. Run the memory governance baseline (§5 Step 2) to capture current state.
+3. Decompose my interrupted task using Tiered Decomposition (§1).
+4. Apply Step 2.5 Token Budget Gate — ensure each sub-task is ≤30K tokens for Sonnet.
+5. Output a split plan with numbered sub-sessions I can execute with Sonnet.
+I was working on: [describe what you were doing]
+```
+
+> ⚠ **Critical:** Open this in a NEW session with Opus 4.6, not in the thrashing session. The thrashing session's context is corrupted — starting fresh is the only reliable recovery. If Opus itself detects THRASHING status mid-session, it must stop immediately and re-decompose before continuing.
 
 ---
 

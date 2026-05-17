@@ -52,3 +52,11 @@ openclaw-handoff.md
 # Editor + OS
 .DS_Store
 *.log
+
+# ─── Build + TypeScript cache (Spec-Driven V31) ───
+
+# ─── Environment files — NEVER commit real credentials ───
+
+# ─── Credentials master list ───
+
+# ─── Third-Party AI Tool Artifacts (safety net) ───
