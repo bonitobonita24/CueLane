@@ -1,7 +1,7 @@
 # Spec-Driven Platform V31 — Bootstrap (Phase 0)
 
 > Loaded contextually when user says 'Bootstrap' in a fresh project.
-> Contains all 18 bootstrap steps including credential collection gate.
+> Contains all 20 bootstrap steps including credential collection gate (Step 18), Loading Library Lock (Step 19 V31.3), Design Toolkit + Stop Hook install (Step 20 V32.8), and Privacy & Compliance Scaffold (Step 20b V32.9 — nested under Step 20, bootstrap total stays at 20).
 
 ---
 
@@ -341,7 +341,33 @@ Step 6 — .cline/memory/agent-log.md
 
 Step 7 — .claude/settings.json
   Claude Code writes Claude Code config with all 9 context file paths
-  (lessons.md listed first, matching Rule 4 read order).
+  (lessons.md listed first, matching Rule 4 hydration order).
+
+  Also merge the V32.8 Stop hook block into the same file (canonical source: templates.md §V32.8).
+  The Stop hook is a command-type hook invoking `scripts/design-stop-hook.sh`; it blocks via a
+  non-zero exit when a done-claim's evidence (`captured_output` in `docs/STATE.md`) is empty or
+  absent. (The declarative `matcher`/`action`/`message` form is NOT valid Claude Code and is
+  silently ignored — use the command form below.)
+  Final merged `.claude/settings.json` shape:
+
+  ```json
+  {
+    "skillListingBudgetFraction": 0.01,
+    "maxSkillDescriptionChars": 1024,
+    "hooks": {
+      "Stop": [
+        {
+          "hooks": [
+            { "type": "command", "command": "bash scripts/design-stop-hook.sh", "timeout": 30 }
+          ]
+        }
+      ]
+    }
+  }
+  ```
+
+  If `.claude/settings.json` already exists from a prior deliverable (#19), merge the `hooks` key
+  only — do not overwrite `skillListingBudgetFraction` or `maxSkillDescriptionChars`.
 
 Step 8 — Bootstrap files
   .gitignore initial content (CREDENTIALS.md MUST be here from day 1 — before any other step commits):
@@ -418,7 +444,39 @@ Step 9 — WSL2 dev environment validation (MODE A only)
   Locked: yes — do not re-ask or scaffold devcontainer files.
   ```
 
-Step 10 — .vscode/mcp.json (MCP entries — V10 + Context7 V23 + shadcn V29)
+Step 10 — MCP config (V31.3 dual-write — .mcp.json for Claude Code + .vscode/mcp.json for VS Code Copilot)
+
+  CRITICAL (V31.3 fix): Claude Code reads PROJECT-scope MCP servers from `.mcp.json`
+  at project root using the `mcpServers` key. VS Code Copilot (and historically Cline)
+  reads `.vscode/mcp.json` using the `servers` key. Both files must be written so
+  Claude Code (primary) AND any legacy VS Code Copilot users get the same MCPs.
+  Bootstrap writes BOTH files. They reference the same binaries — no resource cost.
+
+  --- File 1: .mcp.json (Claude Code primary — committed, project-scope) ---
+  {
+    "mcpServers": {
+      "socraticode": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "socraticode"],
+        "env": {}
+      },
+      "context7": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@upstash/context7-mcp@latest"],
+        "env": {}
+      },
+      "shadcn": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "shadcn@latest", "mcp"],
+        "env": {}
+      }
+    }
+  }
+
+  --- File 2: .vscode/mcp.json (VS Code Copilot — legacy compatibility only) ---
   {
     "servers": {
       "socraticode": {
@@ -435,8 +493,21 @@ Step 10 — .vscode/mcp.json (MCP entries — V10 + Context7 V23 + shadcn V29)
       }
     }
   }
+
+  RATIONALE for project-scope (V31.3): SocratiCode indexes code into a local Qdrant
+  vector DB. For sensitive client projects (payroll, banking, government), indexing
+  must be an EXPLICIT per-project decision — never a machine-wide default. Project-scope
+  .mcp.json makes the wiring visible in git history, contains blast radius if SocratiCode
+  upgrades break, and forces opt-in per repo. NEVER wire SocratiCode at user scope for
+  Spec-Driven projects.
+
   SocratiCode: runs as system-level service. Docker must be running.
-  On first use: SocratiCode auto-pulls Qdrant + Ollama Docker images (~5 min one-time).
+  On first use: SocratiCode auto-pulls Qdrant Docker image (~140 MB one-time).
+  Ollama: framework prefers NATIVE Ollama install (WSL2 / macOS / Linux) over Dockered
+  Ollama — Docker on macOS/Windows can't passthrough GPU. Install native Ollama from
+  https://ollama.com/download then run: `ollama pull nomic-embed-text` (default model,
+  ~274 MB). SocratiCode auto-detects native Ollama on http://localhost:11434.
+
   Context7 (NEW V23): injects live version-specific docs from source repos into prompts.
   Prevents hallucinated deprecated APIs when working with Next.js, Prisma, Auth.js, tRPC, Valkey.
   Usage: append "use context7" to any prompt involving external libraries.
@@ -449,6 +520,15 @@ Step 10 — .vscode/mcp.json (MCP entries — V10 + Context7 V23 + shadcn V29)
   Example: "Add a date picker, dialog, and sidebar to my project"
   → shadcn MCP resolves the components and installs them via CLI.
   No API key needed. Free. MIT. Reference: https://ui.shadcn.com/docs/mcp
+
+  VERIFICATION after writing both files:
+    cd <project_root>
+    claude mcp get socraticode    # MUST show "Scope: Project config (shared via .mcp.json)"
+    claude mcp list               # MUST show socraticode, context7, shadcn all "✓ Connected"
+
+  COMMIT POLICY: .mcp.json IS committed (team gets the same MCP setup).
+                 .vscode/mcp.json IS committed too (for VS Code Copilot users on the team).
+                 Both files must stay in sync — if you add/remove an MCP entry, update both.
 
 Step 11 — .specstory/config.json (NEW V11 — SpecStory passive capture config)
   {
@@ -469,6 +549,27 @@ Step 12 — Governance doc templates
   docs/DECISIONS_LOG.md entry: Git branching strategy — feat/{slug}, scaffold/part-{N}, squash-merge (Rule 23)
   docs/DECISIONS_LOG.md entry: Model routing — planning/execution/governance model assignments (Rule 24)
   Written by Bootstrap Step 9 — dev environment decision is pre-locked. Agents never re-ask.
+
+  LESSONS_REGISTRY.md seed pointer (V32.8):
+  Write docs/LESSONS_REGISTRY.md with the following header block so build sessions know to consult it:
+
+  ```markdown
+  # LESSONS REGISTRY — Cross-Project Promoted Lessons
+  # Source of truth: templates.md §LESSONS_REGISTRY.md entry template
+  # Scope routing: project → lessons.md | framework → deliverable file | conductor → /memory file
+  #
+  # This file is append-only. One entry per promoted lesson.
+  # Entry format: ## <short title> + table with fingerprint / machine_signature / scope /
+  #               failure / standing_check / check_location fields.
+  # See templates.md §V32.8 for the full entry skeleton.
+  #
+  # Build sessions: before starting any phase, grep this file for fingerprints matching
+  # the current task domain (e.g. docker-build, token-pipeline, auth, prisma).
+  # If a matching standing_check exists, run it before writing any code.
+  ```
+
+  Append to .cline/memory/agent-log.md:
+  BOOTSTRAP | Step 12 | docs/LESSONS_REGISTRY.md seed written (V32.8 consult pointer).
 
 Step 13 — Append to .cline/memory/agent-log.md + .cline/memory/lessons.md
   Log: "Bootstrap complete — project initialized"
@@ -546,7 +647,7 @@ Step 16 — Git init + STATE.md (NEW V14)
   # Updated: [timestamp] by BOOTSTRAP
 
   PHASE:        Phase 0 — Bootstrap complete
-  LAST_DONE:    Project structure created. All 18 bootstrap steps complete.
+  LAST_DONE:    Project structure created. All 20 bootstrap steps complete.
   NEXT:         Phase 1 — Set up dev environment (optional — skip if already done)
   BLOCKERS:     none
   GIT_BRANCH:   main
@@ -995,9 +1096,293 @@ Step 18 — Credential Scaffold (V30 — non-blocking — no interview)
   D) Output the "Bootstrap complete" message below. Bootstrap is non-blocking —
      human can proceed to Phase 2 immediately even with unfilled placeholders.
 
-After Claude Code finishes all 18 steps, OUTPUT THE FOLLOWING TEXT TO THE HUMAN. Do not execute these instructions yourself — they are for the human to read:
+Step 19 — Loading Library Lock (NEW V31.3 — UI dual-path decision)
+
+  After Step 18 completes — execute the following automatically:
+
+  A) Append the following entry to docs/DECISIONS_LOG.md (LOCKED):
+     ```
+     ## LOCKED: Loading state library — DUAL-PATH (V31.3)
+
+     Decision: ui-rules.md Rule 11 is the authoritative loading-state policy.
+       - PATH A: shadcn <Skeleton> for shadcn-composed UI (Card, Table, Form, Dialog,
+         Tabs, Sheet, Avatar, and other shadcn primitives + compositions).
+       - PATH B: @aejkatappaja/phantom-ui (MIT, Lit Web Component) for bespoke /
+         non-shadcn UI (custom viz, third-party widgets, custom layouts).
+
+     Hard constraint: NEVER hand-roll a *Skeleton.tsx twin file for a custom component.
+       If tempted, use phantom-ui per PATH B.
+
+     Pin policy:
+       - Initial install accepts ^0.10.1.
+       - After install, pin the resolved exact version in package.json (lockfile-equivalent).
+       - Bump only via explicit Feature Update (Phase 7) with DECISIONS_LOG entry.
+
+     Classification source:
+       - Phase 2.8 mockup tags each rendered component as `shadcn` or `custom`.
+       - Phase 4 Part 5 reads those tags to pick the correct path automatically.
+
+     Locked at Bootstrap Step 19. No re-asking allowed.
+     ```
+
+  B) Append the following entry to .cline/memory/lessons.md
+     (Rule 18 typed format, type = 🟤 decision):
+     ```
+     ## {{DATE}} — 🟤 decision Loading library locked to dual-path (shadcn Skeleton + phantom-ui)
+     - Type:      🟤 decision
+     - Phase:     Bootstrap Step 19
+     - Files:     docs/DECISIONS_LOG.md, .ai_prompt/ui-rules.md
+     - Concepts:  loading-state, skeleton, phantom-ui, shadcn, ui-rules.Rule-11, dual-path
+     - Narrative: V31.3 locks loading states to a dual-path policy. shadcn primitives use
+       shadcn <Skeleton> inline. Custom (non-shadcn) components MUST wrap in <phantom-ui>
+       — never hand-roll a skeleton twin. Phase 4 Part 5 installs both libraries and picks
+       the right path per component using Phase 2.8 mockup classification tags.
+     ```
+
+  C) Append to .cline/memory/agent-log.md:
+     ```
+     {{TIMESTAMP}}  BOOTSTRAP  Step 19 — Loading library dual-path locked in DECISIONS_LOG.md.
+     ```
+
+  Note: NO npm install runs here. package.json does not yet exist at Bootstrap.
+  The actual installs happen in Phase 4 Part 5 (UI scaffold):
+    - `npx shadcn@latest add skeleton` (added to the shadcn add list)
+    - `npm i @aejkatappaja/phantom-ui` (postinstall auto-wires ssr.css into app/layout.tsx)
+    - Pin phantom-ui to resolved exact version after install completes.
+
+  Step 19 is non-blocking. Bootstrap proceeds to completion.
+
+Step 20 — Design Toolkit scaffold (V32.8 — non-blocking)
+
+  After Step 19 completes — execute the following automatically:
+
+  A) Install style-dictionary v5 as a dev dependency:
+     ```bash
+     pnpm add -D style-dictionary@^5
+     ```
+     If package.json does not exist yet at this step, record the dependency in a
+     `.bootstrap-pending-deps.json` scratch file and install during Phase 4 Part 1
+     (root config + package.json generation). This step is non-blocking.
+
+  B) Write `sd.config.mjs` at the project root (canonical source: templates.md §sd.config.mjs):
+     ```js
+     import StyleDictionary from 'style-dictionary';
+
+     const sd = new StyleDictionary({
+       source: ['tokens/tokens.json'],
+       platforms: {
+         css: {
+           transformGroup: 'css',
+           prefix: 'sd',
+           buildPath: 'app/',
+           files: [
+             {
+               destination: 'generated-tokens.css',
+               format: 'css/variables',
+               options: {
+                 selector: ':root',
+                 outputReferences: false,
+               },
+             },
+           ],
+         },
+         ts: {
+           transformGroup: 'js',
+           buildPath: '',
+           files: [
+             {
+               destination: 'tokens.js',
+               format: 'javascript/es6',
+             },
+             {
+               destination: 'tokens.d.ts',
+               format: 'typescript/es6-declarations',
+             },
+           ],
+         },
+       },
+     });
+
+     await sd.buildAllPlatforms();
+     console.log('Style Dictionary build complete');
+     ```
+     Note: `prefix: 'sd'` is non-negotiable — namespaces compiled vars as `--sd-color-*`,
+     `--sd-dimension-*`, etc., preventing collisions with shadcn's own CSS vars.
+
+  C) Write `scripts/design-validate.mjs` (canonical source: templates.md §scripts/design-validate.mjs):
+     Copy the full script content from templates.md §V32.8 `scripts/design-validate.mjs`.
+     After writing: `chmod +x scripts/design-validate.mjs`
+
+  D) Add `design:*` scripts to `package.json` scripts block
+     (canonical source: templates.md §package.json design:* scripts):
+     ```json
+     "design:validate": "node scripts/design-validate.mjs",
+     "design:build":    "npm run design:validate && node sd.config.mjs",
+     "design:check":    "npx playwright test tests/visual/token-pipeline.spec.ts"
+     ```
+     If package.json does not exist yet, record these in `.bootstrap-pending-deps.json`
+     and merge into package.json during Phase 4 Part 1.
+
+  E) Create placeholder directory for design tokens:
+     ```bash
+     mkdir -p tokens
+     ```
+     Write `tokens/.gitkeep` — ensures the directory is tracked before DESIGN.md tokens are placed here.
+
+  F) Append to docs/DECISIONS_LOG.md (LOCKED):
+     ```
+     ## LOCKED: Design Toolkit — style-dictionary v5 (V32.8)
+
+     Decision: style-dictionary v5 is the sole token compiler for all framework-built apps.
+     Config: sd.config.mjs at project root. Prefix: 'sd' (non-negotiable — prevents shadcn collision).
+     Pipeline: design:validate (DTCG gate) → design:build (SD compile) → design:check (Playwright contracts).
+     Token source: tokens/tokens.json (DTCG v2025.10 format). Output: app/generated-tokens.css + tokens.js/d.ts.
+     Locked at Bootstrap Step 20. Phase 4 Part 5 wires generated-tokens.css into app/globals.css.
+     ```
+
+  G) Append to .cline/memory/lessons.md (Rule 18 typed format, type = 🟤 decision):
+     ```
+     ## {{DATE}} — 🟤 decision Design Toolkit locked to style-dictionary v5 (V32.8)
+     - Type:      🟤 decision
+     - Phase:     Bootstrap Step 20
+     - Files:     sd.config.mjs, scripts/design-validate.mjs, package.json (design:* scripts)
+     - Concepts:  style-dictionary, design-tokens, dtcg, sd-prefix, token-pipeline, V32.8
+     - Narrative: V32.8 locks the design toolkit to style-dictionary v5. The 'sd' prefix on all
+       compiled CSS vars is non-negotiable — prevents collisions with shadcn's --color-* / --radius vars.
+       design:validate runs the DTCG schema gate before design:build compiles. design:check runs
+       Playwright visual contracts. Phase 4 Part 5 imports app/generated-tokens.css into globals.css.
+     ```
+
+  H) Append to .cline/memory/agent-log.md:
+     ```
+     {{TIMESTAMP}}  BOOTSTRAP  Step 20 — style-dictionary v5 scaffolded.
+     sd.config.mjs + scripts/design-validate.mjs written. design:* scripts added to package.json.
+     DECISIONS_LOG.md and lessons.md entries written.
+     ```
+
+  Step 20 is non-blocking. Bootstrap proceeds to Step 20b.
+
+Step 20b — Privacy & Compliance Scaffold (NEW V32.9 — non-blocking)
+
+  After Step 20 completes — execute the following automatically:
+
+  A) Write `components/ui/compliance-footer.tsx` (canonical source: templates.md §ComplianceFooter):
+     Copy the full component from templates.md §V32.9 `ComplianceFooter`.
+     Default-ON badges: Philippine Data Privacy Act–Aligned, WCAG 2.2 AA, Privacy by Design, OWASP ASVS.
+     Default-OFF: ISO 27001, SOC 2, PCI DSS (enable only if client holds the real certificate).
+
+  B) Write Prisma consent + retention model stubs in `packages/db/prisma/schema.prisma`
+     (add at the END of the file, after existing models — do not overwrite):
+     ```prisma
+     // ── PRIVACY & COMPLIANCE STUBS (V32.9 — Hook 18) ──────────────────────────
+     // These models scaffold PH DPA (RA 10173) data subject rights (DSR) and
+     // retention requirements. Expand in Phase 4 Part 3 per PRODUCT.md §Data Entities.
+
+     model ConsentRecord {
+       id          String   @id @default(cuid())
+       tenantId    String
+       userId      String
+       purpose     String                     // e.g. "marketing", "analytics", "service-delivery"
+       lawfulBasis String                     // "consent" | "legitimate-interest" | "legal-obligation"
+       granted     Boolean
+       grantedAt   DateTime?
+       revokedAt   DateTime?
+       ipAddress   String?
+       userAgent   String?
+       createdAt   DateTime @default(now())
+       updatedAt   DateTime @updatedAt
+
+       @@index([tenantId, userId])
+       @@index([tenantId, purpose])
+     }
+
+     model DataSubjectRequest {
+       id          String   @id @default(cuid())
+       tenantId    String
+       userId      String
+       type        String                     // "access" | "rectification" | "erasure" | "portability" | "object"
+       status      String   @default("pending") // "pending" | "in-progress" | "completed" | "denied"
+       requestedAt DateTime @default(now())
+       resolvedAt  DateTime?
+       notes       String?
+       resolvedBy  String?
+
+       @@index([tenantId, userId])
+       @@index([tenantId, status])
+     }
+     ```
+
+  C) Write DSR route placeholder in `packages/api/src/routers/dsr.ts`:
+     ```ts
+     // DSR router — Data Subject Request procedures (V32.9 — PH DPA RA 10173 §16)
+     // Expand in Phase 4 Part 4 per PRODUCT.md §Modules and .ai_prompt/privacy.md
+
+     import { router, protectedProcedure } from "../trpc";
+     import { z } from "zod";
+
+     export const dsrRouter = router({
+       // Submit a data subject request (access, erasure, portability, etc.)
+       submit: protectedProcedure
+         .input(z.object({
+           type: z.enum(["access", "rectification", "erasure", "portability", "object"]),
+           notes: z.string().optional(),
+         }))
+         .mutation(async ({ ctx, input }) => {
+           // TODO Phase 4 Part 4: implement DSR workflow + 30-day SLA tracking
+           // Reference: .ai_prompt/privacy.md §Data Subject Rights
+           throw new Error("DSR submission not yet implemented — expand in Phase 4 Part 4");
+         }),
+
+       // List the requesting user's own DSRs
+       list: protectedProcedure
+         .query(async ({ ctx }) => {
+           // TODO Phase 4 Part 4: return ctx.db.dataSubjectRequest.findMany(...)
+           throw new Error("DSR list not yet implemented — expand in Phase 4 Part 4");
+         }),
+     });
+     ```
+
+  D) Append to docs/DECISIONS_LOG.md (LOCKED):
+     ```
+     ## LOCKED: Privacy & Compliance Scaffold — PH DPA + WCAG 2.2 AA (V32.9)
+
+     Decision: V32.9 scaffolds ConsentRecord + DataSubjectRequest Prisma stubs and a DSR tRPC
+     router placeholder at Bootstrap. These are expanded in Phase 4 Part 3 (Prisma schema) and
+     Phase 4 Part 4 (tRPC routers) per PRODUCT.md §Data Entities and .ai_prompt/privacy.md.
+     ComplianceFooter component scaffolded with honest badge policy (default-ON: PH DPA, WCAG 2.2 AA,
+     Privacy by Design, OWASP ASVS; cert badges OFF by default).
+     Locked at Bootstrap Step 20b. Hook 18 (memory-governance.md §3) surfaces any gaps during Phase 4.
+     ```
+
+  E) Append to .cline/memory/lessons.md (Rule 18 typed format, type = 🟤 decision):
+     ```
+     ## {{DATE}} — 🟤 decision Privacy & Compliance Scaffold locked (V32.9)
+     - Type:      🟤 decision
+     - Phase:     Bootstrap Step 20b
+     - Files:     components/ui/compliance-footer.tsx, packages/db/prisma/schema.prisma (stubs),
+                  packages/api/src/routers/dsr.ts (placeholder)
+     - Concepts:  PH-DPA, RA-10173, NPC, WCAG-2.2-AA, DSR, consent, data-retention, compliance, V32.9
+     - Narrative: V32.9 scaffolds privacy/compliance at Bootstrap so the structures exist from day one.
+       ConsentRecord + DataSubjectRequest models provide the Prisma foundation for PH DPA compliance.
+       DSR router placeholder is expanded in Phase 4 Part 4. ComplianceFooter uses honest badge defaults —
+       only assertions backed by framework enforcement are ON by default. Cert badges require real certs.
+     ```
+
+  F) Append to .cline/memory/agent-log.md:
+     ```
+     {{TIMESTAMP}}  BOOTSTRAP  Step 20b — Privacy & Compliance Scaffold complete (V32.9).
+     ComplianceFooter written. ConsentRecord + DataSubjectRequest Prisma stubs appended.
+     DSR tRPC router placeholder written. DECISIONS_LOG.md and lessons.md entries written.
+     Read .ai_prompt/privacy.md during Phase 4 Part 3 to expand stubs into full implementation.
+     ```
+
+  Step 20b is non-blocking. Bootstrap proceeds to completion.
+
+After Claude Code finishes all 20 steps (including Step 20b), OUTPUT THE FOLLOWING TEXT TO THE HUMAN. Do not execute these instructions yourself — they are for the human to read:
 ```
 ✅ Bootstrap complete — CREDENTIALS.md written with AI-generated secrets + blank placeholders.
+✅ Privacy & Compliance Scaffold complete (V32.9) — ConsentRecord/DataSubjectRequest Prisma stubs,
+   DSR tRPC router placeholder, and ComplianceFooter component written. Expand in Phase 4 Parts 3-4.
 
 ⏳ CREDENTIALS TO FILL BEFORE PHASE 5:
    Open CREDENTIALS.md and fill in the sections marked "⏳ FILL LATER":
@@ -1039,7 +1424,7 @@ Next steps — proceed immediately, fill credentials in parallel:
 8. Install accessibility (a11y) skill for apps with WCAG AA requirement (NEW V23):
    Conditional — only if PRODUCT.md Non-functional Requirements declares: accessibility: wcag_aa
    /plugin install a11y-skill (or) npx skills add airowe/claude-a11y-skill
-   Runs WCAG 2.1 A/AA audit: contrast ratios (4.5:1 normal, 3:1 large), focus rings,
+   Runs WCAG 2.2 AA audit (axe-core/Pa11y rulesets): contrast ratios (4.5:1 normal, 3:1 large), focus rings,
    alt text, ARIA labels, keyboard navigation, form labels. Pre-delivery checklist enforced.
    Required for MGE (Philippine Data Privacy Act WCAG AA mandate). Recommended for ERP.
 

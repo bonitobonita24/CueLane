@@ -62,3 +62,10 @@ openclaw-handoff.md
 # ─── Credentials master list ───
 
 # ─── Third-Party AI Tool Artifacts (safety net) ───
+
+# ─── Build + TypeScript cache (Spec-Driven V32) ───
+
+# ─── V32.8 Design Toolkit artifacts ───
+tokens/build/
+tests/visual/__snapshots__/
+tests/visual/diff/

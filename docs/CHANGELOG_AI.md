@@ -5,6 +5,34 @@ Format: Rule 15 — Agent attribution required on every entry.
 
 ---
 
+## 2026-06-30 — Framework sync V31.3 → V32.18 (governance layer only)
+
+- Agent:               CLAUDE_CODE
+- Why:                 Governance-only framework upgrade from V31.3 to V32.18. Migrated versioned _v31 filenames to unversioned canonical names (Master_Prompt.md, CLAUDE_compact.md, etc.); removed 6 _v31 orphan files from .ai_prompt/; deployed 26 framework deliverables including new layers: V32.7 on-demand loading, V32.8 design-as-contract (LESSONS_REGISTRY.md, design-stop-hook.sh), V32.9 compliance (privacy.md), V32.12 design-principles.md, V32.14 motion.md, V32.17 lint-design.sh, V32.18 App-Hardening Harvest (AI/LLM/MCP + API-authz + injection security layer, Security_Checklist 98→114 items). No app source code touched.
+- Files removed:
+  - `.ai_prompt/AI_Tools_Skills_MCPs_Reference_v31.md` — replaced by `.ai_prompt/AI_Tools_Reference.md`
+  - `.ai_prompt/CLAUDE_v31_compact.md` — replaced by `.ai_prompt/CLAUDE_compact.md` + `CLAUDE.md`
+  - `.ai_prompt/ChatGPT_V31_Cross_Audit_Prompt.md` — replaced by `.ai_prompt/ChatGPT_Cross_Audit.md`
+  - `.ai_prompt/Framework_Feature_Index_v31.md` — replaced by `.ai_prompt/Framework_Feature_Index.md`
+  - `.ai_prompt/Master_Prompt_v31.md` — replaced by `AI/Master_Prompt.md`
+  - `.ai_prompt/Post_Generation_Security_Checklist_v31.md` — replaced by `.ai_prompt/Security_Checklist.md`
+  - `.ai_prompt/Product_md_Planning_Assistant_v31.md` — replaced by `.ai_prompt/Planning_Assistant.md`
+- Files added (new deliverables):
+  - `AI/Master_Prompt.md` — unversioned canonical, V32.18
+  - `.claude/agents/spec-executor.md` — Sonnet executor subagent (V32.7.2)
+  - `scripts/lint-deploy.sh` — pre-deploy footgun gate (V32.7.5)
+  - `scripts/design-stop-hook.sh` — Stop hook (V32.8)
+  - `scripts/lint-design.sh` — design anti-slop gate (V32.17)
+  - `.ai_prompt/privacy.md` — PH Data Privacy + WCAG 2.2 AA gate (V32.9)
+  - `.ai_prompt/design-principles.md` — design-principles reference (V32.12)
+  - `.ai_prompt/motion.md` — motion-principles reference (V32.14)
+  - `.ai_prompt/LESSONS_REGISTRY.md` — append-only learning registry (V32.8)
+- Files overwritten (framework governance):
+  - `CLAUDE.md` — compact rules card, now V32.18
+  - `.claude/settings.json` — framework keys injected, existing keys preserved
+
+---
+
 ## 2026-05-17 — Email provider swap: Resend → SMTP
 
 - Agent:               CLAUDE_CODE
