@@ -78,3 +78,6 @@ coverage/
 
 # ─── pnpm patch files ───
 patches/
+
+# Local test evidence (screenshots, QA runs) — project-local, not versioned
+test-artifacts/

@@ -2,7 +2,11 @@ import type { NextAuthConfig } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { prisma } from '@cuelane/db';
+// Auth runs BEFORE any tenant context exists (login is what establishes it), so
+// the L6 tenant-guard (`prisma`) would throw "No tenant context active" here.
+// Use the sanctioned unguarded client for this pre-auth/system-bootstrap lookup —
+// the query below is still manually scoped by `tenantId`, preserving isolation.
+import { prismaRaw } from '@cuelane/db';
 import { Role } from '@cuelane/shared';
 import { authConfigEdge } from './config.edge';
 
@@ -40,7 +44,7 @@ export const authConfig: NextAuthConfig = {
         const { identifier, password, tenantSlug } = parsed.data;
 
         // Resolve tenant first — prevents cross-tenant name collision.
-        const tenant = await prisma.tenant.findUnique({
+        const tenant = await prismaRaw.tenant.findUnique({
           where: { slug: tenantSlug },
           select: { id: true },
         });
@@ -48,7 +52,7 @@ export const authConfig: NextAuthConfig = {
 
         // TODO(schema-gap): Query by email once `email` column is added to User.
         // Currently matches by name (acting as unique username per tenant).
-        const user = await prisma.user.findFirst({
+        const user = await prismaRaw.user.findFirst({
           where: {
             name: identifier,
             role: { in: ['admin'] },
