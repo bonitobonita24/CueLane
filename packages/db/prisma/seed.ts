@@ -10,14 +10,15 @@
 // Requires: DATABASE_URL env var pointing to a running Postgres instance
 
 import { PrismaClient, type Prisma } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// Dev-only PIN hash. Production uses bcrypt (implemented in Part 5 auth layer).
-// Never use SHA-256 for passwords in production — bcrypt/argon2 only.
-function hashPinDev(pin: string): string {
-  return createHash('sha256').update(`cuelane_dev_salt_${pin}`).digest('hex');
+// PIN hash — bcrypt, to MATCH the Auth.js credentials provider which verifies
+// with bcrypt.compare(password, user.pin). (Previously SHA-256, which silently
+// failed every login because the provider never SHA-hashes the input.)
+function hashPin(pin: string): string {
+  return bcrypt.hashSync(pin, 10);
 }
 
 async function main(): Promise<void> {
@@ -129,7 +130,7 @@ async function main(): Promise<void> {
       tenantId: tenant.id,
       name: 'Branch Admin',
       role: 'admin',
-      pin: hashPinDev('0000'),
+      pin: hashPin('0000'),
     },
   });
 
@@ -141,7 +142,7 @@ async function main(): Promise<void> {
       tenantId: tenant.id,
       name: 'Alice Santos',
       role: 'employee',
-      pin: hashPinDev('1234'),
+      pin: hashPin('1234'),
     },
   });
 
@@ -153,7 +154,7 @@ async function main(): Promise<void> {
       tenantId: tenant.id,
       name: 'Bob Reyes',
       role: 'employee',
-      pin: hashPinDev('5678'),
+      pin: hashPin('5678'),
     },
   });
 
