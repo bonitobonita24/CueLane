@@ -27,8 +27,13 @@ case "$ENV" in
     COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cuelane_dev}"
     export COMPOSE_PROJECT_NAME
     # Dev: run infra + app together; app service uses build: (rebuilds from source)
+    # --project-directory is required: Docker Compose v5 resolves --env-file and
+    # relative build contexts (build.context: .) against the project directory,
+    # which otherwise defaults to the first -f file's directory (deploy/compose/dev/),
+    # not the repo root — causing a false "env file not found" and a wrong build context.
     exec docker compose \
       --project-name "$COMPOSE_PROJECT_NAME" \
+      --project-directory "$REPO_ROOT" \
       -f "$SCRIPT_DIR/dev/docker-compose.infra.yml" \
       -f "$SCRIPT_DIR/dev/docker-compose.app.yml" \
       --env-file "$REPO_ROOT/.env.dev" \
@@ -40,6 +45,7 @@ case "$ENV" in
     # Staging: app services only — infra is a separate pre-existing stack on the server
     exec docker compose \
       --project-name "$COMPOSE_PROJECT_NAME" \
+      --project-directory "$REPO_ROOT" \
       -f "$SCRIPT_DIR/stage/docker-compose.app.yml" \
       --env-file "$REPO_ROOT/.env.staging" \
       "$@"
@@ -50,6 +56,7 @@ case "$ENV" in
     # Production: app services only — manual promotion, never auto-deployed
     exec docker compose \
       --project-name "$COMPOSE_PROJECT_NAME" \
+      --project-directory "$REPO_ROOT" \
       -f "$SCRIPT_DIR/prod/docker-compose.app.yml" \
       --env-file "$REPO_ROOT/.env.prod" \
       "$@"
