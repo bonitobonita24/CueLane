@@ -81,6 +81,7 @@ export interface Tenant {
 export interface Service {
   id: string;
   tenantId: string;
+  number: number;  // per-tenant ordinal — regular-ticket prefix, e.g. the "1" in "1-003"
   name: string;
   icon: string;    // emoji from 16 options
   color: string;   // hex from 12 options
@@ -103,9 +104,11 @@ export interface User {
 }
 
 export interface Ticket {
-  id: string;           // P-NNN (priority) or {serviceNumber}-NNN (regular)
+  id: string;            // cuid primary key
   tenantId: string;
   serviceId: string;
+  number: string;        // P-NNN (priority) or {serviceNumber}-NNN (regular) — persisted display number
+  sequence: number;       // numeric part of `number`, e.g. 3 for "1-003"
   status: TicketStatus;
   windowId: string | null;
   createdAt: Date;

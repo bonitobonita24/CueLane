@@ -5,7 +5,7 @@
 // SessionMap is tracked in Valkey (in-memory pub/sub) — no Prisma model for it.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // native  = the build/dev host engine.
   // linux-musl-openssl-3.0.x = the Docker runtime (node:22-alpine, musl + OpenSSL 3).
   // Without the musl target the container fails: "Query Engine for runtime linux-musl not found".
@@ -84,6 +84,7 @@ model Tenant {
   users               User[]
   userServices        UserService[]
   tickets             Ticket[]
+  sequenceCounters    SequenceCounter[]
   playlistEntries     PlaylistEntry[]
   tenantAds           TenantAd[]
   subscription        Subscription?
@@ -96,9 +97,10 @@ model Tenant {
 model Service {
   id        String   @id @default(cuid())
   tenantId  String   @map("tenant_id")
+  number    Int // per-tenant ordinal — regular-ticket prefix, e.g. the "1" in "1-003"
   name      String
-  icon      String   // emoji from 16 supported options
-  color     String   // hex from 12 supported options
+  icon      String // emoji from 16 supported options
+  color     String // hex from 12 supported options
   avgTime   Int      @map("avg_time") // estimated minutes per ticket
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -107,6 +109,7 @@ model Service {
   tickets      Ticket[]
   userServices UserService[]
 
+  @@unique([tenantId, number])
   @@index([tenantId])
   @@map("services")
 }
@@ -163,19 +166,22 @@ model UserService {
 }
 
 model Ticket {
-  // ID format (P-NNN / {serviceNumber}-NNN) is generated in app logic, not DB default.
   id                   String       @id @default(cuid())
   tenantId             String       @map("tenant_id")
   serviceId            String       @map("service_id")
+  // Display number, e.g. "1-003" (regular, prefixed by Service.number) or "P-001" (priority).
+  // Persisted at issue time via the atomic SequenceCounter allocator — never derived by count().
+  number               String
+  sequence             Int // numeric part of `number`, e.g. 3 for "1-003"
   status               TicketStatus @default(waiting)
   windowId             String?      @map("window_id")
   servedBy             String?      @map("served_by")
   priority             Boolean      @default(false)
   transferred          Boolean      @default(false)
   transferredFrom      String?      @map("transferred_from") // windowId origin of transfer
-  returnTo             String?      @map("return_to")        // windowId to auto-return after transfer done
-  returnedFromTransfer Boolean      @default(false)          @map("returned_from_transfer")
-  createdAt            DateTime     @default(now())          @map("created_at")
+  returnTo             String?      @map("return_to") // windowId to auto-return after transfer done
+  returnedFromTransfer Boolean      @default(false) @map("returned_from_transfer")
+  createdAt            DateTime     @default(now()) @map("created_at")
   calledAt             DateTime?    @map("called_at")
   completedAt          DateTime?    @map("completed_at")
 
@@ -188,7 +194,23 @@ model Ticket {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, createdAt])
   @@map("tickets")
+}
+
+// Atomic per-tenant numbering source for ticket issuance (T1). Not a GLOBAL_MODEL — tenant-scoped,
+// guarded like every other tenant table. Key convention: regular = "<serviceId>:<YYYYMMDD>",
+// priority = "priority:<YYYYMMDD>" — daily reset is implicit in the key, no cron needed.
+model SequenceCounter {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+  key      String
+  value    Int    @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@map("sequence_counters")
 }
 
 model PlaylistEntry {
@@ -196,14 +218,14 @@ model PlaylistEntry {
   tenantId   String    @map("tenant_id")
   type       MediaType
   title      String
-  videoId    String?   @map("video_id")    // YouTube video ID
+  videoId    String?   @map("video_id") // YouTube video ID
   storageKey String?   @map("storage_key") // MinIO/S3 key for local files
   fileName   String    @map("file_name")
-  fileSize   Int       @map("file_size")   // bytes
+  fileSize   Int       @map("file_size") // bytes
   fileExt    String    @map("file_ext")
-  isLive     Boolean   @default(false)     @map("is_live") // YouTube live stream flag
+  isLive     Boolean   @default(false) @map("is_live") // YouTube live stream flag
   sortOrder  Int       @map("sort_order")
-  createdAt  DateTime  @default(now())     @map("created_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -217,14 +239,14 @@ model SystemAd {
   id         String   @id @default(cuid())
   type       AdType
   title      String
-  videoId    String?  @map("video_id")    // YouTube video ID
+  videoId    String?  @map("video_id") // YouTube video ID
   storageKey String?  @map("storage_key") // MinIO/S3 key for uploaded files
   fileName   String   @map("file_name")
-  fileSize   Int      @map("file_size")   // bytes
-  duration   Int      // seconds (admin-entered estimate)
+  fileSize   Int      @map("file_size") // bytes
+  duration   Int // seconds (admin-entered estimate)
   enabled    Boolean  @default(true)
-  sortOrder  Int      @map("sort_order")  // chronological play order
-  createdAt  DateTime @default(now())     @map("created_at")
+  sortOrder  Int      @map("sort_order") // chronological play order
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("system_ads")
 }
@@ -239,7 +261,7 @@ model TenantAd {
   storageKey String?  @map("storage_key")
   fileName   String   @map("file_name")
   fileSize   Int      @map("file_size")
-  duration   Int      // seconds (admin-entered estimate)
+  duration   Int // seconds (admin-entered estimate)
   sortOrder  Int      @map("sort_order")
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -256,7 +278,7 @@ model Subscription {
   startDate        DateTime      @map("start_date")
   endDate          DateTime?     @map("end_date")
   downgradeAt      DateTime?     @map("downgrade_at") // tier reverts to free on this date
-  paymentStatus    PaymentStatus @default(free)        @map("payment_status")
+  paymentStatus    PaymentStatus @default(free) @map("payment_status")
   xenditPlanId     String?       @map("xendit_plan_id")
   xenditCustomerId String?       @map("xendit_customer_id")
 
@@ -289,8 +311,8 @@ model AuditLog {
   id        String   @id @default(cuid())
   tenantId  String?  @map("tenant_id")
   userId    String   @map("user_id")
-  action    String   // CREATE | UPDATE | DELETE
-  entity    String   // table name
+  action    String // CREATE | UPDATE | DELETE
+  entity    String // table name
   entityId  String   @map("entity_id")
   before    Json?
   after     Json?

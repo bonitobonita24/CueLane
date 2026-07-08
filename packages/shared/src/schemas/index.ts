@@ -137,7 +137,7 @@ export const createTicketSchema = z.object({
 });
 
 export const updateTicketStatusSchema = z.object({
-  ticketId: z.string().min(1), // P-NNN or {svcNum}-NNN format
+  ticketId: idSchema, // Ticket.id (cuid) — NOT the display `number` (e.g. "1-003"/"P-001")
   status: z.nativeEnum(TicketStatus),
   windowId: idSchema.nullable().optional(),
   servedBy: idSchema.nullable().optional(),
@@ -145,7 +145,7 @@ export const updateTicketStatusSchema = z.object({
 
 export const transferTicketSchema = z
   .object({
-    ticketId: z.string().min(1),
+    ticketId: idSchema, // Ticket.id (cuid)
     toWindowId: idSchema,
     returnAfterDone: z.boolean().default(false),
     returnToWindowId: idSchema.optional(),
@@ -161,7 +161,7 @@ export const transferTicketSchema = z
   });
 
 export const recallTicketSchema = z.object({
-  ticketId: z.string().min(1),
+  ticketId: idSchema, // Ticket.id (cuid)
   priority: z.boolean().default(false), // true = Priority Recall (auto-skips current)
 });
 

@@ -78,22 +78,36 @@ async function main(): Promise<void> {
     { name: 'Withdrawal',      icon: '💳', color: '#F59E0B', avgTime: 7 },
   ];
 
-  const services = await Promise.all(
-    serviceData.map((s) =>
-      prisma.service.upsert({
-        where: { id: `seed-svc-${tenant.id}-${s.name.toLowerCase().replace(/\s+/g, '-')}` },
-        update: {},
-        create: {
-          id: `seed-svc-${tenant.id}-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
-          tenantId: tenant.id,
-          name: s.name,
-          icon: s.icon,
-          color: s.color,
-          avgTime: s.avgTime,
-        },
-      })
-    )
+  // number = 1-based per-tenant ordinal in serviceData order — matches the ROW_NUMBER()
+  // backfill in migration 20260708120000_queue_engine_backbone for pre-existing rows, and
+  // seeds it correctly for a fresh tenant. Two-phase + sequential (not Promise.all): a reseed's
+  // `number` reassignment can collide with the live (tenant_id, number) unique constraint if the
+  // existing DB order (by created_at, set by a prior concurrent seed run) differs from
+  // serviceData's declared order — phase 1 moves every row to a negative scratch number (never
+  // collides with a real 1..N), phase 2 assigns the final positive numbers.
+  const serviceIds = serviceData.map(
+    (s) => `seed-svc-${tenant.id}-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
   );
+  for (const [idx, id] of serviceIds.entries()) {
+    await prisma.service.upsert({
+      where: { id },
+      update: { number: -(idx + 1) },
+      create: {
+        id,
+        tenantId: tenant.id,
+        number: -(idx + 1),
+        name: serviceData[idx]!.name,
+        icon: serviceData[idx]!.icon,
+        color: serviceData[idx]!.color,
+        avgTime: serviceData[idx]!.avgTime,
+      },
+    });
+  }
+  const services: Awaited<ReturnType<typeof prisma.service.upsert>>[] = [];
+  for (const [idx, id] of serviceIds.entries()) {
+    const svc = await prisma.service.update({ where: { id }, data: { number: idx + 1 } });
+    services.push(svc);
+  }
 
   console.log(`  ✓ Services: ${services.map((s) => s.name).join(', ')}`);
 
@@ -198,13 +212,18 @@ async function main(): Promise<void> {
 
   const [win1, win2] = windows as [typeof windows[0], typeof windows[0]];
 
+  // number/sequence backfilled to match the same scheme as migration
+  // 20260708120000_queue_engine_backbone: regular tickets sequence per tenant+service,
+  // priority tickets sequence per tenant, both "P-NNN" / "{service.number}-NNN" 3-digit padded.
   const ticket1 = await prisma.ticket.upsert({
     where: { id: `seed-tkt-${tenant.id}-001` },
-    update: {},
+    update: { number: `${svcDeposit.number}-001`, sequence: 1 },
     create: {
       id: `seed-tkt-${tenant.id}-001`,
       tenantId: tenant.id,
       serviceId: svcDeposit.id,
+      number: `${svcDeposit.number}-001`,
+      sequence: 1,
       status: 'waiting',
       priority: false,
     },
@@ -212,11 +231,13 @@ async function main(): Promise<void> {
 
   const ticket2 = await prisma.ticket.upsert({
     where: { id: `seed-tkt-${tenant.id}-002` },
-    update: {},
+    update: { number: `${svcLoan.number}-001`, sequence: 1 },
     create: {
       id: `seed-tkt-${tenant.id}-002`,
       tenantId: tenant.id,
       serviceId: svcLoan.id,
+      number: `${svcLoan.number}-001`,
+      sequence: 1,
       status: 'serving',
       priority: false,
       windowId: win1.id,
@@ -227,13 +248,15 @@ async function main(): Promise<void> {
 
   const ticket3 = await prisma.ticket.upsert({
     where: { id: `seed-tkt-${tenant.id}-003` },
-    update: {},
+    update: { number: 'P-001', sequence: 1 },
     create: {
       id: `seed-tkt-${tenant.id}-003`,
       tenantId: tenant.id,
       serviceId: svcDeposit.id,
+      number: 'P-001',
+      sequence: 1,
       status: 'completed',
-      priority: true, // priority ticket (P-001 format in app logic)
+      priority: true,
       windowId: win2.id,
       servedBy: alice.id,
       calledAt: new Date(Date.now() - 10 * 60 * 1000),
