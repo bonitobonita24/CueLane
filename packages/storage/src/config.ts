@@ -17,7 +17,7 @@ export interface StorageConfig {
  */
 function requireEnv(key: string, devDefault: string): string {
   const value = process.env[key];
-  if (value) return value;
+  if (value !== undefined && value !== '') return value;
   if (process.env['NODE_ENV'] === 'production') {
     throw new Error(
       `[storage] Required environment variable '${key}' is not set. ` +

@@ -29,9 +29,27 @@ Current build state. Rewritten after every feature update to reflect what exists
 - `src/index.ts` — createClient() vanilla tRPC v11 client; trpc = createTRPCReact<AppRouter>(); AppRouter=any placeholder (TODO S5 — replace with import type from apps/web); peerDep react >=18.2.0; no transformer on client (tRPC v11 — lives on server initTRPC)
 
 ### @cuelane/db — Not yet scaffolded (Phase 4 Part 3)
-### @cuelane/ui — Not yet scaffolded (Phase 4 Part 4)
-### @cuelane/jobs — Not yet scaffolded (Phase 4 Part 4)
-### @cuelane/storage — Not yet scaffolded (Phase 4 Part 4)
+
+### @cuelane/ui ✅ Phase 4 Part 4 complete (swarm/phase4-scaffold, 2026-07-08)
+- `tailwind.config.ts` — Tailwind v3, CSS-var colour tokens; fontFamily: DM Sans (sans), Outfit (display), Space Mono (mono); tailwindcss-animate plugin
+- `postcss.config.mjs` — tailwindcss + autoprefixer
+- `components.json` — shadcn New York style, cssVariables: true, tsx: true
+- `src/styles/globals.css` — full :root + .dark CSS variable blocks; HashiCorp DESIGN.md token mapping (Link Blue #2264d6 → --primary, Dark Charcoal #15181e → .dark --background, etc.); 8 [data-theme] accent presets (default/terraform/vault/waypoint/vagrant/purple/bright/amber-gold); .cl-label utility (13px uppercase 600 1.3px tracking)
+- `src/lib/utils.ts` — cn() via clsx + tailwind-merge
+- `src/components/ui/` — Button, Card, Input, Label, Select, Dialog, Badge, Table, Sonner (all New York style, forwardRef, TypeScript strict)
+- `src/index.ts` — barrel export
+
+### @cuelane/jobs ✅ Phase 4 Part 4 complete (swarm/phase4-scaffold, 2026-07-08)
+- `src/types.ts` — BaseTenantPayload (tenantId+userId), EmailJobPayload, ReportsJobPayload, WebhooksJobPayload, DlqPayload<T>
+- `src/connection.ts` — getConnectionOptions(): RedisOptions from VALKEY_URL (dev fallback: redis://localhost:41708); maxRetriesPerRequest:null (BullMQ required); TLS/password parsing; closeConnection() stub
+- `src/queues/email.ts` — emailQueue + emailDlq (BullMQ Queue<EmailJobPayload>); 3 attempts, exponential backoff, removeOnFail:false; addEmailJob() helper
+- `src/queues/reports.ts` — reportsQueue + reportsDlq; same pattern
+- `src/queues/webhooks.ts` — webhooksQueue + webhooksDlq; same pattern
+
+### @cuelane/storage ✅ Phase 4 Part 4 complete (swarm/phase4-scaffold, 2026-07-08)
+- `src/types.ts` — ALLOWED_MIME_TYPES (jpeg/png/gif/webp/mp4/pdf), BLOCKED_MIME_TYPES (svg+xml/html/js), MAX_FILE_SIZE_BYTES (10MB), MIME_TO_EXT map, SEGMENT_RE (/^[a-z0-9][a-z0-9_-]{0,63}$/), UploadInput/Result/GetSignedUrlInput, StorageValidationError, StorageAuthorizationError
+- `src/config.ts` — S3Client singleton from env (MINIO_ENDPOINT:41709 dev); requireEnv() fails-fast in production; getDefaultBucket()
+- `src/storage.ts` — validatePathSegment() (tenantId+entityType against SEGMENT_RE, prevents traversal); validateUpload() (blocklist→allowlist→path→size via body.byteLength); buildStorageKey (MIME_TO_EXT not originalFilename extension); assertTenantKey() (cross-tenant guard on read/delete/sign); putObject/getObject(tenantId)/deleteObject(tenantId)/getSignedDownloadUrl
 
 ## Apps
 _Not yet scaffolded — Phase 4 Parts 5-6_

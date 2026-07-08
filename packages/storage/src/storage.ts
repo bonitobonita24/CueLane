@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
-import { getS3Client, getDefaultBucket } from './config.js';
+import { getS3Client, getDefaultBucket } from './config';
 import {
   ALLOWED_MIME_TYPES,
   BLOCKED_MIME_TYPES,
@@ -18,7 +18,7 @@ import {
   type UploadInput,
   type UploadResult,
   type GetSignedUrlInput,
-} from './types.js';
+} from './types';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,9 +68,10 @@ function validateUpload(input: UploadInput): void {
   validatePathSegment(input.tenantId, 'tenantId');
   validatePathSegment(input.entityType, 'entityType');
 
-  // Size check
-  if (input.sizeBytes > MAX_FILE_SIZE_BYTES) {
-    const sizeMb = (input.sizeBytes / 1024 / 1024).toFixed(2);
+  // Size check — use body.byteLength as the authoritative value, not caller-supplied sizeBytes
+  const actualSize = input.body.byteLength;
+  if (actualSize > MAX_FILE_SIZE_BYTES) {
+    const sizeMb = (actualSize / 1024 / 1024).toFixed(2);
     throw new StorageValidationError(`File size ${sizeMb}MB exceeds the 10MB limit`);
   }
 }
@@ -96,7 +97,7 @@ export async function putObject(input: UploadInput, bucket?: string): Promise<Up
     Key: key,
     Body: input.body,
     ContentType: input.mimeType,
-    ContentLength: input.sizeBytes,
+    ContentLength: input.body.byteLength,
   });
 
   const response = await client.send(command);

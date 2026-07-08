@@ -5,6 +5,43 @@ Format: Rule 15 — Agent attribution required on every entry.
 
 ---
 
+## 2026-07-08 — Phase 4 Part 4: packages/ui + packages/jobs + packages/storage
+
+- Agent:               CLAUDE_CODE (swarm S3, worktree-isolated parallel agents)
+- Branch:              swarm/phase4-scaffold
+- Session:             S3 — Part 4
+
+### packages/ui (@cuelane/ui)
+- Added `tailwind.config.ts` — Tailwind v3, CSS-var colour system; fonts: DM Sans/Outfit/Space Mono; tailwindcss-animate plugin
+- Added `postcss.config.mjs` — tailwindcss + autoprefixer
+- Added `components.json` — shadcn New York style, cssVariables:true
+- Added `src/styles/globals.css` — full :root + .dark shadcn CSS variable blocks from HashiCorp DESIGN.md token mapping; 8 [data-theme] accent presets (default/terraform/vault/waypoint/vagrant/purple/bright/amber-gold); .cl-label utility
+- Added `src/lib/utils.ts` — cn() via clsx + tailwind-merge
+- Added 9 shadcn/ui New York style components: Button, Card, Input, Label, Select, Dialog, Badge, Table, Sonner
+- Added `src/index.ts` — barrel export
+
+### packages/jobs (@cuelane/jobs)
+- Added typed BullMQ queue definitions for 3 queues (email/reports/webhooks): Queue + DLQ pair each; 3 attempts/exponential backoff/removeOnFail:false per inputs.yml
+- Added `src/connection.ts` — getConnectionOptions() parses VALKEY_URL (dev: redis://localhost:41708); TLS/password-aware; maxRetriesPerRequest:null (BullMQ required)
+- Added `src/types.ts` — BaseTenantPayload (tenantId+userId), per-queue payload interfaces, DlqPayload<T>
+- Added addEmailJob/addReportsJob/addWebhookJob typed helpers
+
+### packages/storage (@cuelane/storage)
+- Added typed MinIO/S3 wrapper using @aws-sdk/client-s3
+- Added path-traversal guard: validatePathSegment() — SEGMENT_RE /^[a-z0-9][a-z0-9_-]{0,63}$/ on tenantId+entityType
+- Added MIME extension from MIME_TO_EXT map (not originalFilename — eliminates .jpg.php bypass)
+- Added body.byteLength size validation (not caller-supplied sizeBytes — eliminates size bypass)
+- Added assertTenantKey() — cross-tenant read/delete/sign guard
+- Added requireEnv() — production fails-fast if storage env vars missing
+- putObject/getObject(tenantId)/deleteObject(tenantId)/getSignedDownloadUrl
+
+### Code review fixes (in-scope blocking findings resolved)
+- Fixed: `.js` imports in packages/storage/src/ violated CLAUDE.md Rule 12 → removed .js extensions
+- Fixed: validateUpload() used caller-supplied sizeBytes instead of body.byteLength → now validates actual body
+- Deferred: DLQ queue objects defined but worker failure-event wiring missing → bucket-A question raised
+
+---
+
 ## 2026-06-30 — Framework sync V31.3 → V32.18 (governance layer only)
 
 - Agent:               CLAUDE_CODE
