@@ -19,7 +19,19 @@ Current build state. Rewritten after every feature update to reflect what exists
 - `.env.example` — added DIRECT_URL (postgres direct, migrations) + DATABASE_URL (pgbouncer pooled, runtime) + STORAGE_PORT
 
 ## Packages
-_Not yet scaffolded — Phase 4 Parts 2-4_
+
+### @cuelane/shared ✅ Phase 4 Part 2 complete (swarm/phase4-scaffold, 2026-07-08)
+- `src/types/index.ts` — enums: Role (employee|admin|super_admin), TenantTier, TenantStatus, VideoMode, TicketStatus, PaymentStatus, MediaType, AdType. Interfaces: Tenant, Service, Window, User, Ticket, PlaylistEntry, TenantAd, SystemAd, Subscription, PasswordResetToken. Plus: SessionMapEntry (Valkey in-memory, NOT a DB entity)
+- `src/schemas/index.ts` — Zod create/update/action schemas for all entities; discriminated unions for playlist/ad types; cross-field validation on transfer (returnAfterDone requires returnToWindowId); bounded reorder arrays; inferred z.infer<> types exported
+- `src/index.ts` — barrel export
+
+### @cuelane/api-client ✅ Phase 4 Part 2 complete (swarm/phase4-scaffold, 2026-07-08)
+- `src/index.ts` — createClient() vanilla tRPC v11 client; trpc = createTRPCReact<AppRouter>(); AppRouter=any placeholder (TODO S5 — replace with import type from apps/web); peerDep react >=18.2.0; no transformer on client (tRPC v11 — lives on server initTRPC)
+
+### @cuelane/db — Not yet scaffolded (Phase 4 Part 3)
+### @cuelane/ui — Not yet scaffolded (Phase 4 Part 4)
+### @cuelane/jobs — Not yet scaffolded (Phase 4 Part 4)
+### @cuelane/storage — Not yet scaffolded (Phase 4 Part 4)
 
 ## Apps
 _Not yet scaffolded — Phase 4 Parts 5-6_

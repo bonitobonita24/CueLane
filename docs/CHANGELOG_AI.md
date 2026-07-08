@@ -122,3 +122,25 @@ Format: Rule 15 — Agent attribution required on every entry.
 - Errors resolved:     none
 
 ---
+
+## 2026-07-08 — Phase 4 Part 2: packages/shared + packages/api-client
+
+- Agent:               CLAUDE_CODE (swarm S2, run-9)
+- Branch:              swarm/phase4-scaffold
+- Files added:
+  - `packages/shared/package.json` — name @cuelane/shared; exports ./src/index.ts; dep zod ^3.25
+  - `packages/shared/tsconfig.json` — extends ../../tsconfig.base.json; composite; outDir dist
+  - `packages/shared/src/types/index.ts` — TS enums (Role, TenantTier, TenantStatus, VideoMode, TicketStatus, PaymentStatus, MediaType, AdType) + interfaces for all 11 entities (Tenant, Service, Window, User, Ticket, PlaylistEntry, TenantAd, SystemAd, Subscription, PasswordResetToken) + SessionMapEntry (Valkey in-memory type only)
+  - `packages/shared/src/schemas/index.ts` — Zod create/update schemas for all entities; discriminated unions for PlaylistEntry and Ad types; cross-field superRefine on transferTicketSchema; bounded reorder arrays (.max(500/.max(100)); inferred input types
+  - `packages/shared/src/index.ts` — barrel: export * from types + schemas
+  - `packages/api-client/package.json` — name @cuelane/api-client; deps @trpc/client+server+react-query ^11 + @tanstack/react-query ^5; peerDep react >=18.2.0; no superjson dep (transformer lives on server per tRPC v11)
+  - `packages/api-client/tsconfig.json` — extends base; composite; jsx react-jsx
+  - `packages/api-client/src/index.ts` — createClient() (vanilla tRPC v11 httpBatchLink); createTRPCReact<AppRouter>() export; AppRouter=any TODO(S5) placeholder; no transformer on client (tRPC v11)
+- Files modified:
+  - `pnpm-lock.yaml` — added zod, @trpc/*, @tanstack/react-query, superjson, react snapshots
+- Schema/migrations:   none (types/schemas layer only)
+- Errors encountered:  ZodNativeEnum.exclude() does not exist (fixed: z.enum literal); tRPC v11 removed client-side transformer (fixed: dropped superjson from httpBatchLink); ESLint strict-boolean-expressions on optional string (fixed: explicit === undefined); unused PaymentStatus import in schemas (removed)
+- Errors resolved:     All — lint/typecheck/build green
+- Code review:         4 confirmed findings fixed in-scope: (1) transferTicketSchema missing cross-field guard for returnAfterDone=true+no returnToWindowId; (2) updatePlaylistEntrySchema allowed isLive on Local entries; (3) reorder schemas unbounded arrays; (4) orphaned superjson dep + missing react peer dep. 2 deferred findings raised as bucket-A questions for conductor.
+
+---
