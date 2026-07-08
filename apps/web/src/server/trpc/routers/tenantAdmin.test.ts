@@ -100,11 +100,10 @@ describe('tenantAdminRouter (Wave 7.6-T4)', () => {
     const updated = await admin.tenantAdmin.updateSettings({ settings: { theme: 'ocean' } });
     expect((updated.settings as { theme?: string }).theme).toBe('ocean');
 
-    await expect(
-      admin.tenantAdmin.updateSettings({
-        settings: { theme: 'not-a-real-preset' } as unknown as { theme: 'ocean' },
-      }),
-    ).rejects.toBeDefined();
+    const invalidThemeInput = { settings: { theme: 'not-a-real-preset' } } as unknown as Parameters<
+      typeof admin.tenantAdmin.updateSettings
+    >[0];
+    await expect(admin.tenantAdmin.updateSettings(invalidThemeInput)).rejects.toBeDefined();
   });
 
   it('updateSettings can update companyName/tagline without touching settings JSON', async () => {

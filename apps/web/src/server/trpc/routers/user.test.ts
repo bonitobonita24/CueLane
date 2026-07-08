@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { NextRequest } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prismaRaw } from '@cuelane/db';
-import { Role, SERVICE_ICON_OPTIONS, SERVICE_COLOR_OPTIONS } from '@cuelane/shared';
+import { Role } from '@cuelane/shared';
 import { appRouter } from '../root';
 import { createCallerFactory } from '../trpc';
 import type { Context } from '../context';
