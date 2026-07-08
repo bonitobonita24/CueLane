@@ -16,18 +16,25 @@ export default async function KioskPage({ params }: KioskPageProps) {
   // fields too, so it re-selects (defense-in-depth, same pattern as layout.tsx).
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { companyName: true, tagline: true, status: true },
+    select: { companyName: true, tagline: true, status: true, settings: true },
   });
 
   if (tenant == null || tenant.status !== 'active') {
     notFound();
   }
 
+  // settings is an untyped Json column (see schema.prisma comment: { theme, printerConfig,
+  // tickerText, businessName, videoMode, liveStreamUrl }) — narrow defensively, default to no
+  // auto-print for any tenant that hasn't configured a kiosk printer.
+  const settings = tenant.settings as { printerConfig?: { enabled?: boolean } } | null;
+  const printEnabled = settings?.printerConfig?.enabled === true;
+
   return (
     <KioskClient
       tenantSlug={tenantSlug}
       companyName={tenant.companyName}
       tagline={tenant.tagline}
+      printEnabled={printEnabled}
     />
   );
 }

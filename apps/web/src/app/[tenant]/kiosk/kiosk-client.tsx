@@ -12,6 +12,9 @@ interface KioskClientProps {
   tenantSlug: string;
   companyName: string;
   tagline: string;
+  /** Tenant's Settings.printerConfig.enabled — gates whether we ever attempt window.print() at
+   *  all (see the printReceipt() comment below for why this matters). */
+  printEnabled: boolean;
 }
 
 interface KioskService {
@@ -33,7 +36,7 @@ const AUTO_RESET_MS = 5_000;
 
 const client = createClient('/api/trpc');
 
-export function KioskClient({ tenantSlug, companyName, tagline }: KioskClientProps) {
+export function KioskClient({ tenantSlug, companyName, tagline, printEnabled }: KioskClientProps) {
   const [services, setServices] = useState<KioskService[]>([]);
   const [counts, setCounts] = useState<{ waiting: number; serving: number } | null>(null);
   const [priorityMode, setPriorityMode] = useState(false);
@@ -74,6 +77,20 @@ export function KioskClient({ tenantSlug, companyName, tagline }: KioskClientPro
     };
   }, []);
 
+  // ⚠ IMPORTANT — window.print() is a MODAL, THREAD-BLOCKING browser API, not a fire-and-forget
+  // one. Calling it opens a native print dialog and suspends the calling script (and every
+  // same-origin frame sharing that renderer thread, including this component's own timers) until
+  // the dialog is dismissed. On a real kiosk this requires either (a) the browser launched in
+  // silent/kiosk-print mode (e.g. Chrome/Chromium `--kiosk-printing`, an OPS/deployment
+  // configuration outside this app's control — see deploy docs), or (b) a human physically
+  // dismissing the dialog. Without (a), calling print() unconditionally would freeze the ENTIRE
+  // kiosk (grid, auto-reset, everything) behind a dialog on every single ticket — the opposite of
+  // "auto-print, 5s auto-reset". Confirmed by a real hang during Playwright E2E verification
+  // (headless has no dialog to dismiss at all, so the call blocked indefinitely).
+  // Mitigation: gate the actual print() call behind `printEnabled` (Tenant.settings.printerConfig
+  // .enabled) — a tenant only opts into this when ops has configured a kiosk-mode printing
+  // browser for their hardware. The receipt markup is still built into the hidden iframe
+  // regardless (harmless, and ready the moment print is enabled).
   function printReceipt(ticket: IssuedTicket): void {
     const frame = printFrameRef.current;
     if (frame == null) return; // no printer surface available — degrade silently
@@ -105,16 +122,17 @@ export function KioskClient({ tenantSlug, companyName, tagline }: KioskClientPro
 </html>`);
       doc.close();
 
+      if (!printEnabled) return; // this tenant has no kiosk-mode printing browser configured
+
       const win = frame.contentWindow;
       if (win == null) return;
-      // Give the frame a tick to lay out before invoking print — degradable: a headless/no-printer
-      // dev environment throws here, which we swallow rather than crash the kiosk flow.
+      // Give the frame a tick to lay out before invoking print.
       setTimeout(() => {
         try {
           win.print();
         } catch {
-          // No printer / print() unsupported in this environment — the on-screen number is
-          // still the source of truth for the customer, so this is a silent no-op.
+          // print() unsupported in this environment — the on-screen number is still the source
+          // of truth for the customer, so this is a silent no-op.
         }
       }, 50);
     } catch {
