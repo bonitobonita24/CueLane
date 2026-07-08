@@ -65,7 +65,7 @@ services:
     healthcheck:
       # TCP-only: pg_isready is not installed in edoburu/pgbouncer (Alpine, minimal deps).
       # nc (busybox) is available; checking if port 5432 accepts connections is sufficient.
-      test: ["CMD-SHELL", "nc -z localhost 5432"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5432"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -140,7 +140,7 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     healthcheck:
       # wget is available in the pgadmin4 image; hits the health ping endpoint
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/misc/ping"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/misc/ping"]
       interval: 30s
       timeout: 10s
       retries: 3

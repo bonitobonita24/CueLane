@@ -5,6 +5,94 @@ Format: Rule 15 — Agent attribution required on every entry.
 
 ---
 
+## 2026-07-08 — Phase 4 Part 7: infra + CI (Docker images, Compose stage/prod, GitHub Actions)
+
+- Agent:               CLAUDE_CODE (swarm S7, headless worker session)
+- Branch:              swarm/phase4-scaffold
+- Session:             S7 — Part 7
+
+### apps/worker/Dockerfile (new)
+- Multi-stage build (deps → builder → runner); context: monorepo root
+- pnpm install --frozen-lockfile in deps stage; workspace package.json stubs for correct resolution
+- builder stage: root node_modules only (pnpm hoists — no per-package dirs); tsc build of all workspace deps in order then worker; inline Node script patches workspace exports from ./src/*.ts → ./dist/*.js so plain `node` resolves @cuelane/* at runtime
+- runner stage: scoped COPY only (no COPY . .) — node_modules + packages/*/dist + packages/*/package.json + apps/worker/dist + apps/worker/package.json; non-root user worker:nodejs
+- Code review fix: removed non-existent per-package node_modules COPY lines (pnpm hoists to root)
+
+### apps/worker/.dockerignore (new)
+- node_modules, dist, .turbo, .git, .env*, *.md, coverage
+
+### deploy/compose/dev/docker-compose.app.yml (new)
+- build: key (dev only) for web + worker; external network cuelane_dev
+- Healthcheck: wget http://127.0.0.1:3000/api/health (C4 compliant)
+
+### deploy/compose/stage/docker-compose.app.yml (new)
+- Web: image bonitobonita24/cuelane:${STAGING_IMAGE_TAG:-staging-latest}; NO build: key (C5)
+- Worker: image bonitobonita24/cuelane-worker:${STAGING_IMAGE_TAG:-staging-latest} (separate image)
+- Traefik: Host(cuelane-staging.powerbyte.app), certresolver=letsencrypt (lowercase, C2), tls=true (C3)
+- Resource limits: app mem_limit=640m/192m/cpus=1.0; worker mem_limit=512m/128m/cpus=1.0 (top-level, not deploy:)
+- Code review fix: worker now references cuelane-worker image (separate from web)
+
+### deploy/compose/prod/docker-compose.app.yml (new)
+- Web: image bonitobonita24/cuelane:${APP_IMAGE_TAG:-latest}
+- Worker: image bonitobonita24/cuelane-worker:${APP_IMAGE_TAG:-latest}
+- Host(cuelane.powerbyte.app); same certresolver/tls/resource-limit pattern as staging
+
+### deploy/compose/dev/docker-compose.infra.yml (updated)
+- Code review fix: pgbouncer healthcheck `nc -z localhost 5432` → `nc -z 127.0.0.1 5432` (C4)
+- Code review fix: pgAdmin healthcheck `http://localhost:80` → `http://127.0.0.1:80` (C4)
+
+### .env.staging.example + .env.prod.example (new)
+- All required vars: DATABASE_URL, DIRECT_URL, REDIS_URL, AUTH_SECRET, SMTP_*, XENDIT_*, TURNSTILE_*, STAGING_IMAGE_TAG/APP_IMAGE_TAG, TRAEFIK_NETWORK=proxy
+
+### deploy/compose/start.sh (new, +x)
+- Dispatches dev|stage|prod; sets COMPOSE_PROJECT_NAME per env (C7); dev runs infra+app compose; stage/prod app-only
+
+### deploy/compose/push.sh (new, +x)
+- docker login guard (C6); dev builds web (apps/web/Dockerfile) AND worker (apps/worker/Dockerfile) with buildx multi-arch; staging/prod re-tags both web + worker images atomically
+- Code review fix: builds both images (previously web only); WORKER_IMAGE=bonitobonita24/cuelane-worker
+
+### deploy/komodo-deploy.sh (new, +x)
+- Vendored from Server-Setups/Powerbyte-Hostinger/komodo/ci-deploy/komodo-deploy.sh
+
+### tools/validate-inputs.mjs (new)
+- Validates inputs.yml against schema; checks required fields + port uniqueness
+
+### tools/check-env.mjs (new)
+- Checks required env vars are set in .env files
+
+### tools/check-product-sync.mjs (new)
+- Rule 20 private tag leak check (GOVERNANCE_DOCS); PRODUCT.md ↔ inputs.yml alignment
+- Code review fix: dropped /g flag from PRIVATE_TAG_RE (stateful lastIndex unnecessary)
+
+### tools/hydration-lint.mjs (new)
+- Scans .tsx/.ts for SSR hydration mismatch patterns
+
+### COMMANDS.md (new)
+- Master operational reference: Docker start/stop/rebuild/push, DB, test, lint, governance, git, services URLs, credentials
+
+### deploy/k8s-scaffold/README.md (new)
+- Placeholder; K8s inactive by default (Rule 6); describes what Phase 7 would scaffold
+
+### .github/workflows/ci.yml (new)
+- pnpm/action-setup@v4 + setup-node@v4; pnpm install --frozen-lockfile; lint, typecheck, build; triggers on push+PR to all branches
+
+### .github/workflows/docker-publish.yml (new)
+- Push to main: builds BOTH web (apps/web/Dockerfile → bonitobonita24/cuelane) AND worker (apps/worker/Dockerfile → bonitobonita24/cuelane-worker) with buildx linux/amd64+arm64; tags sha-{7char} + staging-latest
+- Code review fix: added worker image build step (previously web only — worker CMD would crash); SHA via ${GITHUB_SHA:0:7}
+- Calls deploy/komodo-deploy.sh to pin CUELANE_STAGING_TAG + DeployStack
+
+### package.json (updated)
+- Added tools:* scripts; yaml ^2 devDependency (lockfile updated)
+
+### .gitignore (updated)
+- Added !.env.staging.example + !.env.prod.example exceptions
+
+### Code review gate (S7)
+- 5 confirmed findings fixed: (1) CI only built web image — worker CMD would crash on every staging deploy → added worker image build in CI; (2) per-package node_modules COPY → removed (pnpm hoists); (3) pgbouncer/pgAdmin localhost in healthchecks → 127.0.0.1 (C4); (4) PRIVATE_TAG_RE /g flag with stateful lastIndex → dropped /g; (5) ${github.sha | cut} → ${GITHUB_SHA:0:7}
+- lint-deploy.sh gate: all C1-C8 PASS (3 expected C1 WARNs: unset env vars at lint-time)
+
+---
+
 ## 2026-07-08 — Phase 4 Part 6: apps/worker (BullMQ worker boot — email/reports/webhooks)
 
 - Agent:               CLAUDE_CODE (swarm S6, headless worker session)

@@ -1,0 +1,64 @@
+# ═══════════════════════════════════════════════════════════════════════
+# CueLane — Staging App Stack
+# image: ONLY — pulls pre-built image from Docker Hub (NO build: key).
+# Traefik handles HTTPS routing via the external proxy network.
+#
+# Usage (on staging server):
+#   docker compose -f deploy/compose/stage/docker-compose.app.yml \
+#     --env-file .env.staging up -d
+#
+# Image tags are pinned via the STAGING_IMAGE_TAG Komodo Variable.
+# CI sets CUELANE_STAGING_TAG before deploying (see .github/workflows/docker-publish.yml).
+# ═══════════════════════════════════════════════════════════════════════
+
+name: cuelane_staging
+
+services:
+
+  # ── Next.js web app ──────────────────────────────────────────────────
+  app:
+    image: bonitobonita24/cuelane:${STAGING_IMAGE_TAG:-staging-latest}
+    container_name: cuelane_staging_app
+    restart: unless-stopped
+    mem_limit: 640m
+    mem_reservation: 192m
+    cpus: 1.0
+    env_file: .env.staging
+    networks:
+      - cuelane_staging
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cuelane-staging.rule=Host(`cuelane-staging.powerbyte.app`)"
+      - "traefik.http.routers.cuelane-staging.entrypoints=websecure"
+      - "traefik.http.routers.cuelane-staging.tls=true"
+      - "traefik.http.routers.cuelane-staging.tls.certresolver=letsencrypt"
+      - "traefik.http.services.cuelane-staging.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── BullMQ worker ────────────────────────────────────────────────────
+  worker:
+    image: bonitobonita24/cuelane-worker:${STAGING_IMAGE_TAG:-staging-latest}
+    container_name: cuelane_staging_worker
+    restart: unless-stopped
+    mem_limit: 512m
+    mem_reservation: 128m
+    cpus: 1.0
+    env_file: .env.staging
+    command: ["node", "apps/worker/dist/index.js"]
+    networks:
+      - cuelane_staging
+
+# ── Networks ─────────────────────────────────────────────────────────────
+networks:
+  cuelane_staging:
+    name: cuelane_staging
+    driver: bridge
+  proxy:
+    external: true
+    name: proxy

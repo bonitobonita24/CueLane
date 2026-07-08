@@ -74,11 +74,30 @@ Current build state. Rewritten after every feature update to reflect what exists
 - `src/processors/reports.processor.ts` — skeleton; withTenant(tenantId) scoped; TODO Phase 8
 - `src/processors/webhooks.processor.ts` — skeleton; withTenant(tenantId) scoped; TODO Phase 8 (Xendit validation)
 
-## Infrastructure
-_Not yet scaffolded — Phase 4 Part 7_
+## Infrastructure ✅ Phase 4 Part 7 complete (swarm/phase4-scaffold, 2026-07-08)
+- `apps/web/Dockerfile` — multi-stage (deps→builder→runner); Next.js standalone output; non-root user nextjs:nodejs
+- `apps/web/.dockerignore` — node_modules, .next, dist, .git, .env*, .turbo
+- `apps/worker/Dockerfile` — multi-stage (deps→builder→runner); pnpm root node_modules only (hoisted); inline exports patch (src→dist); CMD node apps/worker/dist/index.js; non-root user worker:nodejs
+- `apps/worker/.dockerignore` — node_modules, dist, .turbo, .git, .env*, *.md, coverage
+- `deploy/compose/dev/docker-compose.app.yml` — build: (dev only) web + worker; healthcheck 127.0.0.1; cuelane_dev network
+- `deploy/compose/stage/docker-compose.app.yml` — image-only (C5); web=bonitobonita24/cuelane, worker=bonitobonita24/cuelane-worker; Traefik labels (certresolver=letsencrypt C2, tls=true C3); healthcheck 127.0.0.1 (C4); resource limits top-level (mem_limit/mem_reservation/cpus)
+- `deploy/compose/prod/docker-compose.app.yml` — same pattern as stage; Host(cuelane.powerbyte.app); APP_IMAGE_TAG
+- `deploy/compose/dev/docker-compose.infra.yml` — pgbouncer+pgAdmin healthchecks use 127.0.0.1 (C4 fix)
+- `.env.staging.example` + `.env.prod.example` — all required vars including STAGING_IMAGE_TAG/APP_IMAGE_TAG
+- `deploy/compose/start.sh` — dispatches dev|stage|prod; COMPOSE_PROJECT_NAME isolation (C7)
+- `deploy/compose/push.sh` — builds/promotes BOTH web + worker images; docker login guard (C6)
+- `deploy/komodo-deploy.sh` — vendored from Server-Setups komodo/ci-deploy; pins CUELANE_STAGING_TAG + DeployStack
+- `COMMANDS.md` — master operational reference (Docker, DB, test, lint, governance, git, service URLs)
+- `deploy/k8s-scaffold/README.md` — K8s inactive placeholder (Rule 6)
+- `tools/validate-inputs.mjs` — inputs.yml schema validation
+- `tools/check-env.mjs` — required env var check
+- `tools/check-product-sync.mjs` — Rule 20 private tag leak + PRODUCT.md ↔ inputs.yml alignment
+- `tools/hydration-lint.mjs` — SSR hydration mismatch scanner
+- `package.json` — tools:* scripts wired; yaml ^2 devDependency
 
-## CI/CD
-_Not yet scaffolded — Phase 4 Part 8_
+## CI/CD ✅ Phase 4 Part 7 complete (swarm/phase4-scaffold, 2026-07-08)
+- `.github/workflows/ci.yml` — pnpm/action-setup@v4; lint + typecheck + build; triggers push+PR all branches
+- `.github/workflows/docker-publish.yml` — push to main; buildx multi-arch (linux/amd64+arm64); builds web (→bonitobonita24/cuelane) AND worker (→bonitobonita24/cuelane-worker); tags sha-{7} + staging-latest; calls komodo-deploy.sh (CUELANE_STAGING_TAG)
 
 ## Governance
 - docs/PRODUCT.md — complete (written by human)

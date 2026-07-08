@@ -13,6 +13,8 @@ build/
 .env
 .env.*
 !.env.example
+!.env.staging.example
+!.env.prod.example
 
 # Credentials master list — GITIGNORED FROM STEP 8. NO EXCEPTIONS.
 CREDENTIALS.md

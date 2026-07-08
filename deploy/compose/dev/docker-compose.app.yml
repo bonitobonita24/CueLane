@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════════════════════════════════════
+# CueLane — Dev App Stack
+# Runs Next.js web app + BullMQ worker from LOCAL SOURCE (build: key present).
+# Dev: direct host port mapping, NO Traefik.
+#
+# Usage (via start.sh):
+#   bash deploy/compose/start.sh dev up -d
+#
+# Ports:
+#   App:    localhost:41716 → container:3000
+#   Worker: background only (no exposed port)
+# ═══════════════════════════════════════════════════════════════════════
+
+name: cuelane_dev
+
+services:
+
+  # ── Next.js web app ──────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: cuelane:dev-latest
+    container_name: cuelane_dev_app
+    restart: unless-stopped
+    env_file: .env.dev
+    ports:
+      - "${APP_PORT:-41716}:3000"
+    networks:
+      - cuelane_dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── BullMQ worker ────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    image: cuelane-worker:dev-latest
+    container_name: cuelane_dev_worker
+    restart: unless-stopped
+    env_file: .env.dev
+    networks:
+      - cuelane_dev
+
+# ── Dev network (defined by docker-compose.infra.yml — marked external here) ──
+networks:
+  cuelane_dev:
+    external: true
