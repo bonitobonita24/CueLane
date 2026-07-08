@@ -18,7 +18,10 @@
       // (no mocks). turbo's default envMode is "strict" — DATABASE_URL must be explicitly
       // listed or it's silently stripped from the task's environment (Prisma then fails with
       // "Environment variable not found: DATABASE_URL" even though the invoking shell has it).
-      "env": ["DATABASE_URL"]
+      // Wave 7.4: station/session.ts's real-Valkey code path (its ioredis singleton falls back
+      // to a plain localhost:41708 default with NO auth) needs VALKEY_URL passed through too,
+      // same reasoning — without it the station tests hit "NOAUTH Authentication required."
+      "env": ["DATABASE_URL", "VALKEY_URL"]
     },
     "dev": {
       "cache": false,

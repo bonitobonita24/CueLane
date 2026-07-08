@@ -23,12 +23,15 @@ import { authConfig } from './config';
 function adminCredentialsProvider(): {
   authorize: (creds: Record<string, unknown>) => Promise<unknown>;
 } {
-  const provider = authConfig.providers.find(
-    (p): p is { options: { id: string; authorize: (creds: Record<string, unknown>) => Promise<unknown> } } =>
-      (p as { options?: { id?: string } }).options?.id === 'admin-credentials',
-  );
-  if (provider == null) throw new Error('admin-credentials provider not found in authConfig');
-  return { authorize: provider.options.authorize };
+  type ProviderWithOptions = {
+    options?: { id?: string; authorize?: (creds: Record<string, unknown>) => Promise<unknown> };
+  };
+  const provider = authConfig.providers
+    .map((p) => p as unknown as ProviderWithOptions)
+    .find((p) => p.options?.id === 'admin-credentials');
+  const authorize = provider?.options?.authorize;
+  if (authorize == null) throw new Error('admin-credentials provider (with options.authorize) not found in authConfig');
+  return { authorize };
 }
 
 describe('authConfig admin-credentials provider (Wave 7.4-T1 regression)', () => {
@@ -52,7 +55,6 @@ describe('authConfig admin-credentials provider (Wave 7.4-T1 regression)', () =>
   });
 
   it('still authorizes the seeded ADMIN user (Branch Admin / pin 0000 against demo)', async () => {
-    const tenant = await prismaRaw.tenant.findUniqueOrThrow({ where: { slug: 'demo' } });
     const result = await adminCredentialsProvider().authorize({
       identifier: 'Branch Admin',
       password: '0000',
