@@ -7,6 +7,9 @@ import {
   TicketStatus,
   MediaType,
   AdType,
+  THEME_PRESETS,
+  SERVICE_ICON_OPTIONS,
+  SERVICE_COLOR_OPTIONS,
 } from '../types/index.js';
 
 // ─── Shared primitives ───────────────────────────────────────────────────────
@@ -51,7 +54,10 @@ const fileExtSchema = z.enum([
 
 // ─── Tenant ──────────────────────────────────────────────────────────────────
 
+// Decision 3 (docs/DECISIONS_LOG.md 2026-07-08) — `enabled` was written by seed.ts but missing
+// from this schema, so `updateTenantSettings` could never round-trip a seeded printerConfig.
 const printerConfigSchema = z.object({
+  enabled: z.boolean().optional(),
   paperWidth: z.string().optional(),
   marginTop: z.number().int().nonnegative().optional(),
   marginBottom: z.number().int().nonnegative().optional(),
@@ -59,8 +65,12 @@ const printerConfigSchema = z.object({
   footerText: z.string().max(200).optional(),
 });
 
+// Decision 2 — theme is a THEME_PRESETS id string (the 9-color custom picker is Wave 7.7).
+const themePresetIds = THEME_PRESETS.map((t) => t.id) as [string, ...string[]];
+const themeSchema = z.enum(themePresetIds);
+
 const tenantSettingsSchema = z.object({
-  theme: z.string().optional(),
+  theme: themeSchema.optional(),
   printerConfig: printerConfigSchema.optional(),
   tickerText: z.string().max(500).optional(),
   businessName: z.string().max(100).optional(),
@@ -89,10 +99,15 @@ export const updateTenantStatusSchema = z.object({
 
 // ─── Service (Transaction Type) ──────────────────────────────────────────────
 
+// Decision 4 — icon/color are constrained to the PM-authored option lists (packages/shared
+// types/index.ts SERVICE_ICON_OPTIONS / SERVICE_COLOR_OPTIONS), not free-form emoji/hex.
+const serviceIconOptions = SERVICE_ICON_OPTIONS as unknown as [string, ...string[]];
+const serviceColorOptions = SERVICE_COLOR_OPTIONS as unknown as [string, ...string[]];
+
 export const createServiceSchema = z.object({
   name: z.string().min(1).max(80),
-  icon: z.string().emoji().max(2),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a hex color'),
+  icon: z.enum(serviceIconOptions),
+  color: z.enum(serviceColorOptions),
   avgTime: z.number().int().positive().max(480), // max 8 hours
 });
 

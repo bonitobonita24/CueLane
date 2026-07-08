@@ -72,9 +72,7 @@ async function main(): Promise<void> {
         liveStreamUrl: null,
         tickerText: 'Welcome to Demo Branch — please take a number and we will serve you shortly.',
         businessName: 'Demo Branch Co.',
-        theme: {
-          preset: 'indigo',
-        },
+        theme: 'indigo',
         printerConfig: {
           enabled: true,
           paperWidth: '80mm',

@@ -46,9 +46,58 @@ export enum AdType {
   Uploaded = 'uploaded',
 }
 
+// ─── Wave 7.6 — Admin Core CRUD constants ─────────────────────────────────────
+// PM-locked decisions (docs/DECISIONS_LOG.md 2026-07-08 "Wave 7.6 Admin Core CRUD"). Tier limits
+// (decision 1), theme presets (decision 2), service icon/color allowlists (decision 4).
+
+/** Per-tenant free-tier caps. `null` = unlimited (premium). Block-AT-cap semantics: a create is
+ *  rejected once `existingCount >= limit` — see apps/web/src/server/domain/admin.ts. */
+export const TIER_LIMITS = {
+  free: { users: 10, services: 6, windows: 4 },
+  premium: null,
+} as const;
+
+/** 8 preset theme ids (decision 2 — the custom 9-color-picker is deferred to Wave 7.7). */
+export const THEME_PRESETS = [
+  { id: 'indigo', label: 'Indigo' },
+  { id: 'ocean', label: 'Ocean' },
+  { id: 'emerald', label: 'Emerald' },
+  { id: 'rose', label: 'Rose' },
+  { id: 'amber', label: 'Amber' },
+  { id: 'violet', label: 'Violet' },
+  { id: 'teal', label: 'Teal' },
+  { id: 'slate', label: 'Slate' },
+] as const;
+
+export type ThemePresetId = (typeof THEME_PRESETS)[number]['id'];
+
+/** 16 emoji options for Service.icon (decision 4). */
+export const SERVICE_ICON_OPTIONS = [
+  '💰', '📋', '📂', '💳', '🏦', '📄', '✍️', '🔑',
+  '📦', '🛠️', '💼', '🧾', '🪪', '📑', '🏧', '👥',
+] as const;
+
+/** 12 hex color options for Service.color — a superset including every seed color
+ *  (#3B82F6 Cash Deposit, #10B981 Loan Inquiry, #8B5CF6 Account Opening, #F59E0B Withdrawal). */
+export const SERVICE_COLOR_OPTIONS = [
+  '#3B82F6', // blue
+  '#10B981', // emerald
+  '#8B5CF6', // violet
+  '#F59E0B', // amber
+  '#EF4444', // red
+  '#EC4899', // pink
+  '#06B6D4', // cyan
+  '#84CC16', // lime
+  '#F97316', // orange
+  '#6366F1', // indigo
+  '#14B8A6', // teal
+  '#64748B', // slate
+] as const;
+
 // ─── Tenant Settings ─────────────────────────────────────────────────────────
 
 export interface PrinterConfig {
+  enabled?: boolean;
   paperWidth?: string;
   marginTop?: number;
   marginBottom?: number;
@@ -57,7 +106,8 @@ export interface PrinterConfig {
 }
 
 export interface TenantSettings {
-  theme?: string;
+  /** A THEME_PRESETS id, e.g. 'indigo' (decision 2 — not the object shape used pre-Wave-7.6). */
+  theme?: ThemePresetId;
   printerConfig?: PrinterConfig;
   tickerText?: string;
   businessName?: string;

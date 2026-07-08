@@ -239,3 +239,36 @@ Locked: yes — do not add Turnstile to kiosk or display pages. Those are public
 **Reversible:** yes — if a future feature needs client→server socket messaging (bidirectional), revisit with a WS sidecar or custom server. No such requirement exists in v1.
 
 **Scope note:** does not affect Wave 7.1 (queue-engine backbone has no transport). Applies when Wave 7.2 (Realtime Transport) is built.
+
+---
+
+## 2026-07-08 — Wave 7.6 Admin Core CRUD: 6 locked PM decisions
+
+**Decided by:** PM (technical `[HOW]` calls, pre-agreed before build).
+
+1. **Limit semantics = block AT the cap.** A tenant-scoped create throws a typed `FORBIDDEN`
+   when `existingCount >= limit` (not `>`). Free tenant may hold exactly 10 users / 6 services /
+   4 windows — the 11th/7th/5th create is rejected. Premium tenants (`Tenant.tier === 'premium'`,
+   e.g. the `demo` tenant) are unlimited: `limit = null` never blocks.
+2. **`settings.theme` = a preset id string**, one of 8 (`indigo`, `ocean`, `emerald`, `rose`,
+   `amber`, `violet`, `teal`, `slate`) — not an object. The custom 9-color-picker (`{ preset,
+   custom: {...} }` shape) is DEFERRED to Wave 7.7. `packages/db/prisma/seed.ts`'s
+   `settings.theme` is fixed from `{ preset: 'indigo' }` to the string `'indigo'`.
+3. `printerConfigSchema` (packages/shared) gains `enabled: z.boolean().optional()` — the seed
+   already writes `printerConfig.enabled: true`, the schema was missing the field.
+4. `SERVICE_ICON_OPTIONS` (16 emoji) and `SERVICE_COLOR_OPTIONS` (12 hex, superset including
+   every color the seed uses) are PM-authored constants in `packages/shared`. `createServiceSchema`
+   is tightened to validate `icon`/`color` against these allowlists (was free-form regex/emoji).
+5. **Tier source of truth for limit checks = `Tenant.tier`**, not `Subscription.tier` (the two can
+   drift; `Tenant.tier` is what `queue.ts`'s existing Return-After-Done premium gate already reads).
+6. Theme tab UI gating on Free tier is a Wave 7.6 UI-only follow-up — no backend action needed
+   here beyond exposing `tier` via `tenantAdmin.getUsage`/`getSettings`.
+
+**Multi-tenancy hard requirement (owner add-on, mid-wave):** every router/domain function in this
+wave resolves `tenantId` from request context only (session — never a client-supplied tenant id,
+never a hardcoded slug/id); every read/write is tenant-scoped via `withTenantContext` (async
+callback form) + `findFirst({ id, tenantId })` guards before update/delete; limits/tier read from
+that request's own `Tenant.tier`. T8's integration suite proves this against 2+ freshly-created
+ephemeral tenants (no shared/seeded tenant assumption) plus isolation + independent-limit assertions.
+
+**Reversible:** yes — decisions 1-6 are additive constants/validation; no destructive schema change.
