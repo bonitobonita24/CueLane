@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start --port 41716",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@cuelane/shared": "workspace:*",
@@ -42,6 +43,7 @@
     "postcss": "^8",
     "autoprefixer": "^10",
     "eslint": "^9",
-    "eslint-config-next": "^15.1.0"
+    "eslint-config-next": "^15.1.0",
+    "vitest": "^2.1.0"
   }
 }
