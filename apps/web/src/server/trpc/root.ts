@@ -5,6 +5,8 @@ import { queueRouter } from './routers/queue';
 import { stationRouter } from './routers/station';
 import { serviceRouter } from './routers/service';
 import { windowRouter } from './routers/window';
+import { userRouter } from './routers/user';
+import { tenantAdminRouter } from './routers/tenantAdmin';
 
 // Root application router — extend with feature routers in Phase 4 Parts 5-6
 export const appRouter = createTRPCRouter({
@@ -14,6 +16,8 @@ export const appRouter = createTRPCRouter({
   station: stationRouter,
   service: serviceRouter,
   window: windowRouter,
+  user: userRouter,
+  tenantAdmin: tenantAdminRouter,
 });
 
 // Export the router type — used by api-client and apps/web typed client
