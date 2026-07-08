@@ -3,19 +3,28 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.1 DONE + PM-verified**
-LAST_DONE:    Phase 7 Wave 7.1 — Queue Engine Backbone (2026-07-08). TDD, real dev Postgres.
-              Commits f1fa3a1 (schema: Service.number, Ticket.number/sequence, atomic SequenceCounter +
-              migration 20260708120000_queue_engine_backbone + seed backfill), 90627a7 (domain/queue.ts:
-              race-safe numbering, priority-first→FIFO callNext, complete/skip/noshow/recall/transfer+
-              Return-After-Done), afb709f (queueRouter tRPC + kioskProcedure), a937cf8 (integration test).
-              PM re-verified independently: typecheck 8/8, tests shared 3/3 + web 25/25, migrate up-to-date.
-              Prior: /login page (f99916a) + SSE realtime decision (88624f5). Roadmap docs/PHASE7_ROADMAP.md.
-              41 commits ahead of origin, 0 pushed (HARD HOLD). App + worker containers healthy.
-NEXT:         Phase 7 Wave 7.2 — Realtime Transport (SSE: Valkey pub/sub → Route Handler ReadableStream →
-              EventSource; per-tenant channel, 6 events). Then 7.3 Kiosk (⚠ FIX seed non-cuid IDs vs .cuid()
-              schemas FIRST — see PHASE7_ROADMAP PM Addendum) → 7.4 Station → 7.5 Display → 7.6+ Admin.
+PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.2 DONE + PM-verified**
+LAST_DONE:    Phase 7 Wave 7.2 — Realtime Transport (SSE) (2026-07-08). TDD, real dev stack.
+              Commits 07b792b (T1 Valkey pub/sub publisher — queueChannel `tenant:{tenantId}:queue`,
+              lazy ioredis singleton, fire-and-forget-safe: a Valkey outage never fails a mutation),
+              83c38a7 (T2 wire queueRouter — all 6 mutations call publishEvents(result.events)),
+              cc2dc13 (T3 SSE Route Handler app/api/tenants/[slug]/queue/stream — runtime=nodejs,
+              force-dynamic, dedicated per-tenant subscriber, `: connected`+heartbeat, abort cleanup;
+              STRICT per-tenant channel isolation, tenantId derived server-side), d1ca600 (T4
+              useQueueStream EventSource hook w/ backoff reconnect). Added ioredis as direct web dep.
+              PM re-verified independently: typecheck 8/8 ✓, web tests 33/33 ✓ (5 files, 8 new), and
+              SSE E2E BY HAND — published a real event to the tenant channel, observed it arrive on a
+              live `curl -N …/stream` as a `data:` frame (subscribers delivered=1, isolation confirmed).
+              Prior waves: 7.1 Queue Engine Backbone (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a),
+              SSE decision (88624f5). 45 commits ahead of origin, 0 pushed (HARD HOLD).
+NEXT:         Phase 7 Wave 7.3 — Kiosk. ⚠ MUST FIX FIRST: seed non-cuid IDs vs .cuid() shared schemas
+              (packages/db/prisma/seed.ts — make seed emit real cuids; do NOT loosen schemas; re-verify
+              seed+tests). See PHASE7_ROADMAP PM Addendum. Then 7.4 Station → 7.5 Display → 7.6+ Admin.
+              Wave 7.2 wired the transport; 7.3+ UIs consume it via useQueueStream.
               Phase 6 (deploy) is gated on owner CREDENTIALS.md items + explicit word (HARD HOLD).
+DEFERRED:     Pre-existing @cuelane/shared lint failure (packages/shared schemas.smoke.test.ts,
+              ESLint TS-project-service parse error, introduced commit 7910825 BEFORE Wave 7.2 —
+              out of scope for the wave). Fix at a task boundary; does not block dev or gates.
 EVIDENCE:     Ground-truth verified by exercising the REAL running dev stack (PM, 2026-07-08):
               • Gates: pnpm -w typecheck 8/8 ✓ · pnpm -w lint 8/8 ✓ · pnpm -w build 8/8 ✓ ·
                 pnpm -w test 3/3 ✓ (new @cuelane/shared smoke suite; repo previously had 0 tests).
