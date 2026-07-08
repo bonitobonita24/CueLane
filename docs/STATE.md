@@ -120,3 +120,15 @@ MODELS:
   execution:  claude-sonnet-4-6 (swarm workers, per battle-test discipline)
 TENANCY:      multi (subdirectory /{tenant}/), tenant_id on all entities, L6 Prisma RLS
 SECURITY:     level=none (no gov/LGU/regulated flag); L3 RBAC + L5 AuditLog + L6 guardrails active
+
+---
+## Wave 7.6 BACKEND (T1–T4,T8) — DONE + PM-VERIFIED (2026-07-08)
+Commits c746895(T1 shared consts+schema+seed) 2df9a72(T2 admin domain+adminProcedure) 75e3117(T3 service+window)
+bf9ef5e(T4 user+tenantAdmin) e7a3df6(T8 integration). PM ground-truth: typecheck 8/8, `pnpm -w test` 97/97 (14 files),
+demo pristine (4svc/3win/3usr/3tkt, theme string). MULTI-TENANCY PROVEN (owner directive): full CRUD matrix vs
+Tenant A+B independently + brand-new Tenant C zero-bootstrap; A-at-cap never blocks B/C; tenantId only from ctx;
+all writes findFirst({id,tenantId})-guarded; no super-admin in new tests. Locked: block-AT-cap, theme=8-preset
+string (custom→7.7), Tenant.tier source. 64 ahead, 0 pushed (HARD HOLD).
+NEXT: Wave 7.6 UI (T5 foundation→T6 svc/win UI→T7 user/printer/theme/tenant UI) + T9 demo dataset (enrich premium
+`demo` + add free-tier demo at caps; owner directive). Deferred: updateUserRoleSchema unwired; create limit-check
+not race-hardened (documented, low-freq admin surface).
