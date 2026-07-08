@@ -14,6 +14,41 @@ import {
 const idSchema = z.string().cuid();
 const pinSchema = z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits');
 
+// Security: only https:// — prevents javascript: / data: XSS via URL fields.
+// z.string().url() already validates URL format; this refine constrains the scheme.
+const httpsUrlSchema = z
+  .string()
+  .url()
+  .refine((v) => v.startsWith('https://'), 'Only https:// URLs are accepted');
+
+// Security: YouTube video IDs are exactly 11 chars [A-Za-z0-9_-]
+// Prevents injection into iframe src attributes
+const youtubeVideoIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{11}$/, 'Invalid YouTube video ID');
+
+// Security: storage key is a server-generated opaque path (tenantId/entity/filename)
+// Constrained to prevent path traversal — alphanumeric + safe path chars only
+const storageKeySchema = z
+  .string()
+  .min(8)
+  .max(512)
+  .regex(/^[A-Za-z0-9_/-]+$/, 'Invalid storage key');
+
+// Security: client-supplied filename — prevent path separators and null bytes
+const fileNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(/^[^/\\\r\n\0]+$/, 'File name must not contain path separators');
+
+// Security: allowlist of accepted file extensions matching inputs.yml allowed_mime_types
+const fileExtSchema = z.enum([
+  'mp4', 'mov', 'avi', 'mkv', 'webm',  // video
+  'png', 'jpg', 'jpeg', 'gif', 'webp',  // image
+  'pdf',                                  // document
+]);
+
 // ─── Tenant ──────────────────────────────────────────────────────────────────
 
 const printerConfigSchema = z.object({
@@ -30,7 +65,7 @@ const tenantSettingsSchema = z.object({
   tickerText: z.string().max(500).optional(),
   businessName: z.string().max(100).optional(),
   videoMode: z.nativeEnum(VideoMode).optional(),
-  liveStreamUrl: z.string().url().optional(),
+  liveStreamUrl: httpsUrlSchema.optional(),
 });
 
 export const createTenantSchema = z.object({
@@ -43,7 +78,7 @@ export const createTenantSchema = z.object({
 export const updateTenantSettingsSchema = z.object({
   companyName: z.string().min(1).max(100).optional(),
   tagline: z.string().max(200).optional(),
-  logoUrl: z.string().url().nullable().optional(),
+  logoUrl: httpsUrlSchema.nullable().optional(),
   settings: tenantSettingsSchema.optional(),
 });
 
@@ -136,16 +171,16 @@ export const createPlaylistEntrySchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(MediaType.YouTube),
     title: z.string().min(1).max(200),
-    videoId: z.string().min(1),
+    videoId: youtubeVideoIdSchema,
     isLive: z.boolean().default(false),
   }),
   z.object({
     type: z.literal(MediaType.Local),
     title: z.string().min(1).max(200),
-    storageKey: z.string().min(1),
-    fileName: z.string().min(1),
+    storageKey: storageKeySchema,
+    fileName: fileNameSchema,
     fileSize: z.number().int().positive(),
-    fileExt: z.string().min(1).max(10),
+    fileExt: fileExtSchema,
   }),
 ]);
 
@@ -165,14 +200,14 @@ export const createTenantAdSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(AdType.YouTube),
     title: z.string().min(1).max(200),
-    videoId: z.string().min(1),
+    videoId: youtubeVideoIdSchema,
     duration: z.number().int().positive().optional(),
   }),
   z.object({
     type: z.literal(AdType.Uploaded),
     title: z.string().min(1).max(200),
-    storageKey: z.string().min(1),
-    fileName: z.string().min(1),
+    storageKey: storageKeySchema,
+    fileName: fileNameSchema,
     fileSize: z.number().int().positive(),
     duration: z.number().int().positive().optional(),
   }),
@@ -193,14 +228,14 @@ export const createSystemAdSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(AdType.YouTube),
     title: z.string().min(1).max(200),
-    videoId: z.string().min(1),
+    videoId: youtubeVideoIdSchema,
     duration: z.number().int().positive().optional(),
   }),
   z.object({
     type: z.literal(AdType.Uploaded),
     title: z.string().min(1).max(200),
-    storageKey: z.string().min(1),
-    fileName: z.string().min(1),
+    storageKey: storageKeySchema,
+    fileName: fileNameSchema,
     fileSize: z.number().int().positive(),
     duration: z.number().int().positive().optional(),
   }),
@@ -217,10 +252,10 @@ export const reorderSystemAdsSchema = z.object({
 
 // ─── Subscription ────────────────────────────────────────────────────────────
 
-export const upgradeSubscriptionSchema = z.object({
-  xenditPlanId: z.string().min(1),
-  xenditCustomerId: z.string().min(1),
-});
+// Security: xenditPlanId / xenditCustomerId must NOT come from the client.
+// Flow: client POSTs this → server creates Xendit plan → returns redirect URL →
+// Xendit sends webhook with IDs → server records them. Client sends no Xendit IDs.
+export const upgradeSubscriptionSchema = z.object({});
 
 export const xenditWebhookSchema = z.object({
   event: z.enum([
