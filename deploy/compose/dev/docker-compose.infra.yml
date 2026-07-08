@@ -1,0 +1,159 @@
+# ═══════════════════════════════════════════════════════════════════════
+# CueLane — Dev Infrastructure Stack
+# Local infra only: direct host port mapping, NO Traefik/reverse proxy.
+# App containers (web + worker) are started separately via `pnpm dev`.
+#
+# Usage:
+#   docker compose -f deploy/compose/dev/docker-compose.infra.yml \
+#     --env-file .env.dev up -d
+#
+# Ports (from inputs.yml):
+#   Postgres:       localhost:41706 → container:5432
+#   PgBouncer:      localhost:41707 → container:5432 (pooled, for app)
+#   Valkey:         localhost:41708 → container:6379
+#   MinIO API:      localhost:41709 → container:9000
+#   MinIO Console:  localhost:41710 → container:9001
+#   MailHog SMTP:   localhost:41711 → container:1025
+#   MailHog UI:     localhost:41712 → container:8025
+#   pgAdmin:        localhost:41713 → container:80
+# ═══════════════════════════════════════════════════════════════════════
+
+name: cuelane_dev_infra
+
+services:
+
+  # ── PostgreSQL 16 ────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      # Disable 127.0.0.1 binding — listen on all interfaces
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    ports:
+      - "${DB_PORT:-41706}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready uses service DNS (postgres itself) — no 127.0.0.1 binding
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── PgBouncer (connection pooler) ────────────────────────────────────
+  # Pool mode: transaction — required for Prisma + pgbouncer compatibility.
+  # App uses DATABASE_URL via :41707; migrations use DIRECT_URL via :41706.
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}"
+      MAX_CLIENT_CONN: "100"
+      DEFAULT_POOL_SIZE: "10"
+      POOL_MODE: "transaction"
+      AUTH_TYPE: "scram-sha-256"
+      SERVER_RESET_QUERY: "DISCARD ALL"
+    ports:
+      - "${PGBOUNCER_PORT:-41707}:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # TCP-only: pg_isready is not installed in edoburu/pgbouncer (Alpine, minimal deps).
+      # nc (busybox) is available; checking if port 5432 accepts connections is sufficient.
+      test: ["CMD-SHELL", "nc -z localhost 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Valkey 7 (Redis-compatible cache + pub/sub) ───────────────────────
+  valkey:
+    image: valkey/valkey:7-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--requirepass", "${REDIS_PASSWORD}", "--bind", "0.0.0.0"]
+    environment:
+      # REDIS_PASSWORD must be in env so the healthcheck shell can read it via $$REDIS_PASSWORD
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "${REDIS_PORT:-41708}:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      # $$REDIS_PASSWORD → compose escapes $$ to $; shell inside container reads $REDIS_PASSWORD from env
+      test: ["CMD-SHELL", "valkey-cli -a $$REDIS_PASSWORD ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ── MinIO (S3-compatible dev object storage) ──────────────────────────
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001", "--address", "0.0.0.0:9000"]
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY}
+    ports:
+      - "${STORAGE_PORT:-41709}:9000"
+      - "${STORAGE_CONSOLE_PORT:-41710}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      # Uses MinIO's built-in health endpoint — mc alias 'local' is pre-configured
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── MailHog (dev SMTP intercept + web UI) ─────────────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "${SMTP_PORT:-41711}:1025"
+      - "${SMTP_UI_PORT:-41712}:8025"
+    # MailHog is stateless and starts instantly; no healthcheck needed.
+    # View caught emails at: http://localhost:41712
+
+  # ── pgAdmin 4 (Postgres GUI) ──────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_PORT:-41713}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    healthcheck:
+      # wget is available in the pgadmin4 image; hits the health ping endpoint
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# ── Named volumes ────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  valkey_data:
+  minio_data:
+  pgadmin_data:
+
+# ── Dev network ──────────────────────────────────────────────────────────
+networks:
+  default:
+    name: cuelane_dev

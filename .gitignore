@@ -69,3 +69,9 @@ openclaw-handoff.md
 tokens/build/
 tests/visual/__snapshots__/
 tests/visual/diff/
+
+# ─── Test coverage ───
+coverage/
+
+# ─── pnpm patch files ───
+patches/

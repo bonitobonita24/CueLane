@@ -5,7 +5,18 @@ Current build state. Rewritten after every feature update to reflect what exists
 ---
 
 ## Root Config
-_Not yet scaffolded — Phase 4 Part 1_
+✅ Phase 4 Part 1 complete (swarm/phase4-scaffold, 2026-07-08)
+- `pnpm-workspace.yaml` — workspace globs: apps/*, packages/*
+- `turbo.json` — tasks: build (^build), lint (^lint), typecheck (^typecheck), test (^test), dev (cache:false)
+- `package.json` — name @cuelane/root, turbo/typescript/eslint/prettier devDeps, db:* passthroughs
+- `tsconfig.base.json` — strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + Bundler moduleResolution + ES2022
+- `.editorconfig` — utf-8, lf, 2-space indent, final newline
+- `.prettierrc` — singleQuote, semi, tabWidth:2, trailingComma:es5
+- `eslint.config.mjs` — ESLint v9 flat config; typescript-eslint recommendedTypeChecked; no-explicit-any/no-unsafe-assignment/strict-boolean-expressions as errors
+- `.gitignore` — updated: added coverage/, patches/
+- `.nvmrc` — 22 (pre-existing)
+- `deploy/compose/dev/docker-compose.infra.yml` — Postgres:41706, PgBouncer:41707, Valkey:41708, MinIO:41709/41710, MailHog:41711/41712, pgAdmin:41713; healthchecks on all services; named volumes; cuelane_dev network
+- `.env.example` — added DIRECT_URL (postgres direct, migrations) + DATABASE_URL (pgbouncer pooled, runtime) + STORAGE_PORT
 
 ## Packages
 _Not yet scaffolded — Phase 4 Parts 2-4_

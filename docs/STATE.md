@@ -3,14 +3,14 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        Phase 3 complete → **Phase 4 Part 1 (scaffold) NEXT**
-LAST_DONE:    Framework synced V32.18 → V32.24 (28 deliverables); V31 orphans removed;
-              STATE tracker migrated to docs/STATE.md. Phases 0–3 artifacts complete:
-              PRODUCT.md (26 sections), DESIGN.md (HashiCorp aesthetic), inputs.yml v3,
-              env files, CREDENTIALS.md, DECISIONS_LOG (11), CHANGELOG_AI, IMPLEMENTATION_MAP.
-NEXT:         Phase 4 Part 1 — monorepo root scaffold (pnpm-workspace.yaml, turbo.json,
-              root tsconfig/eslint/prettier, apps/web + apps/worker + packages/* skeletons,
-              docker-compose dev: Postgres/Valkey/MinIO/MailHog).
+PHASE:        **Phase 4 Part 1 complete → Phase 4 Part 2 NEXT**
+LAST_DONE:    Phase 4 Part 1 — monorepo root config + dev infra compose (2026-07-08, swarm S1 run-8).
+              Created: pnpm-workspace.yaml, turbo.json, tsconfig.base.json, .editorconfig,
+              .prettierrc, eslint.config.mjs, deploy/compose/dev/docker-compose.infra.yml.
+              Updated: package.json (@cuelane/root, turbo/ts/eslint/prettier devDeps),
+              .gitignore (coverage/, patches/), .env.example (DIRECT_URL + DATABASE_URL pgbouncer).
+              pnpm install resolved 111 packages. Turbo graph valid. lint/typecheck/build: 0 errors.
+NEXT:         Phase 4 Part 2 — packages/shared + packages/api-client.
 EVIDENCE:     Framework sync verified — grep CLAUDE_compact.md = V32.24; 28/28 deliverables
               deployed; spec-gap-check ran (all findings expected pre-scaffold).
 BLOCKERS:     Human ⏳ in CREDENTIALS.md before Phase 5 deploy (NOT Phase 4 dev): Docker Hub

@@ -98,3 +98,27 @@ Format: Rule 15 — Agent attribution required on every entry.
 - Errors resolved:     none
 
 ---
+
+## Phase 4 Part 1 — Monorepo Root Config + Dev Infra Compose
+- Date:                2026-07-08
+- Agent:               CLAUDE_CODE (swarm worker S1, run-8)
+- Attribution:         CLAUDE_CODE
+- Why:                 Phase 4 Part 1 scaffold. Establishes monorepo workspace, toolchain config, and dev infrastructure stack before any app code is written.
+- Files added:
+  - `pnpm-workspace.yaml` — workspace globs (apps/*, packages/*)
+  - `turbo.json` — Turborepo v2 tasks: build (outputs .next/** dist/**), lint, typecheck, test, dev
+  - `tsconfig.base.json` — strict TypeScript base: strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + Bundler moduleResolution + ESNext module + ES2022 target
+  - `.editorconfig` — editor consistency (utf-8, lf, 2-space, final newline)
+  - `.prettierrc` — Prettier config (singleQuote, semi, tabWidth:2, trailingComma:es5)
+  - `eslint.config.mjs` — ESLint v9 flat config with typescript-eslint recommendedTypeChecked; no-explicit-any/no-unsafe-assignment/strict-boolean-expressions as errors
+  - `deploy/compose/dev/docker-compose.infra.yml` — dev infra stack: Postgres:41706, PgBouncer:41707(transaction mode), Valkey:41708, MinIO:41709/41710, MailHog:41711/41712, pgAdmin:41713; healthchecks; named volumes; cuelane_dev network
+- Files modified:
+  - `package.json` — updated to @cuelane/root with turbo/typescript/eslint/prettier devDeps and all turbo scripts + db:* passthroughs
+  - `.gitignore` — appended coverage/ and patches/
+  - `.env.example` — added DIRECT_URL (Prisma migrations via postgres:41706), renamed PGBOUNCER_DATABASE_URL to DATABASE_URL (runtime via pgbouncer:41707 with ?pgbouncer=true), added STORAGE_PORT
+- Files deleted:       none
+- Schema/migrations:   none (root config only)
+- Errors encountered:  none
+- Errors resolved:     none
+
+---
