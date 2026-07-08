@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
-import { getS3Client, getDefaultBucket } from './config';
+import { getS3Client, getDefaultBucket } from './config.js';
 import {
   ALLOWED_MIME_TYPES,
   BLOCKED_MIME_TYPES,
@@ -18,7 +18,7 @@ import {
   type UploadInput,
   type UploadResult,
   type GetSignedUrlInput,
-} from './types';
+} from './types.js';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 

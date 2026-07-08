@@ -1,4 +1,4 @@
-import { prisma } from '../client';
+import { prisma } from '../client.js';
 import { type User, type UserRole } from '@prisma/client';
 
 export async function findUserByPin(

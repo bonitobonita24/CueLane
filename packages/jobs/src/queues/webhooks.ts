@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
-import { getConnectionOptions } from '../connection';
-import type { WebhooksJobPayload } from '../types';
+import { getConnectionOptions } from '../connection.js';
+import type { WebhooksJobPayload } from '../types.js';
 
 export const WEBHOOKS_QUEUE_NAME = 'webhooks' as const;
 
@@ -17,7 +17,7 @@ export const webhooksQueue = new Queue<WebhooksJobPayload>(WEBHOOKS_QUEUE_NAME, 
   },
 });
 
-export const webhooksDlq = new Queue<WebhooksJobPayload>(`${WEBHOOKS_QUEUE_NAME}:dlq`, {
+export const webhooksDlq = new Queue<WebhooksJobPayload>(`${WEBHOOKS_QUEUE_NAME}-dlq`, {
   connection: getConnectionOptions(),
   defaultJobOptions: {
     attempts: 1,

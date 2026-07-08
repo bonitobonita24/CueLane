@@ -1,4 +1,4 @@
-import { prismaRaw } from '../client';
+import { prismaRaw } from '../client.js';
 import { type Tenant, type TenantTier, type TenantStatus } from '@prisma/client';
 
 export async function findTenantBySlug(slug: string): Promise<Tenant | null> {

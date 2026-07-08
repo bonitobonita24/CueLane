@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
-import { getConnectionOptions } from '../connection';
-import type { EmailJobPayload } from '../types';
+import { getConnectionOptions } from '../connection.js';
+import type { EmailJobPayload } from '../types.js';
 
 export const EMAIL_QUEUE_NAME = 'email' as const;
 
@@ -18,7 +18,7 @@ export const emailQueue = new Queue<EmailJobPayload>(EMAIL_QUEUE_NAME, {
 });
 
 /** Dead-letter queue for email jobs that exhausted all retries */
-export const emailDlq = new Queue<EmailJobPayload>(`${EMAIL_QUEUE_NAME}:dlq`, {
+export const emailDlq = new Queue<EmailJobPayload>(`${EMAIL_QUEUE_NAME}-dlq`, {
   connection: getConnectionOptions(),
   defaultJobOptions: {
     attempts: 1,

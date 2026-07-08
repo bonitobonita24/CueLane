@@ -1,4 +1,4 @@
-import { prisma } from '../client';
+import { prisma } from '../client.js';
 import { type Ticket, type TicketStatus } from '@prisma/client';
 
 export async function listTicketsByStatus(

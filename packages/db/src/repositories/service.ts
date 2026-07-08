@@ -1,4 +1,4 @@
-import { prisma } from '../client';
+import { prisma } from '../client.js';
 import { type Service } from '@prisma/client';
 
 export async function listServices(tenantId: string): Promise<Service[]> {

@@ -3,7 +3,7 @@
 // on all tenant-scoped tables enforce isolation at the DB level.
 
 import { type Prisma } from '@prisma/client';
-import { prismaRaw } from './client';
+import { prismaRaw } from './client.js';
 
 export async function withTenant<T>(
   tenantId: string,

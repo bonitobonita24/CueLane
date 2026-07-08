@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { tenantGuardExtension } from './middleware/tenant-guard';
+import { tenantGuardExtension } from './middleware/tenant-guard.js';
 
 const globalStore = globalThis as unknown as {
   prismaRaw: PrismaClient;

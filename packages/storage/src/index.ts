@@ -1,3 +1,3 @@
-export * from './config';
-export * from './types';
-export { putObject, getObject, deleteObject, getSignedDownloadUrl } from './storage';
+export * from './config.js';
+export * from './types.js';
+export { putObject, getObject, deleteObject, getSignedDownloadUrl } from './storage.js';
