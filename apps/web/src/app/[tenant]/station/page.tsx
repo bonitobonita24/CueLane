@@ -4,7 +4,7 @@
 // window-selection step.
 import { redirect } from 'next/navigation';
 import { auth } from '@/server/auth';
-import { prisma } from '@cuelane/db';
+import { prisma, withTenantContext } from '@cuelane/db';
 import { Role } from '@cuelane/shared';
 import { StationClient } from './station-client';
 
@@ -31,11 +31,28 @@ export default async function StationPage({ params }: StationPageProps) {
     redirect('/login');
   }
 
-  const windows = await prisma.window.findMany({
-    where: { tenantId: tenant.id },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true },
-  });
+  // L6 lesson (queue.ts's kioskProcedure precedent): Window is a tenant-scoped model, NOT a
+  // GLOBAL_MODEL like Tenant — the L6-guarded `prisma` extension throws "No tenant context
+  // active" for any tenant-scoped query issued outside an AsyncLocalStorage tenant context. A
+  // plain server component has no such context by default (unlike a staffProcedure/kioskProcedure
+  // resolver), so it must be established explicitly here.
+  //
+  // ⚠ The callback passed to withTenantContext MUST be an `async` function (even with no
+  // internal `await`) — a plain synchronous arrow that merely RETURNS a Prisma lazy-thenable
+  // (`() => prisma.window.findMany(...)`) does NOT keep the AsyncLocalStorage context alive
+  // through that thenable's `.then()` continuation: `tenantStorage.run()` only wraps the
+  // SYNCHRONOUS execution of the callback, and a bare arrow's synchronous execution ends the
+  // instant it returns the (still-pending) promise object — the guard extension's async
+  // operation then runs OUTSIDE the ALS store. An `async` callback's V8 continuation machinery
+  // stays properly instrumented, so the same guard sees the context. Confirmed by reproducing
+  // both shapes directly against the real DB (logged to ~/.claude/LESSONS_GLOBAL.md).
+  const windows = await withTenantContext(tenant.id, async () =>
+    prisma.window.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    }),
+  );
 
   return <StationClient tenantSlug={tenantSlug} windows={windows} />;
 }

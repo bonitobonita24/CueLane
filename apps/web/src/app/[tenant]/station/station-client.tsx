@@ -451,12 +451,16 @@ interface TransferDialogProps {
 }
 
 function TransferDialog({ ticket, windows, isPremium, busy, onCancel, onConfirm }: TransferDialogProps) {
-  const [toWindowId, setToWindowId] = useState<string | null>(null);
+  // Empty-string sentinel (never null/undefined) — Radix Select's `value` prop must be present
+  // from the FIRST render or React warns "Select is changing from uncontrolled to controlled"
+  // the moment a real window id is first assigned. '' safely means "no selection yet" (Radix
+  // SelectItem values are always non-empty window ids, so '' can never collide with a real one).
+  const [toWindowId, setToWindowId] = useState<string>('');
   const [returnAfterDone, setReturnAfterDone] = useState(false);
 
   useEffect(() => {
     if (ticket == null) {
-      setToWindowId(null);
+      setToWindowId('');
       setReturnAfterDone(false);
     }
   }, [ticket]);
@@ -468,7 +472,7 @@ function TransferDialog({ ticket, windows, isPremium, busy, onCancel, onConfirm 
           <DialogTitle>Transfer {ticket?.number ?? ''}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
-          <Select onValueChange={setToWindowId} {...(toWindowId != null ? { value: toWindowId } : {})}>
+          <Select onValueChange={setToWindowId} value={toWindowId}>
             <SelectTrigger data-testid="transfer-window-select">
               <SelectValue placeholder="Choose destination window" />
             </SelectTrigger>
@@ -504,8 +508,8 @@ function TransferDialog({ ticket, windows, isPremium, busy, onCancel, onConfirm 
             Cancel
           </Button>
           <Button
-            onClick={() => toWindowId != null && onConfirm(toWindowId, returnAfterDone)}
-            disabled={toWindowId == null || busy}
+            onClick={() => toWindowId !== '' && onConfirm(toWindowId, returnAfterDone)}
+            disabled={toWindowId === '' || busy}
             data-testid="confirm-transfer"
           >
             Transfer
