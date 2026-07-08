@@ -170,7 +170,7 @@ export async function computeDashboard(
   const completionRate = safeDiv(completed, ticketsIssued);
   const noShowRate = safeDiv(noShows, ticketsIssued);
 
-  const hourlyBuckets: number[] = new Array(24).fill(0);
+  const hourlyBuckets: number[] = new Array<number>(24).fill(0);
   for (const t of rangeTickets) {
     const hour = t.createdAt.getHours();
     hourlyBuckets[hour] = (hourlyBuckets[hour] ?? 0) + 1;

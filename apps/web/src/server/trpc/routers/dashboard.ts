@@ -28,13 +28,13 @@ export const dashboardRouter = createTRPCRouter({
 
   ticketLog: adminProcedure.input(dashboardTicketLogSchema).query(async ({ ctx, input }) => {
     const { start, end } = getRangeBounds(input.range);
-    const search = input.search?.trim();
+    const search = input.search?.trim() ?? '';
 
     const tickets = await prismaRaw.ticket.findMany({
       where: {
         tenantId: ctx.tenantId,
         createdAt: { gte: start, lt: end },
-        ...(search
+        ...(search !== ''
           ? {
               OR: [
                 { number: { contains: search, mode: 'insensitive' } },

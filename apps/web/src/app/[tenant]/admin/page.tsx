@@ -1,12 +1,7 @@
-// Wave 7.6-T5 — Admin index redirects to the Services tab (the layout already applied the
-// role/tier guard; this page has no content of its own).
-import { redirect } from 'next/navigation';
+// Wave 7.7a-T3 — Admin index now renders the Dashboard landing directly (previously redirected to
+// /services — Wave 7.6-T5). The layout already applied the role/tier guard.
+import { DashboardClient } from './dashboard-client';
 
-interface AdminPageProps {
-  params: Promise<{ tenant: string }>;
-}
-
-export default async function AdminPage({ params }: AdminPageProps) {
-  const { tenant } = await params;
-  redirect(`/${tenant}/admin/services`);
+export default function AdminPage() {
+  return <DashboardClient />;
 }

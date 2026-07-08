@@ -44,6 +44,14 @@
     --font-sans: 'DM Sans';
     --font-display: 'Outfit';
     --font-mono: 'Space Mono';
+
+    /* Wave 7.7a — shadcn chart palette (Dashboard hourly-traffic bar chart). Derived from
+       --primary's hue family, no hardcoded hex — see ui-rules.md chart rule. */
+    --chart-1: 217 70% 49%;
+    --chart-2: 182 82% 43%;
+    --chart-3: 270 46% 49%;
+    --chart-4: 45 97% 64%;
+    --chart-5: 213 100% 59%;
   }
 
   .dark {
@@ -75,6 +83,12 @@
     --border: 224 13% 20%;
     --input: 224 13% 20%;
     --ring: 217 70% 55%;
+
+    --chart-1: 217 70% 55%;
+    --chart-2: 182 82% 50%;
+    --chart-3: 270 46% 58%;
+    --chart-4: 45 97% 64%;
+    --chart-5: 213 100% 65%;
   }
 }
 

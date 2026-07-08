@@ -19,8 +19,10 @@ export function AdminTabsNav({ tenantSlug, tabs }: AdminTabsNavProps) {
   return (
     <nav aria-label="Admin sections" className="flex gap-1 overflow-x-auto border-b px-4 sm:px-6">
       {tabs.map((tab) => {
-        const href = `/${tenantSlug}/admin/${tab.href}`;
-        const isActive = pathname === href || pathname.startsWith(`${href}/`);
+        // Wave 7.7a-T3: href === '' is the admin ROOT (Dashboard tab) — render without a
+        // trailing slash (`/{tenant}/admin`, not `/{tenant}/admin/`).
+        const href = tab.href === '' ? `/${tenantSlug}/admin` : `/${tenantSlug}/admin/${tab.href}`;
+        const isActive = pathname === href || (tab.href !== '' && pathname.startsWith(`${href}/`));
         return (
           <Link
             key={tab.id}

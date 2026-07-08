@@ -10,12 +10,18 @@ import { Role, TenantTier } from '@cuelane/shared';
 export interface AdminTab {
   id: string;
   label: string;
-  /** Path segment under /{tenant}/admin/, e.g. 'services' → /{tenant}/admin/services */
+  /** Path segment under /{tenant}/admin/, e.g. 'services' → /{tenant}/admin/services. Empty
+   *  string ('') is the special case for the admin ROOT (Dashboard) — AdminTabsNav renders it as
+   *  `/{tenant}/admin` with no trailing slash, not `/{tenant}/admin/`. */
   href: string;
 }
 
-/** All Admin Panel tabs, tenant-agnostic (no tenant/slug baked in — layout.tsx prefixes href). */
+/** All Admin Panel tabs, tenant-agnostic (no tenant/slug baked in — layout.tsx prefixes href).
+ *  Wave 7.7a-T3: 'dashboard' (href '') is the admin index — always visible on every tier (the KPI
+ *  cards + rate bars render for Free; only the advanced blocks inside dashboard-client.tsx are
+ *  tier-gated, so this tab itself is never in FREE_GATED_TAB_IDS). */
 export const ADMIN_TABS: readonly AdminTab[] = [
+  { id: 'dashboard', label: 'Dashboard', href: '' },
   { id: 'services', label: 'Services', href: 'services' },
   { id: 'windows', label: 'Windows', href: 'windows' },
   { id: 'users', label: 'Users', href: 'users' },
