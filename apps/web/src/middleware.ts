@@ -1,4 +1,7 @@
-import { auth } from '@/server/auth';
+// Edge-safe auth instance ONLY — importing from '@/server/auth' would pull the
+// Prisma-backed providers into the Edge middleware bundle and crash at runtime
+// ("Extensions.defineExtension unable to run in this browser environment").
+import { auth } from '@/server/auth/edge';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { Role } from '@cuelane/shared';

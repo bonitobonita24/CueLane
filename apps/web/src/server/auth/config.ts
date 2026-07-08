@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@cuelane/db';
 import { Role } from '@cuelane/shared';
+import { authConfigEdge } from './config.edge';
 
 const adminCredentialsSchema = z.object({
   // NOTE(S5): User schema uses `name` as identifier. A dedicated `email` column
@@ -16,6 +17,10 @@ const adminCredentialsSchema = z.object({
 });
 
 export const authConfig: NextAuthConfig = {
+  // Inherit the edge-safe base (session strategy, callbacks, cookies, pages) and
+  // append the Prisma-backed providers here. Keeping providers only in this
+  // Node-runtime config is what keeps Prisma OUT of the Edge middleware bundle.
+  ...authConfigEdge,
   providers: [
     // Provider 1: Email + password for Admin / Super Admin
     Credentials({
@@ -117,55 +122,7 @@ export const authConfig: NextAuthConfig = {
     }),
   ],
 
-  session: { strategy: 'jwt' },
-
-  callbacks: {
-    // Auth.js v5: JWT base type extends Record<string,unknown> and User has an index signature,
-    // making it impossible to access app-specific fields (tenantId, roles) without `any`.
-    // Block-disable covers only these two callbacks where the cast is unavoidable.
-    /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-
-    // Not async: no await needed — JWT fields are set synchronously from the user object.
-    // User is typed non-nullable; use trigger to detect initial sign-in.
-    jwt({ token, user, trigger }) {
-      if (trigger === 'signIn' || trigger === 'signUp') {
-        const u = user as any;
-        return {
-          ...token,
-          userId: String(u.id ?? ''),
-          tenantId: (u.tenantId as string | null | undefined) ?? null,
-          roles: (u.roles as Role[] | undefined) ?? [],
-        };
-      }
-      return token;
-    },
-
-    // Not async: no await needed — session fields are set synchronously from the token.
-    session({ session, token }) {
-      const tok = token as any;
-      session.user.id = String(tok.userId ?? '');
-      session.user.tenantId = (tok.tenantId as string | null | undefined) ?? null;
-      session.user.roles = (tok.roles as Role[] | undefined) ?? [];
-      return session;
-    },
-
-    /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-  },
-
-  pages: {
-    signIn: '/login',
-    error: '/login',
-  },
-
-  // SameSite=Lax prevents CSRF — safe for subdirectory multi-tenant routing
-  cookies: {
-    sessionToken: {
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env['NODE_ENV'] === 'production',
-      },
-    },
-  },
+  // session, callbacks (jwt/session), pages, and cookies are inherited from
+  // authConfigEdge (spread above) — the single source of truth shared with the
+  // edge middleware instance. Do NOT redefine them here.
 };
