@@ -132,3 +132,28 @@ string (custom→7.7), Tenant.tier source. 64 ahead, 0 pushed (HARD HOLD).
 NEXT: Wave 7.6 UI (T5 foundation→T6 svc/win UI→T7 user/printer/theme/tenant UI) + T9 demo dataset (enrich premium
 `demo` + add free-tier demo at caps; owner directive). Deferred: updateUserRoleSchema unwired; create limit-check
 not race-hardened (documented, low-freq admin surface).
+
+---
+## Wave 7.6 UI (T5–T7) — DONE + PM-VERIFIED (2026-07-09)
+Commits 698f0cc(T5 UI foundation: 9 shadcn primitives via CLI; `[tenant]/admin/layout.tsx` role-guard + tier tab-nav
+Free-hides-Theme, logic in unit-tested `_lib/access.ts`+`limits.ts`; `_components/UsageMeter`+`DataTable`)
+8b70c3c(T6 services+windows admin: TanStack tables + RHF/Zod dialogs, icon/color pickers, at-cap disable; fixed real
+RSC bug — RHF `react-server` export condition broke the @cuelane/ui barrel → dedicated subpath exports `/form`+`/toaster`)
+4a2fc2d(T7 users+service-assign+printer+theme[8-preset,Free-gated]+usage UI). All via tRPC vanilla proxy client.
+PM ground-truth: typecheck clean, `pnpm -w test` 121/121 (shared6/db2/web113), build 8/8 (6 admin routes), container
+rebuilt+serving, /demo/admin unauth→307. LIVE tenant-Admin browser render (Branch Admin/0000@demo, NOT super-admin):
+services tab real data + "4·Unlimited" premium meter + tab nav + CRUD. Deferred: theme swatches picker-only preview,
+NOT wired to runtime Kiosk/Station/Display CSS → Wave 7.7.
+
+## Wave 7.6-T9 demo dataset — DONE + PM-VERIFIED (2026-07-09)
+Commit cd5e320. seed.ts rewritten data-driven (`TenantSeedSpec`/`seedTenant()`), idempotent, real cuids. TWO tenants:
+`demo`(PREMIUM, "Bayanihan Rural Bank — Lipa Branch") 8svc/5win/6usr/9tkt, theme=emerald+ticker, admin Branch Admin/0000;
+NEW `clinic`(FREE, "Barangay Bagong Pag-asa Health Station") 6svc/4win/9usr/6tkt AT/NEAR caps, admin Nurse Admin/0001.
+PM ground-truth (psql): demo premium 8/5/6/9, clinic free 6/4/9/6; seed idempotent (counts stable on re-run); typecheck
+clean, `pnpm -w test` 121/121, build 8/8. LIVE browser as clinic tenant-Admin (Nurse Admin/0001): services "6/6" +
+progressbar + "Free tier limit reached" msg + **Add Service DISABLED** + NO Theme tab (free-gated) — at-cap gating &
+multi-tenancy proven live. Only test baseline needing update was seed.test.ts (asserts the demo fixture's own counts,
+4/3/3/3→8/5/6/9); all other tests already ephemeral-tenant/counter-relative. 69 ahead, 0 pushed (HARD HOLD).
+WAVE 7.6 COMPLETE (backend+UI+demo). NEXT: Wave 7.7 (Dashboard + Media + Display video/ads; incl. wiring theme presets
+to runtime CSS — the T7 deferral). Then 7.8 Super Admin → 7.9 Landing/Signup.
+New demo logins: demo(premium) Branch Admin/0000 · clinic(free) Nurse Admin/0001 · super-admin webmaster@localhost.com.
