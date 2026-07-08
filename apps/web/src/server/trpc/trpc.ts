@@ -1,7 +1,9 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
+import { z } from 'zod';
 import type { Context } from './context';
 import { rateLimiters } from '@/server/lib/rate-limit';
+import { prismaRaw, withTenantContext } from '@cuelane/db';
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
@@ -54,3 +56,33 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
     },
   });
 });
+
+// Kiosk procedure — unauthenticated customer-facing endpoints (ticket issuance + live counts
+// from a tenant's public kiosk page, no session). Every kiosk procedure's input MUST include
+// `tenantSlug` (tRPC v11 input merging — see queueRouter's `.input(callNextSchema-like shapes)`
+// stacked on top of this base). Resolves tenantId via the UNGUARDED `prismaRaw` client — the L6
+// tenant-guard extension throws with no AsyncLocalStorage context active (see
+// packages/db/src/middleware/tenant-guard.ts) — then runs the rest of the procedure chain inside
+// `withTenantContext` so any L6-guarded `prisma` calls downstream are correctly tenant-scoped.
+// Wave 7.1-T3 / the Prisma L6 lesson: this is the mandatory pattern for the unauthenticated path.
+export const kioskProcedure = t.procedure
+  .use(({ ctx, next }) => {
+    rateLimiters.public.check(extractClientIp(ctx.req));
+    return next({ ctx });
+  })
+  .input(z.object({ tenantSlug: z.string().min(1) }))
+  .use(({ input, next }) => {
+    return (async () => {
+      const tenant = await prismaRaw.tenant.findUnique({
+        where: { slug: input.tenantSlug },
+        select: { id: true, status: true },
+      });
+      if (tenant == null) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Unknown tenant.' });
+      }
+      if (tenant.status !== 'active') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Tenant is suspended.' });
+      }
+      return withTenantContext(tenant.id, () => next({ ctx: { tenantId: tenant.id } }));
+    })();
+  });

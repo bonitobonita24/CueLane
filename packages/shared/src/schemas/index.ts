@@ -162,7 +162,25 @@ export const transferTicketSchema = z
 
 export const recallTicketSchema = z.object({
   ticketId: idSchema, // Ticket.id (cuid)
-  priority: z.boolean().default(false), // true = Priority Recall (auto-skips current)
+  // true = Priority Recall (auto-skips current). NOTE: Wave 7.1's queue domain only implements
+  // "re-announce the current serving ticket" — the auto-skip variant is a station-level (7.4)
+  // behavior layered on top of recall(), not yet wired.
+  priority: z.boolean().default(false),
+});
+
+// Wave 7.1 — queueRouter-specific inputs.
+
+export const callNextSchema = z.object({
+  windowId: idSchema,
+});
+
+export const completeTicketSchema = z.object({
+  ticketId: idSchema, // Ticket.id (cuid)
+  outcome: z.enum(['done', 'noshow']),
+});
+
+export const skipTicketSchema = z.object({
+  ticketId: idSchema, // Ticket.id (cuid)
 });
 
 // ─── PlaylistEntry ───────────────────────────────────────────────────────────

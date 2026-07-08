@@ -284,7 +284,9 @@ export interface TransferInput {
   ticketId: string;
   toWindowId: string;
   returnAfterDone: boolean;
-  returnToWindowId?: string;
+  // `| undefined` (not just `?`) — exactOptionalPropertyTypes: the Zod-inferred
+  // transferTicketSchema output type has an explicit `string | undefined`, not an absent key.
+  returnToWindowId?: string | undefined;
 }
 
 /**

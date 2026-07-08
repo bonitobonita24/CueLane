@@ -154,7 +154,7 @@ describe('queue domain (Wave 7.1)', () => {
 
   it('recall re-announces a serving ticket (bumps calledAt) without changing its status', async () => {
     const svc = await freshService();
-    const issued = await withTenant(tenantId, (tx) => issueTicket({ serviceId: svc.id, priority: false }, { tenantId, tx }));
+    await withTenant(tenantId, (tx) => issueTicket({ serviceId: svc.id, priority: false }, { tenantId, tx }));
     const called = await withTenant(tenantId, (tx) =>
       callNext({ windowId: windowOrigin, userId, serviceIds: [svc.id] }, { tenantId, tx }),
     );
