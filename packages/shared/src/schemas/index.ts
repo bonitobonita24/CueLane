@@ -65,12 +65,36 @@ const printerConfigSchema = z.object({
   footerText: z.string().max(200).optional(),
 });
 
-// Decision 2 — theme is a THEME_PRESETS id string (the 9-color custom picker is Wave 7.7).
+// Decision 2 — theme is a THEME_PRESETS id string (back-compat: every tenant seeded before
+// Wave 7.7b stores exactly this bare-string shape, e.g. 'indigo').
 const themePresetIds = THEME_PRESETS.map((t) => t.id) as [string, ...string[]];
 const themeSchema = z.enum(themePresetIds);
 
+// Wave 7.7b — Premium custom 9-color theme. Each value MUST be a bare HSL triplet ("H S% L%",
+// no `hsl()` wrapper) — the exact shape injected verbatim into a server-rendered inline `style`
+// attribute (apps/web `[tenant]/layout.tsx`), so this regex is a security gate (attack-informed
+// hardening — CSS-variable-value injection), not just a formatting nicety.
+const hslTripletSchema = z
+  .string()
+  .regex(/^\d{1,3} \d{1,3}% \d{1,3}%$/, 'Expected an HSL triplet like "217 70% 49%"');
+
+export const customThemeSchema = z.object({
+  primary: hslTripletSchema,
+  primaryForeground: hslTripletSchema,
+  secondary: hslTripletSchema,
+  secondaryForeground: hslTripletSchema,
+  accent: hslTripletSchema,
+  accentForeground: hslTripletSchema,
+  background: hslTripletSchema,
+  foreground: hslTripletSchema,
+  ring: hslTripletSchema,
+});
+
+// Either a preset id (legacy bare-string shape, decision 2) OR a Premium custom object.
+export const themeSettingSchema = z.union([themeSchema, z.object({ custom: customThemeSchema })]);
+
 const tenantSettingsSchema = z.object({
-  theme: themeSchema.optional(),
+  theme: themeSettingSchema.optional(),
   printerConfig: printerConfigSchema.optional(),
   tickerText: z.string().max(500).optional(),
   businessName: z.string().max(100).optional(),

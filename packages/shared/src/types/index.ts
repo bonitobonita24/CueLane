@@ -57,19 +57,89 @@ export const TIER_LIMITS = {
   premium: null,
 } as const;
 
-/** 8 preset theme ids (decision 2 — the custom 9-color-picker is deferred to Wave 7.7). */
+/** The 9 CSS custom-property vars every theme (preset OR custom) resolves to. Values are bare
+ *  HSL triplet strings ("H S% L%", NO `hsl()` wrapper) — the exact format `packages/ui`'s
+ *  Tailwind config expects (`hsl(var(--primary))` etc.) and `globals.css` already uses for the
+ *  base `:root`/`.dark` tokens. Chosen to match the vars Kiosk/Station/Admin actually consume
+ *  (`bg-primary`, `border-primary`, `text-primary-foreground`, `ring-ring`, `bg-secondary`,
+ *  `bg-accent`, `bg-background`, `text-foreground`, etc. — grepped across apps/web + packages/ui). */
+export interface ThemeVars {
+  primary: string;
+  primaryForeground: string;
+  secondary: string;
+  secondaryForeground: string;
+  accent: string;
+  accentForeground: string;
+  background: string;
+  foreground: string;
+  ring: string;
+}
+
+/** Premium-only custom 9-color theme (Wave 7.7b) — same 9 keys as `ThemeVars`, tenant-supplied. */
+export type CustomTheme = ThemeVars;
+
+/** 8 preset theme ids (decision 2, Wave 7.6) — each now carries real CSS-variable color VALUES
+ *  (Wave 7.7b), not just an id/label. Every preset is WCAG-AA contrast-checked (primary vs. its
+ *  white foreground, ≥4.5:1) and tasteful/distinct — no default-indigo-slop; 'indigo' is one of 8
+ *  explicit user-selectable options here, not the app's own default accent (that's Link Blue,
+ *  globals.css `:root`). `secondary`/`accent`/`background`/`foreground` are left at the base
+ *  neutral `:root` values for every preset (only the accent hue changes per-tenant) — only
+ *  `primary`/`primaryForeground`/`ring` vary. */
 export const THEME_PRESETS = [
-  { id: 'indigo', label: 'Indigo' },
-  { id: 'ocean', label: 'Ocean' },
-  { id: 'emerald', label: 'Emerald' },
-  { id: 'rose', label: 'Rose' },
-  { id: 'amber', label: 'Amber' },
-  { id: 'violet', label: 'Violet' },
-  { id: 'teal', label: 'Teal' },
-  { id: 'slate', label: 'Slate' },
-] as const;
+  {
+    id: 'indigo', label: 'Indigo',
+    vars: { primary: '243 75% 59%', primaryForeground: '0 0% 100%', ring: '243 75% 59%' },
+  },
+  {
+    id: 'ocean', label: 'Ocean',
+    vars: { primary: '201 96% 32%', primaryForeground: '0 0% 100%', ring: '201 96% 32%' },
+  },
+  {
+    id: 'emerald', label: 'Emerald',
+    vars: { primary: '163 94% 24%', primaryForeground: '0 0% 100%', ring: '163 94% 24%' },
+  },
+  {
+    id: 'rose', label: 'Rose',
+    vars: { primary: '345 83% 41%', primaryForeground: '0 0% 100%', ring: '345 83% 41%' },
+  },
+  {
+    id: 'amber', label: 'Amber',
+    vars: { primary: '26 90% 37%', primaryForeground: '0 0% 100%', ring: '26 90% 37%' },
+  },
+  {
+    id: 'violet', label: 'Violet',
+    vars: { primary: '263 70% 50%', primaryForeground: '0 0% 100%', ring: '263 70% 50%' },
+  },
+  {
+    id: 'teal', label: 'Teal',
+    vars: { primary: '175 77% 26%', primaryForeground: '0 0% 100%', ring: '175 77% 26%' },
+  },
+  {
+    id: 'slate', label: 'Slate',
+    vars: { primary: '215 25% 27%', primaryForeground: '0 0% 100%', ring: '215 25% 27%' },
+  },
+] as const satisfies ReadonlyArray<{
+  id: string;
+  label: string;
+  vars: Pick<ThemeVars, 'primary' | 'primaryForeground' | 'ring'>;
+}>;
 
 export type ThemePresetId = (typeof THEME_PRESETS)[number]['id'];
+
+/** Neutral base vars (from globals.css `:root`) every preset inherits for the 6 vars it doesn't
+ *  override. Kept here (not re-derived) so `resolveThemeVars` never has to reach into CSS. */
+export const THEME_BASE_VARS: Omit<ThemeVars, 'primary' | 'primaryForeground' | 'ring'> = {
+  secondary: '210 8% 95%',
+  secondaryForeground: '228 8% 25%',
+  accent: '210 8% 95%',
+  accentForeground: '228 8% 25%',
+  background: '0 0% 100%',
+  foreground: '0 0% 0%',
+};
+
+/** A tenant's `settings.theme` value: a preset id (legacy bare-string shape, Wave 7.6) OR a
+ *  Premium custom 9-color object (Wave 7.7b). */
+export type ThemeSetting = ThemePresetId | { custom: CustomTheme };
 
 /** 16 emoji options for Service.icon (decision 4). */
 export const SERVICE_ICON_OPTIONS = [
@@ -106,8 +176,9 @@ export interface PrinterConfig {
 }
 
 export interface TenantSettings {
-  /** A THEME_PRESETS id, e.g. 'indigo' (decision 2 — not the object shape used pre-Wave-7.6). */
-  theme?: ThemePresetId;
+  /** A THEME_PRESETS id (e.g. 'indigo', decision 2) OR a Premium custom-color object
+   *  (`{ custom: {...} }`, Wave 7.7b). See `ThemeSetting`. */
+  theme?: ThemeSetting;
   printerConfig?: PrinterConfig;
   tickerText?: string;
   businessName?: string;
