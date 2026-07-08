@@ -3,28 +3,44 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.2 DONE + PM-verified**
-LAST_DONE:    Phase 7 Wave 7.2 — Realtime Transport (SSE) (2026-07-08). TDD, real dev stack.
-              Commits 07b792b (T1 Valkey pub/sub publisher — queueChannel `tenant:{tenantId}:queue`,
-              lazy ioredis singleton, fire-and-forget-safe: a Valkey outage never fails a mutation),
-              83c38a7 (T2 wire queueRouter — all 6 mutations call publishEvents(result.events)),
-              cc2dc13 (T3 SSE Route Handler app/api/tenants/[slug]/queue/stream — runtime=nodejs,
-              force-dynamic, dedicated per-tenant subscriber, `: connected`+heartbeat, abort cleanup;
-              STRICT per-tenant channel isolation, tenantId derived server-side), d1ca600 (T4
-              useQueueStream EventSource hook w/ backoff reconnect). Added ioredis as direct web dep.
-              PM re-verified independently: typecheck 8/8 ✓, web tests 33/33 ✓ (5 files, 8 new), and
-              SSE E2E BY HAND — published a real event to the tenant channel, observed it arrive on a
-              live `curl -N …/stream` as a `data:` frame (subscribers delivered=1, isolation confirmed).
-              Prior waves: 7.1 Queue Engine Backbone (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a),
-              SSE decision (88624f5). 45 commits ahead of origin, 0 pushed (HARD HOLD).
-NEXT:         Phase 7 Wave 7.3 — Kiosk. ⚠ MUST FIX FIRST: seed non-cuid IDs vs .cuid() shared schemas
-              (packages/db/prisma/seed.ts — make seed emit real cuids; do NOT loosen schemas; re-verify
-              seed+tests). See PHASE7_ROADMAP PM Addendum. Then 7.4 Station → 7.5 Display → 7.6+ Admin.
-              Wave 7.2 wired the transport; 7.3+ UIs consume it via useQueueStream.
-              Phase 6 (deploy) is gated on owner CREDENTIALS.md items + explicit word (HARD HOLD).
-DEFERRED:     Pre-existing @cuelane/shared lint failure (packages/shared schemas.smoke.test.ts,
-              ESLint TS-project-service parse error, introduced commit 7910825 BEFORE Wave 7.2 —
-              out of scope for the wave). Fix at a task boundary; does not block dev or gates.
+PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.3 DONE + PM-verified**
+LAST_DONE:    Phase 7 Wave 7.3 — Customer Kiosk (2026-07-08). Single Sonnet worker, TDD, real dev stack.
+              Commits b8797d9 (T0 seed-cuid BLOCKER fix — seed.ts emits REAL Prisma cuids, never literal
+              `seed-*` ids; Service upserts by natural unique (tenantId,number), Window/User/Ticket via
+              find-by-natural-key-then-create; + packages/db/prisma/seed.test.ts TDD runs real seed CLI
+              twice, asserts cuid shape + idempotency), 0aaf118 (T1 Kiosk UI — [tenant]/kiosk server shell
+              + kiosk-client.tsx: transaction grid, priority-lane, issue→number→hidden-iframe-receipt→5s
+              auto-reset, LIVE waiting counts via Wave-7.2 useQueueStream SSE (no polling); added kiosk-safe
+              queueRouter.listActive query + its test; uses tRPC v11 vanilla proxy client — no react-query
+              provider exists yet, avoided an unscoped cross-cutting add), cc2fca2 (fix: gate auto-print
+              behind Tenant.settings.printerConfig.enabled — window.print() is modal/thread-blocking, hangs
+              headless/kiosk if unconditional).
+              PM re-verified INDEPENDENTLY against ground truth: typecheck 8/8 ✓; pnpm -w test 39/39 ✓
+              (shared 3, db 2, web 34) with DATABASE_URL loaded (turbo test task is envMode=strict → needs
+              DATABASE_URL in shell + dev DB up — established convention, NOT a bug); seed emits real cuids
+              (tenant+all services match /^c[a-z0-9]{24}$/); live GET /demo/kiosk → 200 ("Demo Branch Co.",
+              priority lane rendered); worker Playwright artifacts test-artifacts/phase7-kiosk/ (grid,
+              regular ticket 2-002, priority P-002 verified in DB priority:true). NOAUTH publisher log-spam
+              during web tests = BY DESIGN (fire-and-forget-safe), tests still 34/34.
+              Prior waves: 7.2 SSE (07b792b/83c38a7/cc2dc13/d1ca600), 7.1 Queue Engine
+              (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a). 49 commits ahead of origin, 0 pushed (HARD HOLD).
+NEXT:         Phase 7 Wave 7.4 — Employee Station (desktop). PIN login → window select (SessionMap in
+              Valkey) → call/complete(3-option: done/noshow/return-after-done)/skip/recall/transfer,
+              skipped panel, stats sidebar, Web Audio chime + SpeechSynthesis voice. Consumes the queueRouter
+              staff procedures (callNext/complete/skip/recall/transfer, all built in 7.1) + useQueueStream.
+              Verify: full serve cycle across two devices reflects instantly; voice announces. Then 7.5 Big
+              Display → 7.6+ Admin. Phase 6 (deploy) gated on owner CREDENTIALS.md + explicit word (HARD HOLD).
+DEFERRED (task-boundary fast-follows, non-blocking):
+              1. Pre-existing @cuelane/shared lint failure (packages/shared schemas.smoke.test.ts, ESLint
+                 TS-project-service parse error, from commit 7910825 BEFORE Wave 7.2). `pnpm -w lint` = 7/8.
+                 Does not block dev/typecheck/tests. Fix at next boundary (before or alongside 7.4).
+              2. queue.integration.test.ts pollutes the SHARED `demo` tenant with orphaned fixture rows
+                 (no afterAll teardown) — demo now has 7 services / 9 tickets vs seeded 4/3, visible on the
+                 real kiosk grid. Fix: give the integration test its OWN ephemeral tenant OR add teardown;
+                 then re-seed demo clean. (Discovered by PM during 7.3 verify.)
+              3. Ops note for Phase 6+: true zero-touch kiosk auto-print needs the kiosk browser launched
+                 with a silent-print flag (Chrome --kiosk-printing); until then keep printerConfig.enabled
+                 false. Not app code — deployment/runbook concern.
 EVIDENCE:     Ground-truth verified by exercising the REAL running dev stack (PM, 2026-07-08):
               • Gates: pnpm -w typecheck 8/8 ✓ · pnpm -w lint 8/8 ✓ · pnpm -w build 8/8 ✓ ·
                 pnpm -w test 3/3 ✓ (new @cuelane/shared smoke suite; repo previously had 0 tests).
