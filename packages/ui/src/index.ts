@@ -24,3 +24,4 @@ export * from './components/ui/progress';
 export * from './components/ui/alert-dialog';
 export * from './components/ui/dropdown-menu';
 export * from './components/ui/separator';
+export * from './components/ui/checkbox';
