@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Context } from './context';
 import { rateLimiters } from '@/server/lib/rate-limit';
 import { prismaRaw, withTenantContext } from '@cuelane/db';
+import { Role } from '@cuelane/shared';
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
@@ -65,6 +66,31 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 // packages/db/src/middleware/tenant-guard.ts) — then runs the rest of the procedure chain inside
 // `withTenantContext` so any L6-guarded `prisma` calls downstream are correctly tenant-scoped.
 // Wave 7.1-T3 / the Prisma L6 lesson: this is the mandatory pattern for the unauthenticated path.
+// Admin procedure — protected, tenant-scoped, Admin-only. The shared base for every Wave 7.6
+// Admin Core CRUD mutation/query (services/windows/users/tenant settings). Identical composition
+// to queueRouter's `staffProcedure` (protectedProcedure → tenant guard → role guard → establish
+// the L6 AsyncLocalStorage tenant context) but with the role narrowed to Admin only — no
+// Employee access to admin CRUD. Defined here (not composed from middleware/tenant.ts +
+// middleware/rbac.ts) to avoid a circular import: those two files import `middleware` FROM this
+// file, so importing them back into trpc.ts would create a cycle. Inlined equivalent logic
+// instead — same L1 tenant-guard + L3 RBAC checks, just expressed directly.
+export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  const isSuperAdmin = ctx.roles.includes(Role.SuperAdmin);
+  if (!isSuperAdmin && ctx.tenantId == null) {
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'No tenant context in session.' });
+  }
+  if (!ctx.roles.includes(Role.Admin)) {
+    throw new TRPCError({ code: 'FORBIDDEN' });
+  }
+
+  const tenantId = ctx.tenantId;
+  const userId = ctx.userId;
+  if (tenantId == null || userId == null) {
+    throw new TRPCError({ code: 'UNAUTHORIZED' });
+  }
+  return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));
+});
+
 export const kioskProcedure = t.procedure
   .use(({ ctx, next }) => {
     rateLimiters.public.check(extractClientIp(ctx.req));
