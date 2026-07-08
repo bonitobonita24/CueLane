@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    /* Link Blue #2264d6 */
+    --primary: 217 70% 49%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Light muted surface #f1f2f3 */
+    --secondary: 210 8% 95%;
+    --secondary-foreground: 228 8% 25%;
+
+    --muted: 210 8% 95%;
+    --muted-foreground: 225 7% 43%;
+
+    --accent: 210 8% 95%;
+    --accent-foreground: 228 8% 25%;
+
+    /* Destructive red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border #d5d7db */
+    --border: 216 8% 85%;
+    /* Input border */
+    --input: 216 8% 85%;
+    /* Focus ring */
+    --ring: 217 70% 49%;
+
+    --radius: 0.5rem;
+
+    /* Fonts */
+    --font-sans: 'DM Sans';
+    --font-display: 'Outfit';
+    --font-mono: 'Space Mono';
+  }
+
+  .dark {
+    /* Dark Charcoal #15181e */
+    --background: 224 13% 10%;
+    --foreground: 0 0% 95%;
+
+    --card: 224 13% 13%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 224 13% 13%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 217 70% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 224 13% 17%;
+    --secondary-foreground: 0 0% 85%;
+
+    --muted: 224 13% 17%;
+    --muted-foreground: 225 7% 60%;
+
+    --accent: 224 13% 17%;
+    --accent-foreground: 0 0% 85%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 224 13% 20%;
+    --input: 224 13% 20%;
+    --ring: 217 70% 55%;
+  }
+}
+
+/* ── 8 accent theme presets ── */
+
+/* 1. default — Link Blue #2264d6 */
+[data-theme="default"] {
+  --primary: 217 70% 49%;
+  --primary-foreground: 0 0% 100%;
+}
+
+/* 2. terraform — Terraform Purple #7b42bc */
+[data-theme="terraform"] {
+  --primary: 270 46% 49%;
+  --primary-foreground: 0 0% 100%;
+}
+
+/* 3. vault — Vault Yellow/Amber #ffcf25 (dark foreground for contrast) */
+[data-theme="vault"] {
+  --primary: 48 100% 57%;
+  --primary-foreground: 224 13% 10%;
+}
+
+/* 4. waypoint — Waypoint Teal #14c6cb */
+[data-theme="waypoint"] {
+  --primary: 182 82% 43%;
+  --primary-foreground: 0 0% 100%;
+}
+
+/* 5. vagrant — Vagrant Blue #1868f2 */
+[data-theme="vagrant"] {
+  --primary: 222 89% 52%;
+  --primary-foreground: 0 0% 100%;
+}
+
+/* 6. purple — Purple Accent #911ced */
+[data-theme="purple"] {
+  --primary: 277 83% 50%;
+  --primary-foreground: 0 0% 100%;
+}
+
+/* 7. bright — Bright Blue #2b89ff */
+[data-theme="bright"] {
+  --primary: 213 100% 59%;
+  --primary-foreground: 0 0% 100%;
+}
+
+/* 8. amber-gold — Amber Gold #FCD34D (dark foreground for contrast) */
+[data-theme="amber-gold"] {
+  --primary: 45 97% 64%;
+  --primary-foreground: 224 13% 10%;
+}
+
+/* ── Utility classes ── */
+
+@layer utilities {
+  /* HashiCorp wayfinding label pattern from DESIGN.md */
+  .cl-label {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.3px;
+    line-height: 1.4;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
