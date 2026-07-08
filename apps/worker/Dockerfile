@@ -26,7 +26,9 @@ RUN npm install -g pnpm
 # pnpm hoists all deps to the root node_modules; individual package dirs do NOT exist.
 COPY --from=deps /app/node_modules ./node_modules
 # Copy source — build stage can COPY . . safely (this is NOT the runtime stage)
-COPY tsconfig.base.json turbo.json ./
+# Root package.json + pnpm-workspace.yaml are required so `pnpm --filter` can
+# resolve the workspace root manifest (pnpm errors ERR_PNPM_NO_PKG_MANIFEST without it).
+COPY package.json pnpm-workspace.yaml tsconfig.base.json turbo.json ./
 COPY packages/db      ./packages/db
 COPY packages/jobs    ./packages/jobs
 COPY packages/shared  ./packages/shared
@@ -48,6 +50,8 @@ RUN node -e "var fs=require('fs');['packages/db','packages/jobs','packages/share
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Prisma query engine needs OpenSSL for libssl detection (@cuelane/db). See web Dockerfile.
+RUN apk add --no-cache openssl libc6-compat
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 worker
 # External dependencies — full node_modules (includes pnpm workspace symlinks)
 COPY --from=builder /app/node_modules ./node_modules
@@ -61,6 +65,15 @@ COPY --from=builder /app/packages/shared/dist          ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json  ./packages/shared/
 COPY --from=builder /app/packages/storage/dist          ./packages/storage/dist
 COPY --from=builder /app/packages/storage/package.json  ./packages/storage/
+# Per-package node_modules symlink trees. Under pnpm each workspace package's
+# DIRECT deps (bullmq, nodemailer, @prisma/client, …) live as symlinks in the
+# package's own node_modules/ pointing into the root .pnpm store (already copied
+# above). Without these the runtime fails with ERR_MODULE_NOT_FOUND (e.g. bullmq).
+COPY --from=builder /app/apps/worker/node_modules   ./apps/worker/node_modules
+COPY --from=builder /app/packages/db/node_modules   ./packages/db/node_modules
+COPY --from=builder /app/packages/jobs/node_modules  ./packages/jobs/node_modules
+COPY --from=builder /app/packages/shared/node_modules  ./packages/shared/node_modules
+COPY --from=builder /app/packages/storage/node_modules ./packages/storage/node_modules
 # Compiled worker entry point
 COPY --from=builder /app/apps/worker/dist          ./apps/worker/dist
 COPY --from=builder /app/apps/worker/package.json  ./apps/worker/
