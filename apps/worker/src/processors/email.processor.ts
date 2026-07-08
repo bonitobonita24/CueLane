@@ -22,52 +22,65 @@ function escapeHtml(raw: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Safely coerce an unknown template value to a string. Only primitives are
+ * stringified; objects/arrays/functions become '' (never leak '[object Object]'
+ * into an email, and satisfies @typescript-eslint/no-base-to-string).
+ */
+function asStr(v: unknown): string {
+  return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
+    ? String(v)
+    : '';
+}
+
 function renderTemplate(
   templateId: string,
   data: Record<string, unknown>,
 ): { subject: string; html: string; text: string } {
-  const url = escapeHtml(String(data['url'] ?? ''));
-  const plan = escapeHtml(String(data['plan'] ?? ''));
-  const endDate = escapeHtml(String(data['endDate'] ?? ''));
-  const renewalDate = escapeHtml(String(data['renewalDate'] ?? ''));
+  const rawUrl = asStr(data['url']);
+  const url = escapeHtml(rawUrl);
+  const plan = escapeHtml(asStr(data['plan']));
+  const endDate = escapeHtml(asStr(data['endDate']));
+  const renewalDate = escapeHtml(asStr(data['renewalDate']));
 
   switch (templateId) {
     case 'email_verification':
       return {
         subject: 'Verify your CueLane account',
         html: `<p>Click <a href="${url}">here</a> to verify your email.</p>`,
-        text: `Verify your email: ${String(data['url'] ?? '')}`,
+        text: `Verify your email: ${rawUrl}`,
       };
     case 'password_reset':
       return {
         subject: 'Reset your CueLane password',
         html: `<p>Click <a href="${url}">here</a> to reset your password. Link expires in 1 hour.</p>`,
-        text: `Reset your password: ${String(data['url'] ?? '')}`,
+        text: `Reset your password: ${rawUrl}`,
       };
     case 'subscription_confirmation':
       return {
         subject: 'Your CueLane subscription is confirmed',
         html: `<p>Your subscription to plan <strong>${plan}</strong> is now active.</p>`,
-        text: `Your subscription to ${String(data['plan'] ?? '')} is now active.`,
+        text: `Your subscription to ${asStr(data['plan'])} is now active.`,
       };
     case 'subscription_cancellation':
       return {
         subject: 'Your CueLane subscription has been cancelled',
         html: `<p>Your subscription has been cancelled. Access ends on ${endDate}.</p>`,
-        text: `Your subscription has been cancelled. Access ends on ${String(data['endDate'] ?? '')}.`,
+        text: `Your subscription has been cancelled. Access ends on ${asStr(data['endDate'])}.`,
       };
     case 'subscription_renewal_reminder':
       return {
         subject: 'Your CueLane subscription renews soon',
         html: `<p>Your subscription renews on ${renewalDate}.</p>`,
-        text: `Your subscription renews on ${String(data['renewalDate'] ?? '')}.`,
+        text: `Your subscription renews on ${asStr(data['renewalDate'])}.`,
       };
     default: {
-      const body = escapeHtml(String(data['body'] ?? ''));
+      const rawBody = asStr(data['body']);
+      const subject = asStr(data['subject']);
       return {
-        subject: data['subject'] !== undefined ? String(data['subject']) : 'CueLane notification',
-        html: `<p>${body}</p>`,
-        text: String(data['body'] ?? ''),
+        subject: subject.length > 0 ? subject : 'CueLane notification',
+        html: `<p>${escapeHtml(rawBody)}</p>`,
+        text: rawBody,
       };
     }
   }

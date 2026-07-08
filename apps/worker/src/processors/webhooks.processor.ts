@@ -6,7 +6,9 @@ export async function processWebhooksJob(job: Job<WebhooksJobPayload>): Promise<
   const { tenantId, endpoint, event, data, attempt } = job.data;
 
   await withTenant(tenantId, async (tx) => {
-    // TODO (Phase 8): validate Xendit signature, dispatch to tenant handler, persist webhook log
+    // TODO (Phase 8): validate Xendit signature, dispatch to tenant handler, persist webhook log.
+    // Placeholder await keeps the callback genuinely async (require-await) until real IO lands.
+    await Promise.resolve();
     console.log(
       `[webhooks] processing event=${event} endpoint=${endpoint} attempt=${attempt ?? 1} tenant=${tenantId} job=${job.id ?? 'unknown'}`,
       { dataDefined: data !== undefined, txDefined: tx !== undefined },

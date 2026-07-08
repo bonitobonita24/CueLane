@@ -6,7 +6,9 @@ export async function processReportsJob(job: Job<ReportsJobPayload>): Promise<vo
   const { tenantId, reportType, filters, outputFormat, notifyEmail } = job.data;
 
   await withTenant(tenantId, async (tx) => {
-    // TODO (Phase 8): query tenant data via tx, build report, upload to storage
+    // TODO (Phase 8): query tenant data via tx, build report, upload to storage.
+    // Placeholder await keeps the callback genuinely async (require-await) until real IO lands.
+    await Promise.resolve();
     console.log(
       `[reports] generating reportType=${reportType} format=${outputFormat} tenant=${tenantId} job=${job.id ?? 'unknown'}`,
       { filters, notifyEmail, txDefined: tx !== undefined },
