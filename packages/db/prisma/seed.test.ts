@@ -9,6 +9,11 @@
 // Runs the REAL `tsx prisma/seed.ts` CLI entry point (no mocks, exercises the exact path
 // `pnpm --filter @cuelane/db db:seed` runs) against the REAL dev Postgres DB, then inspects the
 // resulting rows via `prismaRaw` — same no-mocks convention as every other test in this repo.
+//
+// Wave 7.6-T9 — seed.ts now seeds the enriched `demo` tenant (8 services / 5 windows / 6 users /
+// 9 tickets) PLUS a second free-tier `clinic` tenant. This file only asserts `demo`'s counts
+// (its own natural-key idempotency); `clinic`'s counts are covered by the Wave 7.6-T9 seed smoke
+// check (see docs/PRODUCT.md / STATE.md), not duplicated here.
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -44,19 +49,19 @@ describe('prisma/seed.ts (T0 — real-cuid ids + idempotent reseed)', () => {
       expect(tenant.id).toMatch(CUID_RE);
 
       const services = await prismaRaw.service.findMany({ where: { tenantId: tenant.id } });
-      expect(services.length).toBe(4);
+      expect(services.length).toBe(8);
       for (const s of services) expect(s.id).toMatch(CUID_RE);
 
       const windows = await prismaRaw.window.findMany({ where: { tenantId: tenant.id } });
-      expect(windows.length).toBe(3);
+      expect(windows.length).toBe(5);
       for (const w of windows) expect(w.id).toMatch(CUID_RE);
 
       const users = await prismaRaw.user.findMany({ where: { tenantId: tenant.id } });
-      expect(users.length).toBe(3);
+      expect(users.length).toBe(6);
       for (const u of users) expect(u.id).toMatch(CUID_RE);
 
       const tickets = await prismaRaw.ticket.findMany({ where: { tenantId: tenant.id } });
-      expect(tickets.length).toBe(3);
+      expect(tickets.length).toBe(9);
       for (const t of tickets) expect(t.id).toMatch(CUID_RE);
     })();
   });
