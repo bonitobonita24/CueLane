@@ -13,7 +13,12 @@
     },
     "test": {
       "dependsOn": ["^test"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**"],
+      // Wave 7.1: @cuelane/web's domain/router/integration tests hit the real dev Postgres DB
+      // (no mocks). turbo's default envMode is "strict" — DATABASE_URL must be explicitly
+      // listed or it's silently stripped from the task's environment (Prisma then fails with
+      // "Environment variable not found: DATABASE_URL" even though the invoking shell has it).
+      "env": ["DATABASE_URL"]
     },
     "dev": {
       "cache": false,

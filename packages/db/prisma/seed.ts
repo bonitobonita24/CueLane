@@ -266,6 +266,33 @@ async function main(): Promise<void> {
 
   console.log(`  ✓ Tickets: ${[ticket1, ticket2, ticket3].map((t) => `${t.id}(${t.status})`).join(', ')}`);
 
+  // ─── SequenceCounter reservations ───────────────────────────────────────────
+  // The 3 seed tickets above set `number`/`sequence` directly, bypassing the atomic
+  // SequenceCounter allocator (apps/web/src/server/domain/queue.ts issueTicket) that live
+  // ticket issuance uses. Without a matching counter row, the FIRST live issueTicket() call
+  // for demo today would start from 0 again and re-issue "1-001"/"P-001" — a duplicate of
+  // what's already seeded. Reserve the counters at `value: 1` for each key the seed just
+  // consumed (mirrors this file's own todayKey/pad3 scheme). `update: {}` is intentional — if
+  // a real issueTicket() call already bumped this counter higher (e.g. dev testing between
+  // reseeds), a reseed must NOT roll it back and re-open a collision window.
+  function todayKey(): string {
+    const d = new Date();
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}${m}${day}`;
+  }
+
+  const reservedCounterKeys = [`${svcDeposit.id}:${todayKey()}`, `${svcLoan.id}:${todayKey()}`, `priority:${todayKey()}`];
+  for (const key of reservedCounterKeys) {
+    await prisma.sequenceCounter.upsert({
+      where: { tenantId_key: { tenantId: tenant.id, key } },
+      update: {},
+      create: { tenantId: tenant.id, key, value: 1 },
+    });
+  }
+  console.log(`  ✓ SequenceCounter reservations: ${reservedCounterKeys.length} keys`);
+
   // ─── System Ad placeholder ──────────────────────────────────────────────────
 
   const existingAd = await prisma.systemAd.findFirst();
