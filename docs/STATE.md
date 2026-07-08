@@ -3,12 +3,19 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 5 (Validation) COMPLETE — ready for Phase 6**
-LAST_DONE:    Phase 5 — Validation (2026-07-08). Stood the full dev stack up on REAL data, fixed
-              every runtime defect found, and exercised the running app end-to-end (Playwright MCP).
-              10 local commits (8c9560b..HEAD) — see FIXES below. App + worker containers healthy.
-NEXT:         Phase 6 — Dockerize/deploy hardening (stage/prod). Human trigger: "Start Phase 6".
-              (Deploy stays on HARD HOLD — local dev only until explicit owner word.)
+PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.1 DONE + PM-verified**
+LAST_DONE:    Phase 7 Wave 7.1 — Queue Engine Backbone (2026-07-08). TDD, real dev Postgres.
+              Commits f1fa3a1 (schema: Service.number, Ticket.number/sequence, atomic SequenceCounter +
+              migration 20260708120000_queue_engine_backbone + seed backfill), 90627a7 (domain/queue.ts:
+              race-safe numbering, priority-first→FIFO callNext, complete/skip/noshow/recall/transfer+
+              Return-After-Done), afb709f (queueRouter tRPC + kioskProcedure), a937cf8 (integration test).
+              PM re-verified independently: typecheck 8/8, tests shared 3/3 + web 25/25, migrate up-to-date.
+              Prior: /login page (f99916a) + SSE realtime decision (88624f5). Roadmap docs/PHASE7_ROADMAP.md.
+              41 commits ahead of origin, 0 pushed (HARD HOLD). App + worker containers healthy.
+NEXT:         Phase 7 Wave 7.2 — Realtime Transport (SSE: Valkey pub/sub → Route Handler ReadableStream →
+              EventSource; per-tenant channel, 6 events). Then 7.3 Kiosk (⚠ FIX seed non-cuid IDs vs .cuid()
+              schemas FIRST — see PHASE7_ROADMAP PM Addendum) → 7.4 Station → 7.5 Display → 7.6+ Admin.
+              Phase 6 (deploy) is gated on owner CREDENTIALS.md items + explicit word (HARD HOLD).
 EVIDENCE:     Ground-truth verified by exercising the REAL running dev stack (PM, 2026-07-08):
               • Gates: pnpm -w typecheck 8/8 ✓ · pnpm -w lint 8/8 ✓ · pnpm -w build 8/8 ✓ ·
                 pnpm -w test 3/3 ✓ (new @cuelane/shared smoke suite; repo previously had 0 tests).
