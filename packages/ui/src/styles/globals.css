@@ -139,6 +139,65 @@
     letter-spacing: 1.3px;
     line-height: 1.4;
   }
+
+  /* Wave 7.5 — Big Display "Now Serving" cell flash, fired by remounting the cell (React `key`
+     keyed on ticketNumber) whenever a window's serving ticket changes. Respects R13/motion.md's
+     mandatory prefers-reduced-motion gate: the animation is entirely disabled (falls back to a
+     static gold glow, no motion) for users who have requested reduced motion — this is a plain
+     CSS keyframe (no Motion(motion.dev) dependency added for a single one-shot flash; see
+     ui-rules.md Rule 14 INHERIT-not-REPLACE — DESIGN.md is silent on this exact pattern). */
+  .cl-pulse-glow {
+    animation: cl-pulse-glow-kf 900ms ease-out 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cl-pulse-glow {
+      animation: none;
+      text-shadow: 0 0 18px rgba(252, 211, 77, 0.55);
+    }
+  }
+}
+
+@layer utilities {
+  /* Wave 7.5 — Big Display bottom ticker, continuous marquee. Disabled under
+     prefers-reduced-motion (falls back to a static, truncated line) — same R13/motion.md gate as
+     .cl-pulse-glow above. */
+  .cl-ticker-scroll {
+    display: inline-block;
+    padding-left: 100%;
+    animation: cl-ticker-scroll-kf 28s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cl-ticker-scroll {
+      animation: none;
+      padding-left: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
+
+@keyframes cl-ticker-scroll-kf {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes cl-pulse-glow-kf {
+  0% {
+    text-shadow: 0 0 0px rgba(252, 211, 77, 0);
+  }
+  30% {
+    text-shadow: 0 0 24px rgba(252, 211, 77, 0.9);
+  }
+  100% {
+    text-shadow: 0 0 0px rgba(252, 211, 77, 0);
+  }
 }
 
 @layer base {
