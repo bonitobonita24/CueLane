@@ -3,44 +3,48 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.3 DONE + PM-verified**
-LAST_DONE:    Phase 7 Wave 7.3 — Customer Kiosk (2026-07-08). Single Sonnet worker, TDD, real dev stack.
-              Commits b8797d9 (T0 seed-cuid BLOCKER fix — seed.ts emits REAL Prisma cuids, never literal
-              `seed-*` ids; Service upserts by natural unique (tenantId,number), Window/User/Ticket via
-              find-by-natural-key-then-create; + packages/db/prisma/seed.test.ts TDD runs real seed CLI
-              twice, asserts cuid shape + idempotency), 0aaf118 (T1 Kiosk UI — [tenant]/kiosk server shell
-              + kiosk-client.tsx: transaction grid, priority-lane, issue→number→hidden-iframe-receipt→5s
-              auto-reset, LIVE waiting counts via Wave-7.2 useQueueStream SSE (no polling); added kiosk-safe
-              queueRouter.listActive query + its test; uses tRPC v11 vanilla proxy client — no react-query
-              provider exists yet, avoided an unscoped cross-cutting add), cc2fca2 (fix: gate auto-print
-              behind Tenant.settings.printerConfig.enabled — window.print() is modal/thread-blocking, hangs
-              headless/kiosk if unconditional).
-              PM re-verified INDEPENDENTLY against ground truth: typecheck 8/8 ✓; pnpm -w test 39/39 ✓
-              (shared 3, db 2, web 34) with DATABASE_URL loaded (turbo test task is envMode=strict → needs
-              DATABASE_URL in shell + dev DB up — established convention, NOT a bug); seed emits real cuids
-              (tenant+all services match /^c[a-z0-9]{24}$/); live GET /demo/kiosk → 200 ("Demo Branch Co.",
-              priority lane rendered); worker Playwright artifacts test-artifacts/phase7-kiosk/ (grid,
-              regular ticket 2-002, priority P-002 verified in DB priority:true). NOAUTH publisher log-spam
-              during web tests = BY DESIGN (fire-and-forget-safe), tests still 34/34.
-              Prior waves: 7.2 SSE (07b792b/83c38a7/cc2dc13/d1ca600), 7.1 Queue Engine
-              (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a). 49 commits ahead of origin, 0 pushed (HARD HOLD).
-NEXT:         Phase 7 Wave 7.4 — Employee Station (desktop). PIN login → window select (SessionMap in
-              Valkey) → call/complete(3-option: done/noshow/return-after-done)/skip/recall/transfer,
-              skipped panel, stats sidebar, Web Audio chime + SpeechSynthesis voice. Consumes the queueRouter
-              staff procedures (callNext/complete/skip/recall/transfer, all built in 7.1) + useQueueStream.
-              Verify: full serve cycle across two devices reflects instantly; voice announces. Then 7.5 Big
-              Display → 7.6+ Admin. Phase 6 (deploy) gated on owner CREDENTIALS.md + explicit word (HARD HOLD).
+PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.4 DONE + PM-verified**
+LAST_DONE:    Phase 7 Wave 7.4 — Employee Station (desktop) (2026-07-08). Single Sonnet worker, TDD, real dev stack.
+              Commits ec1575e (T0 — queue.integration.test.ts afterAll teardown; restored demo to seed baseline
+              4 svc/3 tickets/3 windows/3 users — RESOLVES prior DEFERRED #2), d2f5f9f (fix: admin-credentials
+              authorize() filtered role:{in:['admin']} → silently blocked EVERY employee login despite the code
+              supporting Role.Employee — real latent Phase-4 bug, caught because 7.4 finally tests a tenant
+              EMPLOYEE path), 8bb268d (T1 backend — recallSkipped domain fn + tRPC procedure, listSkipped/
+              listWindows queries, Valkey-backed station.getWindow/setWindow session keyed station:{tenantId}:
+              {userId}), d794ec0 (T2/T3 frontend — station page/client: window-select→serve cycle→skipped
+              panel→transfer dialog + useAnnounce chime/voice hook; reuses Auth.js session, protected route
+              redirects unauth→/login?callbackUrl; tRPC v11 vanilla proxy client per kiosk pattern), b8c068f
+              (fix: 3 bugs found live-testing — missing withTenantContext wrap; the wrap needed an ASYNC
+              callback (a plain arrow returning a Prisma lazy-thenable loses AsyncLocalStorage context — new
+              L6 lesson); React controlled/uncontrolled <Select> via empty-string sentinel).
+              PM re-verified INDEPENDENTLY against ground truth: typecheck 8/8 ✓; pnpm -w test 58 green
+              (shared 3, db 2, web 53) with DATABASE_URL+VALKEY_URL loaded; pnpm -w build 8/8 ✓ (/[tenant]/
+              station compiles 3.72 kB/176 kB); live GET /demo/station → 307 → /login?callbackUrl (auth guard
+              works); demo tenant DB re-confirmed CLEAN post-run (services=4/tickets=3/windows=3); two-tab SSE
+              flow + transfer+Return-After-Done DB-verified per test-artifacts/phase7-station/NOTES.md +3 png.
+              Prior waves: 7.3 Kiosk (b8797d9/0aaf118/cc2fca2), 7.2 SSE (07b792b/83c38a7/cc2dc13/d1ca600),
+              7.1 Queue Engine (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a). 55 commits ahead, 0 pushed (HARD HOLD).
+NEXT:         Phase 7 Wave 7.5 — Big Display. 2×2 now-serving grid (gold names, clamp sizing, pulse-glow),
+              up-next, total-waiting bar (color bands), ticker, 16:9 lock, live updates via useQueueStream.
+              (Video/ads panel deferred to 7.7.) Deps: 7.1 + 7.2 (both done). Verify: a call updates the grid
+              instantly (SSE, no reload); layout locks 16:9; free-tier Powerbyte branding shows. Then 7.6 Admin
+              Core CRUD → 7.7+ Dashboard/Media/Ads. Phase 6 (deploy) gated on owner CREDENTIALS.md + explicit
+              word (HARD HOLD). REMINDER: every new feature's validation MUST exercise a TENANT path, not just
+              super-admin (that gap hid the L6 auth bug + the employee-login-filter bug).
 DEFERRED (task-boundary fast-follows, non-blocking):
               1. Pre-existing @cuelane/shared lint failure (packages/shared schemas.smoke.test.ts, ESLint
                  TS-project-service parse error, from commit 7910825 BEFORE Wave 7.2). `pnpm -w lint` = 7/8.
-                 Does not block dev/typecheck/tests. Fix at next boundary (before or alongside 7.4).
-              2. queue.integration.test.ts pollutes the SHARED `demo` tenant with orphaned fixture rows
-                 (no afterAll teardown) — demo now has 7 services / 9 tickets vs seeded 4/3, visible on the
-                 real kiosk grid. Fix: give the integration test its OWN ephemeral tenant OR add teardown;
-                 then re-seed demo clean. (Discovered by PM during 7.3 verify.)
+                 Does not block dev/typecheck/tests (the smoke suite itself PASSES as a test — this is the
+                 LINT parse step only). Fix at a task boundary.
+              2. [RESOLVED in 7.4-T0 commit ec1575e] queue.integration.test.ts demo-tenant pollution — now
+                 has afterAll teardown; demo re-verified clean (4 svc/3 tickets/3 windows).
               3. Ops note for Phase 6+: true zero-touch kiosk auto-print needs the kiosk browser launched
                  with a silent-print flag (Chrome --kiosk-printing); until then keep printerConfig.enabled
                  false. Not app code — deployment/runbook concern.
+              4. Station "Change Window" button is a disabled placeholder (fast-follow); chime/voice actual
+                 AUDIO output unasserted headless (code path verified error-free only); a second REAL employee
+                 session completing a Return-After-Done ticket at the destination window not driven live
+                 (domain behavior covered by queue.integration.test.ts's Return-After-Done test, passing).
 EVIDENCE:     Ground-truth verified by exercising the REAL running dev stack (PM, 2026-07-08):
               • Gates: pnpm -w typecheck 8/8 ✓ · pnpm -w lint 8/8 ✓ · pnpm -w build 8/8 ✓ ·
                 pnpm -w test 3/3 ✓ (new @cuelane/shared smoke suite; repo previously had 0 tests).
