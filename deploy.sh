@@ -18,6 +18,15 @@
 # V32.17 (lint-design.sh design anti-slop gate) adds deliverable #26 — scripts/lint-design.sh
 # (D1–D7 cardinal sins + P1a; --report-only advisory at Phase 3.3/Parts5-6/Phase 5).
 # Deliverable count 25 → 26. See GROUP 9 below.
+# V32.20 (managed-context region + regenerator) adds deliverable #27 — scripts/sync-context.sh
+# (rewrites the AIEF:MANAGED region in CLAUDE.md from docs/STATE.md + DECISIONS_LOG/PRODUCT.md +
+# CHANGELOG_AI.md; idempotent, invoked by the Smart Checkpoint POST hook). Deliverable count
+# 26 → 27. See GROUP 10 below.
+# V32.21 (spec-persistence taxonomy + cross-artifact gap-check) adds deliverable #28 —
+# scripts/spec-gap-check.sh (advisory, non-blocking scan of PRODUCT.md ↔ inputs.yml ↔ Prisma
+# schema ↔ IMPLEMENTATION_MAP.md ↔ STATE.md for DRIFT/UNBUILT/PHASE-REALITY-MISMATCH/
+# DERIVATION-DRIFT; invoked by phases.md Phase 7 pre-flight MODEL HOOK + Prompt 2.9). Deliverable
+# count 27 → 28. See GROUP 11 below.
 # ============================================================
 # SAFETY CONTRACT (read this before running)
 # ============================================================
@@ -44,6 +53,15 @@
 #         • scripts/lint-deploy.sh           (pre-deploy footgun gate — deliverable #20;
 #                                            invoked by phases.md Phase 5/6 as
 #                                            `bash scripts/lint-deploy.sh deploy/compose`)
+#      V32.20 managed-context region (overwrite-with-backup — deliverable #27):
+#         • scripts/sync-context.sh          (idempotent CLAUDE.md AIEF:MANAGED regenerator;
+#                                            invoked by memory-governance.md §2/§3 Smart
+#                                            Checkpoint POST hook as `bash scripts/sync-context.sh`)
+#      V32.21 cross-artifact gap-check (overwrite-with-backup — deliverable #28):
+#         • scripts/spec-gap-check.sh        (advisory PRODUCT.md ↔ inputs.yml ↔ Prisma schema ↔
+#                                            IMPLEMENTATION_MAP.md ↔ STATE.md gap scan; invoked by
+#                                            phases.md Phase 7 pre-flight as
+#                                            `bash scripts/spec-gap-check.sh --report-only`)
 #      V32.8 design toolkit (overwrite-with-backup, scaffold-if-absent):
 #         • scripts/design-stop-hook.sh      (Claude Code Stop hook — deliverable #21)
 #         • .ai_prompt/LESSONS_REGISTRY.md   (consult pointer — design drift lessons — deliverable #22)
@@ -104,6 +122,8 @@
 #   │   ├── design-principles.md       ← NEW V32.12 — framework-level design guidance (→ .ai_prompt/, deliverable #24)
 #   │   ├── motion.md                  ← NEW V32.14 — framework-level motion guidance (→ .ai_prompt/, deliverable #25)
 #   │   ├── lint-design.sh             ← NEW V32.17 — design anti-slop gate (→ scripts/, deliverable #26)
+#   │   ├── sync-context.sh            ← NEW V32.20 — managed-context regenerator (→ scripts/, deliverable #27)
+#   │   ├── spec-gap-check.sh          ← NEW V32.21 — cross-artifact gap-check (→ scripts/, deliverable #28)
 #   │   ├── Planning_Assistant.md
 #   │   ├── Framework_Feature_Index.md
 #   │   ├── AI_Tools_Reference.md
@@ -111,7 +131,7 @@
 #   │   ├── ChatGPT_Cross_Audit.md
 #   │   ├── Prompt_References.md
 #   │   └── Prompt_References.html     ← interactive HTML UI for prompt references
-#   └── deploy.sh             ← this script at project root (23rd file — total deliverable set)
+#   └── deploy.sh             ← this script at project root (28-file total deliverable set)
 #
 # DEPLOYED TARGET LOCATIONS (V32.7.2 additions):
 #   .claude/agents/spec-executor.md    ← overwrite-with-backup (framework-owned)
@@ -131,6 +151,10 @@
 #   scripts/lint-design.sh             ← overwrite-with-backup (framework-owned), chmod +x (deliverable #26, V32.17)
 #   NOTE: sd.config.mjs, design-validate.mjs, STATE.md.template — scaffolded by bootstrap.md
 #   Step 20 from templates.md (not deploy-copied).
+# DEPLOYED TARGET LOCATIONS (V32.20 addition):
+#   scripts/sync-context.sh            ← overwrite-with-backup (framework-owned), chmod +x (deliverable #27, V32.20)
+# DEPLOYED TARGET LOCATIONS (V32.21 addition):
+#   scripts/spec-gap-check.sh          ← overwrite-with-backup (framework-owned), chmod +x (deliverable #28, V32.21)
 #
 # USAGE:
 #   cd your-project
@@ -638,6 +662,35 @@ if [ -f "$PROJECT/scripts/lint-design.sh" ]; then
 fi
 echo ""
 
+# ============================================================
+# GROUP 10 — scripts/ target: sync-context.sh managed-context regenerator (V32.20)
+# Deliverable #27. Idempotent regenerator for the AIEF:MANAGED region in CLAUDE.md;
+# invoked by memory-governance.md §2 Target 1 / §3 Hook Text POST as
+# `bash scripts/sync-context.sh` after every Smart Checkpoint rewrite of STATE.md.
+# Overwrite-with-backup (framework-owned) + chmod +x.
+# ============================================================
+echo "─── Group 10: scripts/sync-context.sh — managed-context regenerator (V32.20) ───"
+# scripts/ already created by Group 6 — no mkdir needed here.
+overwrite_with_backup "$AI_PROMPT/sync-context.sh" "$PROJECT/scripts/sync-context.sh"
+if [ -f "$PROJECT/scripts/sync-context.sh" ]; then
+  chmod +x "$PROJECT/scripts/sync-context.sh"
+fi
+echo ""
+
+# ============================================================
+# GROUP 11 — scripts/ target: spec-gap-check.sh cross-artifact gap-check (V32.21)
+# Deliverable #28. phases.md Phase 7 pre-flight MODEL HOOK + Prompt 2.9 invoke it as
+# `bash scripts/spec-gap-check.sh --report-only` (advisory — never blocks a phase).
+# Overwrite-with-backup (framework-owned) + chmod +x.
+# ============================================================
+echo "─── Group 11: scripts/spec-gap-check.sh — cross-artifact gap-check (V32.21) ───"
+# scripts/ already created by Group 6 — no mkdir needed here.
+overwrite_with_backup "$AI_PROMPT/spec-gap-check.sh" "$PROJECT/scripts/spec-gap-check.sh"
+if [ -f "$PROJECT/scripts/spec-gap-check.sh" ]; then
+  chmod +x "$PROJECT/scripts/spec-gap-check.sh"
+fi
+echo ""
+
 # 7c: tests/visual/ scaffold — create directory + .gitkeep ONLY if the directory is absent.
 # Never overwrite existing snapshot files inside tests/visual/.
 if [ ! -d "$PROJECT/tests/visual" ]; then
@@ -675,7 +728,7 @@ echo ""
 # SUMMARY
 # ============================================================
 echo "============================================================"
-echo "  ✅ V32.17 deployment complete — safety contract honored"
+echo "  ✅ V32.20 deployment complete — safety contract honored"
 echo "============================================================"
 echo ""
 echo "  Files deployed to project tree (OVERWRITE bucket):"
@@ -685,6 +738,8 @@ echo "    .claude/agents/spec-executor.md         ← Sonnet executor subagent (
 echo "    scripts/lint-deploy.sh                  ← pre-deploy footgun gate, chmod +x (V32.7.5, deliverable #20)"
 echo "    scripts/design-stop-hook.sh             ← Claude Code Stop hook, chmod +x (V32.8, deliverable #21)"
 echo "    scripts/lint-design.sh                  ← design anti-slop gate, chmod +x (V32.17, deliverable #26)"
+echo "    scripts/sync-context.sh                 ← managed-context regenerator, chmod +x (V32.20, deliverable #27)"
+echo "    scripts/spec-gap-check.sh               ← cross-artifact gap-check, chmod +x (V32.21, deliverable #28)"
 echo ""
 echo "  Merged additively (APPEND/MERGE bucket):"
 echo "    .gitignore                              ← V32 entries added, user entries preserved"
@@ -713,7 +768,7 @@ echo "    (Human reference — do not move:)"
 echo "    Planning_Assistant.md      ← claude.ai planning + Phase 2.8 mockup (already done before this script)"
 echo "    Framework_Feature_Index.md            ← feature + capability reference"
 echo "    AI_Tools_Reference.md     ← tools + model routing reference"
-echo "    Security_Checklist.md ← 114-item security audit (16 sections)"
+echo "    Security_Checklist.md ← 135-item security audit (20 sections)"
 echo "    ChatGPT_Cross_Audit.md         ← cross-AI validation prompt"
 echo "    Prompt_References.md                      ← scenario-based prompt guide (markdown)"
 echo "    Prompt_References.html                    ← scenario-based prompt guide (interactive UI — START HERE)"
@@ -725,6 +780,8 @@ echo "    (Deployed to scripts/ — do not run from .ai_prompt/:)"
 echo "    lint-deploy.sh                            ← pre-deploy footgun gate (deploys to scripts/lint-deploy.sh, V32.7.5)"
 echo "    design-stop-hook.sh                       ← Claude Code Stop hook (deploys to scripts/, V32.8)"
 echo "    lint-design.sh                            ← design anti-slop gate (deploys to scripts/lint-design.sh, V32.17)"
+echo "    sync-context.sh                           ← managed-context regenerator (deploys to scripts/sync-context.sh, V32.20)"
+echo "    spec-gap-check.sh                         ← cross-artifact gap-check (deploys to scripts/spec-gap-check.sh, V32.21)"
 echo "    (Note: sd.config.mjs, design-validate.mjs, STATE.md.template are scaffolded by"
 echo "     bootstrap.md Step 20 from templates.md — not deployed by this script)"
 echo "    (Scaffold — created only if absent:)"

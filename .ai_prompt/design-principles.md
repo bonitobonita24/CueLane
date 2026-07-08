@@ -340,9 +340,9 @@ DESIGN.md decides how each LOOKS; this contract decides which must EXIST. WCAG 2
 
 ---
 
-## Pillar 8 — Anti-AI-Slop (the seven cardinal sins)
+## Pillar 8 — Anti-AI-Slop (cardinal sins + extended tells)
 
-Concrete tells that separate "shipped by a designer" from "default LLM output." Surfaced by `scripts/lint-design.sh` (D1–D7), which runs `--report-only` at the design phases (3.3 / Parts 5-6 / Phase 5) — advisory, for agent self-correction, not a hard block.
+Concrete tells that separate "shipped by a designer" from "default LLM output." Surfaced by `scripts/lint-design.sh` (D1–D8 P0 + P1a–P1i advisory), which runs `--report-only` at the design phases (3.3 / Parts 5-6 / Phase 5) — advisory, for agent self-correction, not a hard block.
 
 1. Default Tailwind indigo/violet as accent — use `var(--accent)`.
 2. Two-stop purple/blue/cyan "trust" gradient on the hero — flat surface + type beats it.
@@ -351,11 +351,22 @@ Concrete tells that separate "shipped by a designer" from "default LLM output." 
 5. Rounded card + coloured left-border (the "AI dashboard tile") — drop one.
 6. Invented metrics ("10× faster", "99.9% uptime") — real source or labelled placeholder.
 7. Filler copy (lorem ipsum, "feature one/two/three") — solve emptiness with composition.
+8. Gradient / clip-to-text fill on headings or metrics — use a solid `var(--*)` colour.
 
 **Add soul without breaking rules:** one deliberate accent moment, real content, an authored type hierarchy, asymmetry where the grid earns it. (Guidance — not auto-checked.)
 
+**Extended slop tells (judgment — reviewer-flagged, not all auto-checked):**
+
+- *Visual:* nested cards (flatten with spacing/dividers); cream/beige default surface (fine only if a deliberate DESIGN.md choice — never auto-failed); dark-mode glowing box-shadows; hairline border paired with a wide diffuse shadow (commit to one); icon-tile stacked above a heading (the universal AI feature-card — try side-by-side); side-tab/border accent on a rounded card.
+- *Type:* single font for the whole page (pair a display + body face); overused face (Inter/Geist/Plus Jakarta/Space Grotesk/Fraunces); flat type hierarchy (aim ≥1.25 step ratio); oversized full-sentence hero headline.
+- *Motion:* layout-property animation (animate transform/opacity — see motion.md); bounce/elastic easing.
+- *Copy:* marketing buzzwords; em-dash overuse (>2 in body copy); aphoristic manufactured-contrast cadence ("Not a feature. A platform."); theater-framing ("X is just theater"); numbered section markers (01/02/03) and repeated tracked eyebrow kickers as editorial scaffolding.
+- *Token drift:* font / colour / border-radius used outside `docs/DESIGN.md` — route through the token system or make it an intentional DESIGN.md addition (this is the **ui-rules.md R12 / design-back-port** surface, INHERIT-not-REPLACE).
+
+(Harvested concept-only from Pythoughts-labs/designer-skill's 44-rule detector, MIT. Several need a browser/DOM/contrast engine the static bash gate can't run — they live here as agent + `/design-review` guidance.)
+
 **Testable checks:**
-- [ ] `bash scripts/lint-design.sh --report-only <ui-dir>` reviewed; no unresolved D1–D7 sins.
+- [ ] `bash scripts/lint-design.sh --report-only <ui-dir>` reviewed; no unresolved D1–D8 sins.
 
 ---
 
@@ -379,6 +390,7 @@ All items are binary pass/fail. Fails block Phase 5 close.
 - [ ] All spacing values on the 4-point grid (multiples of 4px).
 - [ ] Three spacing tiers visibly distinct: tight / default / loose.
 - [ ] Layout tested at 360px viewport — no overflow, columns collapse correctly.
+- [ ] No cards-inside-cards nesting for visual depth — use spacing, dividers, type instead.
 
 ### Typography
 - [ ] All body text ≥ 16px; all secondary/supporting text ≥ 14px.
@@ -386,6 +398,7 @@ All items are binary pass/fail. Fails block Phase 5 close.
 - [ ] One h1 per page; heading levels sequential, no skipped levels.
 - [ ] Prose containers have `max-width` limiting line length to ≤ 75ch.
 - [ ] Fluid headings use `clamp()` — no bare `vw` for font sizes.
+- [ ] No justified body text (rivers of white) — `text-align:left`.
 
 ### Color
 - [ ] All normal text/background pairs ≥ 4.5:1 contrast.
@@ -396,6 +409,7 @@ All items are binary pass/fail. Fails block Phase 5 close.
 ### Interaction & Controls
 - [ ] All controls define ≥ 5 states (default / hover / focus / active / disabled).
 - [ ] Async actions have loading states; error states name the problem and offer a next step.
+- [ ] Tooltips/menus/popovers not clipped by an `overflow:hidden` ancestor.
 - [ ] Doherty threshold: any async action responding ≥ 400ms shows a loading/progress state.
 - [ ] Empty states explain why and offer an action.
 - [ ] Touch targets ≥ 44 × 44px with ≥ 8px between adjacent targets.

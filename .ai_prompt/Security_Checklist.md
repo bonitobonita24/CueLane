@@ -11,7 +11,7 @@
 > **How to use:** Copy this file into your project root. After code generation, `grep` or
 > manually inspect each item. Mark PASS / FAIL / N/A. Fix all FAILs before squash-merge.
 >
-> **Total: 114 verification items across 16 sections.**
+> **Total: 135 verification items across 20 sections.**
 
 ---
 
@@ -140,6 +140,11 @@
 □ 5.6  Critical operations (payment, role change, soft delete) are idempotent
        → Secure Code Generation: DATABASE SAFETY item 6
        CHECK: calling the same mutation twice must not double-charge, double-delete, or corrupt state
+□ 5.7  Any single-use/limited resource (coupon, invite link, password-reset token, limited-stock
+       purchase) uses a DB-level guard, not an app-level read-then-write
+       → Secure Code Generation: DATABASE SAFETY item 2 (generalized rule)
+       VERIFY: redemption/consumption logic uses a unique index or conditional UPDATE ... WHERE
+               qty > 0 / used_at IS NULL — not a separate check-then-act
 ```
 
 ---
@@ -241,6 +246,10 @@
        → Secure Code Generation: SECURE PRODUCTION DEFAULTS item 7
        VERIFY: grep -rn "rateLimiters" src/server/trpc/ — protectedProcedure should chain .api or .public tier
        VERIFY: no tRPC procedure exists without ANY rate limiter middleware chained
+□ 9.9  Clickjacking protection present — X-Frame-Options: DENY or CSP frame-ancestors 'none'
+       → Secure Code Generation: SECURE PRODUCTION DEFAULTS item 9
+       VERIFY: grep -rn "X-Frame-Options\|frame-ancestors" next.config.ts — both headers present
+               together (not X-Frame-Options alone) except on explicitly embeddable widget routes
 ```
 
 ---
@@ -328,6 +337,11 @@
        VERIFY: CSP headers include challenges.cloudflare.com in script-src and frame-src
        VERIFY: .env.dev AND .env.staging use Cloudflare test keys (1x00000000000000000000AA), .env.prod uses real keys
        VERIFY: Turnstile api.js loaded from https://challenges.cloudflare.com/turnstile/v0/api.js — NOT proxied or cached
+□ 12.10 Open redirect protection — no redirect to a client-supplied URL without allowlist validation
+       → Secure Code Generation: AGENT PROHIBITIONS item 14
+       VERIFY: grep -rn "returnTo\|redirect_to\|next=\|redirect=" src/ — every usage validates against
+               a same-origin/approved-path allowlist and rejects protocol-relative (//) or absolute
+               external URLs
 ```
 
 ---
@@ -543,6 +557,130 @@ API Top 10 authorization set + the non-SQL injection classes.
 □ 16.9  CORS not wildcard in prod + Host header validated
         → security.md § INJECTION FAMILY item 5 + SECURE PRODUCTION DEFAULTS item 5
         VERIFY: no wildcard CORS in production; Host header validated/pinned where it drives links or cache keys
+
+□ 16.10 Prototype pollution closed — no __proto__/constructor/prototype key injection
+        → security.md § INJECTION FAMILY item 6
+        VERIFY: object-merge utilities reject __proto__/constructor/prototype keys from untrusted
+                input; no unguarded deep-merge or lodash.merge on user-controlled objects
+```
+
+---
+
+## SECTION 17 — AUTH TOKEN & OAUTH SECURITY
+
+Run whenever the app issues/validates JWTs or implements an OAuth/SSO login flow.
+→ security.md § Auth DEFAULTS item 7 + § OAUTH/SSO SAFETY.
+
+```
+□ 17.1  JWT signing algorithm is pinned server-side — alg:none rejected
+        → security.md § Auth DEFAULTS item 7
+        VERIFY: Auth.js JWT strategy configures the algorithm explicitly; a token whose header
+                claims a different alg (or "none") is rejected, not silently accepted
+
+□ 17.2  Signing-secret entropy ≥32 bytes, generated (not user-chosen)
+        → security.md § Auth DEFAULTS item 7
+        VERIFY: AUTH_SECRET / JWT signing secret is ≥32 bytes of high-entropy generated data (e.g.
+                openssl rand -base64 32) — never a short or human-chosen string
+
+□ 17.3  OAuth flows use PKCE (S256)
+        → security.md § OAUTH/SSO SAFETY item 1
+        VERIFY: every OAuth authorization-code flow includes code_challenge_method=S256 — plain
+                method and PKCE-less flows are rejected
+
+□ 17.4  state parameter is CSRF-bound and single-use
+        → security.md § OAUTH/SSO SAFETY item 3
+        VERIFY: state is tied to the initiating session and rejected if missing, mismatched, or replayed
+
+□ 17.5  redirect_uri validated against an exact-match allowlist
+        → security.md § OAUTH/SSO SAFETY item 2
+        VERIFY: no wildcard or prefix/substring match accepted for redirect_uri — exact string match only
+
+□ 17.6  No token placed in a URL query string beyond the initial authorization-code redirect
+        → security.md § OAUTH/SSO SAFETY item 4
+        VERIFY: grep for access_token=/id_token= in query-string construction outside the OAuth
+                provider's own redirect — must return 0
+```
+
+---
+
+## SECTION 18 — COMMAND / CODE EXECUTION SAFETY
+
+Run whenever the app shells out, evaluates dynamic code, or accepts input that could reach an
+interpreter. → security.md § AGENT PROHIBITIONS item 15.
+
+```
+□ 18.1  No unsanitized exec/eval/Function/shell call exists anywhere in the codebase
+        → security.md § AGENT PROHIBITIONS item 15
+        VERIFY: grep -rn "child_process.exec(\|eval(\|new Function(" src/ — any hit with
+                user-derived input is a FAIL
+
+□ 18.2  Where shelling out is unavoidable, execFile()/argv-array form is used with validated,
+        allowlisted arguments — never string-concatenated shell commands
+        → security.md § AGENT PROHIBITIONS item 15
+        VERIFY: grep -rn "execFile\|spawn(" src/ — arguments passed as an array, not interpolated
+                into a shell string
+
+□ 18.3  Any required shell-out runs least-privilege / sandboxed
+        → security.md § AGENT PROHIBITIONS item 15
+        CHECK: the process invoking a shell command runs with the minimum OS privileges needed and,
+               where feasible, inside an isolated/sandboxed execution context
+```
+
+---
+
+## SECTION 19 — CLOUD CREDENTIAL SAFETY (S3/R2/MinIO)
+
+Run whenever the app integrates AWS S3, Cloudflare R2, or MinIO storage.
+→ security.md § CLOUD CREDENTIAL SAFETY.
+
+```
+□ 19.1  App-runtime IAM keys are scoped to the specific bucket + minimum actions
+        → security.md § CLOUD CREDENTIAL SAFETY item 1
+        VERIFY: no s3:* or account-wide keys configured in the app runtime; policy lists only the
+                actions the app actually performs (GetObject/PutObject/DeleteObject on its own bucket)
+
+□ 19.2  Container/task IAM role preferred over long-lived static keys in staging/production
+        → security.md § CLOUD CREDENTIAL SAFETY item 2
+        VERIFY: production deployment uses a task/instance role where the platform supports it;
+                static keys, if used, are rotated on the same cadence as other production secrets
+
+□ 19.3  Bucket policy denies public listing
+        → security.md § CLOUD CREDENTIAL SAFETY item 3
+        VERIFY: bucket policy has no s3:ListBucket grant to anonymous/public principals
+
+□ 19.4  Presigned URLs are short-TTL and scoped to one object key
+        → security.md § CLOUD CREDENTIAL SAFETY item 4
+        VERIFY: grep -rn "presign\|getSignedUrl" src/ — TTL is minutes not days, and the signed URL
+                targets a single object key, never a prefix or whole-bucket grant
+```
+
+---
+
+## SECTION 20 — MOBILE APP SAFETY (CONDITIONAL — native mobile only)
+
+Run only when PRODUCT.md §9 declares native mobile (Expo). Skip entirely for web-only apps.
+→ security.md § MOBILE APP SAFETY.
+
+```
+□ 20.1  Certificate pinning on all mobile API calls
+        → security.md § MOBILE APP SAFETY item 1
+        VERIFY: the mobile client pins the expected certificate/public key and rejects connections
+                presenting a certificate outside the pinned set
+
+□ 20.2  No sensitive data unencrypted in AsyncStorage/WatermelonDB
+        → security.md § MOBILE APP SAFETY item 2
+        VERIFY: auth tokens and PII are stored via SecureStore/Keychain-backed encryption
+                (expo-secure-store or platform Keychain/Keystore), never plain AsyncStorage
+
+□ 20.3  Deep-link handlers validate/allowlist before any privileged action
+        → security.md § MOBILE APP SAFETY item 3
+        VERIFY: every deep-link entry point re-validates the link and its parameters server-side
+                before performing auth, navigation-to-privileged-screen, or a data mutation
+
+□ 20.4  Biometric unlock is a local-UX gate only, never a substitute for server-side session auth
+        → security.md § MOBILE APP SAFETY item 4
+        VERIFY: Face ID/fingerprint unlock gates local app access only; every privileged API call
+                still requires a valid server-side session/token independent of biometric state
 ```
 
 ---
@@ -550,7 +688,7 @@ API Top 10 authorization set + the non-SQL injection classes.
 ## HOW TO USE THIS CHECKLIST
 
 **After Phase 4 (initial scaffold):**
-Run ALL 16 sections. Every item applies. This is the most critical audit — the scaffold
+Run ALL 20 sections. Every item applies. This is the most critical audit — the scaffold
 defines the security posture for the entire project lifecycle.
 
 **After Phase 7 (Feature Update):**
@@ -562,6 +700,10 @@ Run only the sections relevant to the feature:
 - Changed auth config? → Section 1
 - Personal data feature added or changed? → Section 14
 - Added an LLM / agent / tool / MCP surface? → Section 15
+- Added/changed JWT issuance or an OAuth/SSO login flow? → Section 17
+- Added a shell-out, eval, or dynamic-code path? → Section 18
+- Added or changed AWS/R2/MinIO cloud storage credentials? → Section 19
+- Added native mobile (Expo) features? → Section 20
 - Always run Section 13 (Phase 5 commands) regardless
 
 **Cross-AI audit loop:**

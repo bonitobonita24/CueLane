@@ -1,4 +1,4 @@
-# Spec-Driven Platform V31 — Scenarios 1-39
+# Spec-Driven Platform V31 — Scenarios 1-40
 
 > Loaded contextually when user triggers a named scenario.
 > Read ONLY the scenario matching the user's request.
@@ -2206,6 +2206,131 @@ VERIFICATION:
     ships it (confirmed via dry-run or grep).
   - Conductor route: memory topic file exists and contains a machine-executable check.
   - No duplicate entries in the registry for the same check.
+```
+
+---
+
+### SCENARIO 40 — Brownfield spec evolution: the Flow-Back 5-step reconcile loop (NEW V32.21)
+```
+CONTEXT:
+  A discovery lands closest to the code (a bugfix, a live-data quirk, an ops finding)
+  rather than in docs/PRODUCT.md. This is the Flow-Back pattern named in Rule 1's
+  Spec-Persistence Model addendum (Master_Prompt.md) — the artifact nearest the work
+  gets edited first, and the rest of the spec set is reconciled back up to it. Left
+  un-reconciled, the artifact set (PRODUCT.md / inputs.yml / Prisma schema /
+  IMPLEMENTATION_MAP.md / STATE.md) silently diverges and the next Feature Update or
+  Phase 8 batch builds against a stale picture of reality.
+
+WHEN TO USE:
+  - A hotfix or ops-driven change was made directly to code/config, not via PRODUCT.md.
+  - A brownfield adoption reveals behavior that no spec artifact documents.
+  - `spec-gap-check.sh` (Prompt 2.9 / phases.md Phase 7 pre-flight MODEL HOOK) reports
+    a DRIFT, UNBUILT, PHASE/REALITY MISMATCH, or DERIVATION DRIFT finding.
+
+THE 5-STEP RECONCILE LOOP:
+  1. CAPTURE the discovery in the closest artifact.
+     Write down what was actually found/changed in the artifact nearest the work —
+     usually the code itself, a migration, or a config file. Do not wait for a
+     "proper" spec update first; capture it where it happened.
+
+  2. CLASSIFY the discovery.
+     Ask: is this a BEHAVIOR change (what the app does — belongs in PRODUCT.md),
+     a STRATEGY change (an architecture/tech decision — belongs in DECISIONS_LOG.md),
+     a TASK-BREAKDOWN change (what's built vs pending — belongs in
+     IMPLEMENTATION_MAP.md), or CODE-ONLY (an internal refactor with no external
+     spec implication — no other artifact needs updating)? The classification
+     determines which artifacts in step 3 actually need touching.
+
+  3. UPDATE any other artifacts that now disagree.
+     Given the classification from step 2, propagate the discovery upward:
+       BEHAVIOR      → docs/PRODUCT.md (human-owned — Rule 1; the agent proposes the
+                        exact edit, the human applies it)
+       STRATEGY      → docs/DECISIONS_LOG.md (agent-owned — log the decision)
+       TASK-BREAKDOWN → docs/IMPLEMENTATION_MAP.md (agent-owned — rewrite current state)
+       CODE-ONLY     → no propagation needed; stop here.
+     inputs.yml / inputs.schema.json / the Prisma schema are DISPOSABLE DERIVATIONS
+     (Living-Spec model) — regenerate them from the updated PRODUCT.md rather than
+     hand-patching them to match the code.
+
+  4. RUN THE CROSS-ARTIFACT GAP-CHECK.
+     Run `bash scripts/spec-gap-check.sh --report-only` (also available as
+     Prompt 2.9 — Validate Spec Consistency, which now includes this run) to confirm
+     the artifact set agrees: PRODUCT.md ↔ inputs.yml ↔ Prisma schema ↔
+     IMPLEMENTATION_MAP.md ↔ STATE.md. Non-blocking — it surfaces remaining gaps,
+     it does not gate this scenario.
+
+  5. RESUME only once the artifact set is trustworthy.
+     If step 4 still reports findings that step 3 should have closed, repeat steps
+     2-4 before resuming the interrupted Feature Update / Phase 8 batch / bootstrap.
+     A clean (or explicitly-accepted, logged) gap report means the next session can
+     trust PRODUCT.md, IMPLEMENTATION_MAP.md, and STATE.md again.
+
+VERIFICATION:
+  - The classifying artifact (PRODUCT.md / DECISIONS_LOG.md / IMPLEMENTATION_MAP.md)
+    reflects the discovery.
+  - `bash scripts/spec-gap-check.sh --report-only` output no longer lists the
+    specific finding that triggered this scenario (or the human has explicitly
+    accepted and logged the remaining divergence).
+  - CHANGELOG_AI.md records the reconcile with agent attribution (Rule 15).
+```
+
+---
+
+### SCENARIO 41 — Spec Expert Panel review before spec-lock (NEW V32.24)
+```
+CONTEXT:
+  docs/PRODUCT.md (and at Phase 2.8, docs/DESIGN.md / docs/MOCKUP.jsx) is about to
+  cross a hard boundary — the design handing off to Claude Code's designer-skills
+  bundle (Phase 2.8), or the spec locking into inputs.yml / the Prisma schema
+  (Phase 3). A single generalist read of PRODUCT.md at this point misses
+  domain-specific gaps a narrow expert lens would catch — a missing tenancy index,
+  an unversioned API surface, an RBAC hole, a flow with no acceptance criteria.
+
+WHEN TO USE:
+  - Phase 2.8 design pre-handoff, before the mockup baseline is treated as final.
+  - Phase 3 pre-lock, before spec files (inputs.yml / Prisma schema) generate.
+  - Any time PRODUCT.md changed materially and you want a structured multi-lens
+    review before committing to the next phase (optional at other times; MANDATORY
+    at the two gates above — see Prompt 3.24).
+
+THE 5-EXPERT PANEL (dispatched in parallel as ephemeral Sonnet subagents, PM =
+Opus synthesizes):
+  1. secure-code-guardian  → security, authz depth, data-privacy/compliance gaps
+  2. architecture-designer → system structure, scalability, coupling, module
+                              boundaries
+  3. api-designer          → API surface, contracts, versioning, integration seams
+  4. test-master           → testability, coverage gaps, edge cases, acceptance
+                              criteria
+  5. database-optimizer    → schema/data-model, indexing, query/access patterns,
+                              tenancy
+
+STEPS:
+  1. PM dispatches all 5 expert-lens subagents in parallel, each scoped to
+     docs/PRODUCT.md (+ DESIGN.md/MOCKUP.jsx at Phase 2.8) and its one skill lens.
+  2. PM synthesizes the 5 findings lists into one, dedups overlapping findings
+     across lenses, and prioritizes (Critical / High / Medium).
+  3. PM feeds every finding into the Flow-Back / LIVING-SPEC reconcile (Rule 1
+     Spec-Persistence Model, Scenario 40's 5-step loop) — classify each finding
+     (BEHAVIOR → PRODUCT.md edit proposal, STRATEGY → DECISIONS_LOG.md,
+     TASK-BREAKDOWN → IMPLEMENTATION_MAP.md) and propose the exact edit; the human
+     applies PRODUCT.md changes per Rule 1.
+  4. Resolve every CRITICAL finding before the gate closes. High/Medium findings
+     are recorded (DECISIONS_LOG.md or IMPLEMENTATION_MAP.md as classified) but do
+     not block.
+
+THE GATE (phases.md MODEL HOOK, Phase 2.8 + Phase 3):
+  Phase 2.8 design handoff and Phase 3 spec-lock CANNOT close while any CRITICAL
+  Spec-Expert-Panel finding is unresolved. A clean run emits a single collapsed
+  line — `✅ spec-expert-panel: clear`. An unresolved-Critical run blocks with
+  `⛔ spec-expert-panel: N Critical findings unresolved`.
+
+VERIFICATION:
+  - All 5 expert lenses returned findings (or an explicit "no findings" per lens).
+  - Merged, deduped, prioritized findings list exists (visible in phase output).
+  - Zero unresolved CRITICAL findings at gate-check time — each was either
+    resolved (PRODUCT.md/DECISIONS_LOG.md/IMPLEMENTATION_MAP.md updated) or the
+    human explicitly accepted + logged the risk.
+  - CHANGELOG_AI.md records the panel run + verdict (Rule 15).
 ```
 
 ---
