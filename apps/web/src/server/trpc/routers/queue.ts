@@ -3,8 +3,10 @@
 // and the unauthenticated kiosk path (`kioskProcedure`, resolves tenantId via prismaRaw then
 // enters `withTenantContext` — the L6 lesson from the /login fix).
 //
-// Every mutation returns the domain `events[]` for Wave 7.2 (realtime transport) to publish — this
-// router does not publish anything itself yet (no-op by design).
+// Wave 7.2-T2 — every mutation now publishes its domain `events[]` to Valkey pub/sub via
+// `publishEvents` (fire-and-forget-safe: a Valkey outage never fails the mutation — see
+// server/realtime/publisher.ts). Publish happens AFTER the domain call succeeds (ticket state is
+// already committed), so a publish failure never rolls back or blocks the response.
 
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
@@ -21,6 +23,7 @@ import { prisma, withTenant, withTenantContext } from '@cuelane/db';
 import { createTRPCRouter, kioskProcedure, protectedProcedure } from '../trpc';
 import { requireTenant } from '../middleware/tenant';
 import { requireRole } from '../middleware/rbac';
+import { publishEvents } from '@/server/realtime/publisher';
 import {
   callNext as domainCallNext,
   complete as domainComplete,
@@ -71,6 +74,7 @@ export const queueRouter = createTRPCRouter({
         const result = await withTenant(ctx.tenantId, (tx) =>
           domainIssueTicket({ serviceId: input.serviceId, priority: input.priority }, { tenantId: ctx.tenantId, tx }),
         );
+        await publishEvents(result.events);
         return { number: result.ticket.number, ticketId: result.ticket.id };
       } catch (e) {
         rethrow(e);
@@ -100,6 +104,7 @@ export const queueRouter = createTRPCRouter({
       const result = await withTenant(ctx.tenantId, (tx) =>
         domainCallNext({ windowId: input.windowId, userId: ctx.userId, serviceIds }, { tenantId: ctx.tenantId, tx }),
       );
+      await publishEvents(result.events);
       return result.ticket;
     } catch (e) {
       rethrow(e);
@@ -109,6 +114,7 @@ export const queueRouter = createTRPCRouter({
   complete: staffProcedure.input(completeTicketSchema).mutation(async ({ ctx, input }) => {
     try {
       const result = await withTenant(ctx.tenantId, (tx) => domainComplete(input, { tenantId: ctx.tenantId, tx }));
+      await publishEvents(result.events);
       return result.ticket;
     } catch (e) {
       rethrow(e);
@@ -118,6 +124,7 @@ export const queueRouter = createTRPCRouter({
   skip: staffProcedure.input(skipTicketSchema).mutation(async ({ ctx, input }) => {
     try {
       const result = await withTenant(ctx.tenantId, (tx) => domainSkip(input, { tenantId: ctx.tenantId, tx }));
+      await publishEvents(result.events);
       return result.ticket;
     } catch (e) {
       rethrow(e);
@@ -129,6 +136,7 @@ export const queueRouter = createTRPCRouter({
       const result = await withTenant(ctx.tenantId, (tx) =>
         domainRecall({ ticketId: input.ticketId }, { tenantId: ctx.tenantId, tx }),
       );
+      await publishEvents(result.events);
       return result.ticket;
     } catch (e) {
       rethrow(e);
@@ -147,6 +155,7 @@ export const queueRouter = createTRPCRouter({
 
     try {
       const result = await withTenant(ctx.tenantId, (tx) => domainTransfer(input, { tenantId: ctx.tenantId, tx }));
+      await publishEvents(result.events);
       return result.ticket;
     } catch (e) {
       rethrow(e);
