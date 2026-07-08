@@ -265,4 +265,52 @@ describe('queueRouter (Wave 7.1)', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
   });
+
+  // Wave 7.5 — Big Display's single-round-trip public read (TDD: written before the `state`
+  // procedure implementation). Uses dedicated fixtures (service/window/employee) so this test's
+  // now-serving/up-next assertions aren't polluted by tickets other tests in this file leave behind.
+  describe('Wave 7.5 — display.state (public read for the wall screen)', () => {
+    it('returns branding + now-serving + up-next + totalWaiting for the public display, with NO session', async () => {
+      const svc = await prismaRaw.service.create({
+        data: { tenantId: premiumTenantId, number: 55, name: 'Display Svc', icon: 'D', color: '#555555', avgTime: 5 },
+      });
+      const win = await prismaRaw.window.create({ data: { tenantId: premiumTenantId, name: 'Display Window' } });
+      const employee = await prismaRaw.user.create({
+        data: { tenantId: premiumTenantId, name: 'Display Emp', role: 'employee', pin: 'x' },
+      });
+      await prismaRaw.userService.create({ data: { tenantId: premiumTenantId, userId: employee.id, serviceId: svc.id } });
+
+      const kioskCaller = createCaller(ctxFor({}));
+      const issued = await kioskCaller.queue.issue({ tenantSlug: premiumTenantSlug, serviceId: svc.id, priority: false });
+      const issued2 = await kioskCaller.queue.issue({ tenantSlug: premiumTenantSlug, serviceId: svc.id, priority: false });
+
+      const staffCaller = createCaller(
+        ctxFor({
+          session: { user: { id: employee.id } } as unknown as Context['session'],
+          userId: employee.id,
+          roles: [Role.Employee],
+          tenantId: premiumTenantId,
+        }),
+      );
+      await staffCaller.queue.callNext({ windowId: win.id });
+
+      // No session at all — this is the unauthenticated wall-display path.
+      const state = await kioskCaller.queue.state({ tenantSlug: premiumTenantSlug });
+
+      expect(state.companyName).toBe('Premium Test Co.');
+      expect(state.tier).toBe('premium');
+      expect(typeof state.totalWaiting).toBe('number');
+      expect(state.totalWaiting).toBeGreaterThanOrEqual(1);
+
+      const servingEntry = state.nowServing.find((e) => e.windowId === win.id);
+      expect(servingEntry?.ticketNumber).toBe(issued.number);
+      expect(servingEntry?.serviceName).toBe('Display Svc');
+      expect(servingEntry?.windowName).toBe('Display Window');
+
+      expect(state.upNext.some((e) => e.ticketNumber === issued2.number)).toBe(true);
+
+      // Never leaks another tenant's data (L6 tenant-isolation lesson).
+      expect(state.nowServing.every((e) => e.ticketNumber !== '')).toBe(true);
+    });
+  });
 });

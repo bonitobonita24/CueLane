@@ -98,6 +98,50 @@ export const queueRouter = createTRPCRouter({
     });
   }),
 
+  // Wave 7.5 — Big Display's single-round-trip public read. Public (kioskProcedure — the wall
+  // screen has no login, same unauthenticated posture as the kiosk), tenantSlug-resolved. Returns
+  // everything the display client needs in one call: now-serving (per window, with the ticket
+  // + service it's serving), up-next (next 6 waiting, priority-first-then-FIFO — same ordering
+  // queueRouter.callNext uses), the total waiting count, and the branding fields needed for
+  // free-tier gating (companyName + tier — Tenant is a GLOBAL_MODEL, so reading it via the plain
+  // `prisma` client here needs no extra tenant-context wrap; ctx.tenantId is server-resolved from
+  // tenantSlug by kioskProcedure, never client-supplied — no cross-tenant leakage).
+  state: kioskProcedure.query(async ({ ctx }) => {
+    const [tenant, nowServing, upNext, totalWaiting] = await Promise.all([
+      prisma.tenant.findUnique({ where: { id: ctx.tenantId }, select: { companyName: true, tier: true } }),
+      prisma.ticket.findMany({
+        where: { tenantId: ctx.tenantId, status: 'serving' },
+        orderBy: { calledAt: 'asc' },
+        include: { window: { select: { id: true, name: true } }, service: { select: { name: true } } },
+      }),
+      prisma.ticket.findMany({
+        where: { tenantId: ctx.tenantId, status: 'waiting' },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+        take: 6,
+        include: { service: { select: { name: true } } },
+      }),
+      prisma.ticket.count({ where: { tenantId: ctx.tenantId, status: 'waiting' } }),
+    ]);
+
+    return {
+      companyName: tenant?.companyName ?? '',
+      tier: tenant?.tier ?? 'free',
+      nowServing: nowServing.map((t) => ({
+        windowId: t.windowId,
+        windowName: t.window?.name ?? 'Window',
+        ticketNumber: t.number,
+        serviceName: t.service.name,
+        priority: t.priority,
+      })),
+      upNext: upNext.map((t) => ({
+        ticketNumber: t.number,
+        serviceName: t.service.name,
+        priority: t.priority,
+      })),
+      totalWaiting,
+    };
+  }),
+
   // Live waiting/serving counts — safe for the public kiosk display (no ticket-level detail).
   counts: kioskProcedure.query(async ({ ctx }) => {
     const [waiting, serving] = await Promise.all([
