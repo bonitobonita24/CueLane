@@ -24,7 +24,7 @@
 // The priority assertion below is therefore RELATIVE to the real counter state read at
 // beforeAll (not a hardcoded literal), proving the atomic allocator is correct in the presence
 // of real pre-existing data — a strictly stronger check than a clean-DB literal would be.
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { prismaRaw } from '@cuelane/db';
 import { Role } from '@cuelane/shared';
@@ -93,6 +93,31 @@ describe('queue integration (Wave 7.1-T4, against the seeded demo tenant)', () =
     const winD = await prismaRaw.window.create({ data: { tenantId, name: 'T4 Destination Window' } });
     windowOriginId = winO.id;
     windowDestId = winD.id;
+  });
+
+  // ⚠ T0 fix (Wave 7.4) — this suite's beforeAll fixtures (services, windows, an employee) plus
+  // every ticket issued by the tests below were being left behind in the REAL `demo` tenant with
+  // no cleanup, permanently polluting it (observed: demo drifted to 7 services/9 tickets vs the
+  // seeded 4/3 baseline — visible on the kiosk/station UI). Per the file header's own reasoning
+  // this suite intentionally runs against the real seeded tenant rather than an ephemeral one
+  // (idSchema/cuid workaround), so the correct fix is teardown, not switching tenants: delete
+  // every row this file created, in FK-safe order (tickets → userService → user → windows →
+  // services), leaving `demo` exactly as seed.ts left it. Uses tenantId-scoped `deleteMany`
+  // filters (not a truncate) so this NEVER touches the real seeded rows.
+  afterAll(async () => {
+    const fixtureServiceIds = [svcNumberingA.id, svcNumberingB.id, transferSvcId];
+    const fixtureWindowIds = [windowOriginId, windowDestId];
+
+    await prismaRaw.ticket.deleteMany({
+      where: {
+        tenantId,
+        OR: [{ serviceId: { in: fixtureServiceIds } }, { windowId: { in: fixtureWindowIds } }],
+      },
+    });
+    await prismaRaw.userService.deleteMany({ where: { tenantId, userId: transferEmployeeId } });
+    await prismaRaw.user.deleteMany({ where: { tenantId, id: transferEmployeeId } });
+    await prismaRaw.window.deleteMany({ where: { tenantId, id: { in: fixtureWindowIds } } });
+    await prismaRaw.service.deleteMany({ where: { tenantId, id: { in: fixtureServiceIds } } });
   });
 
   it('issues 2 regular tickets on services with no prior demo activity — correct service-number prefix', async () => {
