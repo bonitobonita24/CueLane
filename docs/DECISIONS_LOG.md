@@ -272,3 +272,39 @@ that request's own `Tenant.tier`. T8's integration suite proves this against 2+ 
 ephemeral tenants (no shared/seeded tenant assumption) plus isolation + independent-limit assertions.
 
 **Reversible:** yes — decisions 1-6 are additive constants/validation; no destructive schema change.
+
+---
+
+## 2026-07-09 — Wave 7.7b Theme Runtime Wiring: 3 locked PM decisions
+
+**Decided by:** PM (technical `[HOW]` calls, per the Wave 7.7b task brief).
+
+1. **`settings.theme` widens to `ThemePresetId | { custom: CustomTheme }`.** The 8 presets
+   (`packages/shared` `THEME_PRESETS`) now carry real WCAG-AA-checked HSL color values
+   (`primary`/`primaryForeground`/`ring`), not just id/label. `CustomTheme` is a 9-key object
+   (`primary`, `primaryForeground`, `secondary`, `secondaryForeground`, `accent`,
+   `accentForeground`, `background`, `foreground`, `ring` — the vars Kiosk/Station/Admin actually
+   consume, grepped across `apps/web` + `packages/ui`). Back-compat: every pre-existing bare
+   `theme: 'indigo'`-shaped row still validates and resolves — `themeSettingSchema` is a union, and
+   `resolveThemeVars()` is defensive against any legacy/malformed shape (including the
+   pre-decision-2 `{ preset: 'indigo' }` object), always falling back to the default preset rather
+   than throwing.
+2. **Theme resolution happens server-side, once, in `[tenant]/layout.tsx`** — not a client
+   effect — so there is no theme flash on first paint. This is the ONLY place `resolveThemeVars` is
+   called for the live app surfaces; it reads `Tenant.settings` via the plain `prisma` client with
+   no `withTenantContext` wrap (safe because `Tenant` is a GLOBAL_MODEL, same convention as
+   `kiosk/page.tsx`/`display/page.tsx`).
+3. **The Theme admin tab is UN-GATED for Free tier** (supersedes the 2026-07-08 Wave 7.6 call
+   "Theme tab is Premium-only") — Free tenants now get the 8 presets; only the in-tab **custom**
+   9-color picker stays Premium-gated (`ThemeClient` reads `Tenant.tier` directly, not a route-level
+   gate). `FREE_GATED_TAB_IDS` (`admin/_lib/access.ts`) no longer contains `'theme'`.
+
+**Note — Display screen is NOT yet wired to the theme vars.** `display-client.tsx` hardcodes its
+entire palette (`#15181e`, `#FCD34D` gold, etc.) inline — it consumes zero CSS custom properties
+today, so per-tenant theming has no visible effect there yet (Kiosk/Station/Admin DO pick it up via
+`bg-primary`/`border-primary`/`text-primary-foreground`/`ring-ring` Tailwind classes). Rewiring the
+Big Display to the theme system is OUT OF SCOPE for this wave — flagged as a follow-up, not fixed
+here (deferred-fix-at-task-boundary discipline).
+
+**Reversible:** yes — additive schema widening (union, not a breaking change) + a UI-gating
+reversal (trivial to re-add `'theme'` to `FREE_GATED_TAB_IDS` if the owner wants the old gate back).

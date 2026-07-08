@@ -1,6 +1,8 @@
-// Wave 7.6-T7 — Theme admin tab. Free-gated (AdminLayout's tab nav already hides this route for
-// Free tenants); this page adds a defense-in-depth server-side gate, same pattern as
-// layout.tsx's role guard, for a Free-tier admin who hits the URL directly.
+// Wave 7.6-T7 — Theme admin tab. Wave 7.7b: no longer Free-gated (Free tenants get the 8 presets
+// too — only the in-tab Premium custom-color picker is tier-gated, by ThemeClient itself reading
+// Tenant.tier). `isTabGatedForTier` is retained as a defense-in-depth call, same pattern as
+// layout.tsx's role guard, for whenever a future tab IS added to FREE_GATED_TAB_IDS — it's a no-op
+// today (theme isn't in that set anymore).
 import { redirect } from 'next/navigation';
 import { prisma } from '@cuelane/db';
 import { TenantTier } from '@cuelane/shared';

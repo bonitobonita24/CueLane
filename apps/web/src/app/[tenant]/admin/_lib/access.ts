@@ -30,8 +30,12 @@ export const ADMIN_TABS: readonly AdminTab[] = [
   { id: 'usage', label: 'Usage', href: 'usage' },
 ] as const;
 
-/** Tab ids hidden on the Free tier (media/branding customization is a Premium feature). */
-const FREE_GATED_TAB_IDS: ReadonlySet<string> = new Set(['theme']);
+/** Tab ids hidden on the Free tier. Wave 7.7b: 'theme' is REMOVED from this set — Free tenants now
+ *  see the Theme tab too (8 presets), same as Premium. Only the CUSTOM 9-color picker inside that
+ *  tab stays Premium-gated (theme-client.tsx checks `Tenant.tier` itself, not this list). This
+ *  supersedes the Wave 7.6-T7 decision ("Theme tab is Premium-only" — see
+ *  docs/DECISIONS_LOG.md 2026-07-08) per the Wave 7.7b brief (docs/DECISIONS_LOG.md 2026-07-09). */
+const FREE_GATED_TAB_IDS: ReadonlySet<string> = new Set([]);
 
 /** True when the caller's roles satisfy the Admin Panel gate (Admin or SuperAdmin). */
 export function isAdminRole(roles: readonly Role[]): boolean {

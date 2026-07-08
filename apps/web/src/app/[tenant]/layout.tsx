@@ -26,11 +26,12 @@ export async function generateMetadata({
 // globals.css's `:root`/`.dark` token names) — e.g. `primaryForeground` → `--primary-foreground`.
 function themeVarsToStyle(vars: ThemeVars): CSSProperties {
   const style: Record<string, string> = {};
-  for (const [key, value] of Object.entries(vars)) {
+  const entries = Object.entries(vars) as Array<[string, string]>;
+  for (const [key, value] of entries) {
     const kebab = key.replace(/([A-Z])/g, '-$1').toLowerCase();
     style[`--${kebab}`] = value;
   }
-  return style as CSSProperties;
+  return style;
 }
 
 export default async function TenantLayout({
