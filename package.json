@@ -1,7 +1,29 @@
 {
-  "name": "cuelane",
-  "version": "0.0.0",
+  "name": "@cuelane/root",
+  "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.0.0",
-  "scripts": {}
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @cuelane/db generate",
+    "db:migrate": "pnpm --filter @cuelane/db migrate:dev",
+    "db:studio": "pnpm --filter @cuelane/db studio",
+    "db:seed": "pnpm --filter @cuelane/db seed"
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "typescript": "^5",
+    "eslint": "^9",
+    "typescript-eslint": "^8",
+    "prettier": "^3"
+  }
 }
+
