@@ -3,7 +3,27 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.5 DONE + PM-verified**
+PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.7a (Admin Dashboard) DONE + PM-verified**
+CURRENT:      Phase 7 Wave 7.7a — Admin Dashboard (2026-07-09). Single Sonnet worker, TDD real dev Postgres.
+              Commits 146ecbd (T1 — server/domain/dashboard.ts: computeDashboard(db,tenantId,{range}) → 8 KPIs
+              [issued/completed/waitingNow/servingNow/noShows/skipped/transferred/avgWaitSec] + completion/no-show
+              rates + hourlyTraffic(24) + perService/perWindow/employeePerformance; waiting/serving LIVE, rest
+              range-scoped), d2531ba (T2 — dashboardRouter.get + .ticketLog adminProcedure, dashboardRangeSchema/
+              dashboardTicketLogSchema in @cuelane/shared, registered root.ts, returns tier for UI gating), 8595d4f
+              (T3 — Dashboard landing UI: daily/monthly/yearly toggle, 8 KPI cards, rate bars, shadcn chart(Recharts)
+              hourly bar, per-txn/per-window/employee blocks Premium-gated, searchable ticket log; vanilla tRPC proxy;
+              useReducedMotion guards). Real latent bug found+fixed (not deferred): ToggleGroup added to @cuelane/ui
+              BARREL broke prod build of /login (unrelated RSC) — radix client-only re-export, same class as the RHF
+              form trap; fix = dedicated exports subpaths @cuelane/ui/toggle-group + /chart. Logged LESSONS_GLOBAL
+              nextjs.shadcn-ui-barrel.rsc-client-only-reexport. PM re-verified INDEPENDENTLY: typecheck 8/8 ✓; pnpm -w
+              test 130/130 ✓ (needs DATABASE_URL + authed VALKEY_URL=redis://:<pw>@localhost:41708 — unauth Valkey
+              fails 1 realtime test w/ NOAUTH, not a real bug); pnpm -w build 8/8 ✓ (/[tenant]/admin 106kB, /login
+              clean). LIVE tenant-Admin both tenants: clinic(free) 8 KPIs match psql (6/1/3/2) + advanced blocks
+              HIDDEN; demo(premium) match psql (9/2/4/3) + all 3 Premium blocks render; ticket-log search 9→2;
+              tenant isolation confirmed; 0 console errors (test-artifacts/phase7-dashboard/). 73 commits ahead, 0
+              pushed (HARD HOLD). NEXT = Wave 7.7b (theme runtime CSS wiring + custom color picker). Full 7.7 plan
+              (4 sub-waves 7.7a-d, Architect 2026-07-09) tracked in memory project_cuelane_build_state.
+              ── history ──
 LAST_DONE:    Phase 7 Wave 7.5 — Big Display (2026-07-08). Sonnet worker (died mid-verify on an API drop; PM
               finished container-rebuild + E2E + commit). Commits e3d4278 (T0 — public queue.state read:
               kioskProcedure, tenantSlug-resolved, single round-trip returning now-serving/up-next(6, prio-FIFO)/
