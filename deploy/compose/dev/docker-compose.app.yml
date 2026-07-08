@@ -9,9 +9,31 @@
 # Ports:
 #   App:    localhost:41716 → container:3000
 #   Worker: background only (no exposed port)
+#
+# NOTE on env: .env.dev holds HOST-facing addresses (localhost + mapped ports) so
+# host-run tooling (prisma migrate/seed/studio) works. Containers, however, must
+# reach the infra services by their in-network names. The x-cuelane-runtime-env
+# anchor below overrides those addresses for the app + worker containers only.
 # ═══════════════════════════════════════════════════════════════════════
 
 name: cuelane_dev
+
+# In-network service addresses shared by app + worker (override .env.dev localhost values).
+x-cuelane-runtime-env: &cuelane-runtime-env
+  DATABASE_URL: "postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public"
+  VALKEY_URL: "redis://:${REDIS_PASSWORD}@valkey:6379"
+  REDIS_URL: "redis://:${REDIS_PASSWORD}@valkey:6379"
+  MINIO_ENDPOINT: "http://minio:9000"
+  MINIO_PORT: "9000"
+  MINIO_USE_SSL: "false"
+  MINIO_ACCESS_KEY: "${STORAGE_ACCESS_KEY}"
+  MINIO_SECRET_KEY: "${STORAGE_SECRET_KEY}"
+  MINIO_BUCKET: "${STORAGE_BUCKET}"
+  MINIO_REGION: "${STORAGE_REGION}"
+  SMTP_HOST: "mailhog"
+  SMTP_PORT: "1025"
+  SMTP_FROM: "dev@cuelane.app"
+  SMTP_FROM_NAME: "CueLane Dev"
 
 services:
 
@@ -24,10 +46,24 @@ services:
     container_name: cuelane_dev_app
     restart: unless-stopped
     env_file: .env.dev
+    environment:
+      <<: *cuelane-runtime-env
+      # SUPER_ADMIN_EMAIL + SUPER_ADMIN_PASSWORD_HASH come from .env.dev (gitignored)
+      # via env_file — the official local-dev super-admin cred (Server-Setups).
+      # Never place the real credential in this tracked compose file.
     ports:
       - "${APP_PORT:-41716}:3000"
     networks:
       - cuelane_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
@@ -44,8 +80,15 @@ services:
     container_name: cuelane_dev_worker
     restart: unless-stopped
     env_file: .env.dev
+    environment:
+      <<: *cuelane-runtime-env
     networks:
       - cuelane_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
 
 # ── Dev network (defined by docker-compose.infra.yml — marked external here) ──
 networks:
