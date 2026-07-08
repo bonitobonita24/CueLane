@@ -55,7 +55,12 @@ export const authConfig: NextAuthConfig = {
         const user = await prismaRaw.user.findFirst({
           where: {
             name: identifier,
-            role: { in: ['admin'] },
+            // Wave 7.4-T1 fix: was `role: { in: ['admin'] } }`, which silently blocked every
+            // employee-role user from ever signing in (roleMap below already maps 'employee' ->
+            // Role.Employee, and staffProcedure explicitly allows Role.Employee — this filter was
+            // the one place that disagreed). The Employee Station requires an employee session,
+            // so both roles must be queryable here.
+            role: { in: ['admin', 'employee'] },
             tenantId: tenant.id,  // scoped to this tenant — prevents cross-tenant auth
           },
           select: {
