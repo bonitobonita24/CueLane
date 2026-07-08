@@ -1,0 +1,301 @@
+// CueLane — packages/db Prisma schema
+// Tenancy: multi (subdirectory routing). All tenant-scoped tables carry tenant_id.
+// L5 AuditLog always active. L6 Prisma extension ($allOperations) enforces tenant isolation in app layer.
+// L2 RLS enforced at DB level via separate migration (20260708000001_rls_tenant_isolation).
+// SessionMap is tracked in Valkey (in-memory pub/sub) — no Prisma model for it.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum TenantTier {
+  free
+  premium
+}
+
+enum TenantStatus {
+  active
+  suspended
+}
+
+enum VideoMode {
+  playlist
+  live
+}
+
+enum UserRole {
+  employee
+  admin
+}
+
+enum TicketStatus {
+  waiting
+  serving
+  completed
+  skipped
+  noshow
+}
+
+enum PaymentStatus {
+  active
+  past_due
+  cancelled
+  free
+}
+
+enum MediaType {
+  youtube
+  local
+}
+
+enum AdType {
+  youtube
+  uploaded
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id          String       @id @default(cuid())
+  slug        String       @unique // URL identifier for subdirectory routing /{slug}/
+  companyName String       @map("company_name")
+  tagline     String
+  logoUrl     String?      @map("logo_url")
+  tier        TenantTier   @default(free)
+  status      TenantStatus @default(active)
+  // JSON: { theme, printerConfig, tickerText, businessName, videoMode, liveStreamUrl }
+  settings    Json         @default("{}")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  services            Service[]
+  windows             Window[]
+  users               User[]
+  userServices        UserService[]
+  tickets             Ticket[]
+  playlistEntries     PlaylistEntry[]
+  tenantAds           TenantAd[]
+  subscription        Subscription?
+  passwordResetTokens PasswordResetToken[]
+  auditLogs           AuditLog[]           @relation("TenantAuditLogs")
+
+  @@map("tenants")
+}
+
+model Service {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  icon      String   // emoji from 16 supported options
+  color     String   // hex from 12 supported options
+  avgTime   Int      @map("avg_time") // estimated minutes per ticket
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets      Ticket[]
+  userServices UserService[]
+
+  @@index([tenantId])
+  @@map("services")
+}
+
+model Window {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets                Ticket[] @relation("WindowTickets")
+  transferredFromTickets Ticket[] @relation("TransferredFromWindow")
+  returnToTickets        Ticket[] @relation("ReturnToWindow")
+
+  @@index([tenantId])
+  @@map("windows")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  role      UserRole @default(employee)
+  // Stored hashed (bcrypt in production, SHA-256 dev hash in seed). See Part 5 auth layer.
+  pin       String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userServices        UserService[]
+  servedTickets       Ticket[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+// Explicit join table: User ↔ Service (many-to-many, tenantId for L6 guard)
+model UserService {
+  id        String @id @default(cuid())
+  tenantId  String @map("tenant_id")
+  userId    String @map("user_id")
+  serviceId String @map("service_id")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceId])
+  @@index([tenantId])
+  @@map("user_services")
+}
+
+model Ticket {
+  // ID format (P-NNN / {serviceNumber}-NNN) is generated in app logic, not DB default.
+  id                   String       @id @default(cuid())
+  tenantId             String       @map("tenant_id")
+  serviceId            String       @map("service_id")
+  status               TicketStatus @default(waiting)
+  windowId             String?      @map("window_id")
+  servedBy             String?      @map("served_by")
+  priority             Boolean      @default(false)
+  transferred          Boolean      @default(false)
+  transferredFrom      String?      @map("transferred_from") // windowId origin of transfer
+  returnTo             String?      @map("return_to")        // windowId to auto-return after transfer done
+  returnedFromTransfer Boolean      @default(false)          @map("returned_from_transfer")
+  createdAt            DateTime     @default(now())          @map("created_at")
+  calledAt             DateTime?    @map("called_at")
+  completedAt          DateTime?    @map("completed_at")
+
+  tenant                Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  service               Service @relation(fields: [serviceId], references: [id])
+  window                Window? @relation("WindowTickets", fields: [windowId], references: [id])
+  servedByUser          User?   @relation(fields: [servedBy], references: [id])
+  transferredFromWindow Window? @relation("TransferredFromWindow", fields: [transferredFrom], references: [id])
+  returnToWindow        Window? @relation("ReturnToWindow", fields: [returnTo], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("tickets")
+}
+
+model PlaylistEntry {
+  id         String    @id @default(cuid())
+  tenantId   String    @map("tenant_id")
+  type       MediaType
+  title      String
+  videoId    String?   @map("video_id")    // YouTube video ID
+  storageKey String?   @map("storage_key") // MinIO/S3 key for local files
+  fileName   String    @map("file_name")
+  fileSize   Int       @map("file_size")   // bytes
+  fileExt    String    @map("file_ext")
+  isLive     Boolean   @default(false)     @map("is_live") // YouTube live stream flag
+  sortOrder  Int       @map("sort_order")
+  createdAt  DateTime  @default(now())     @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("playlist_entries")
+}
+
+// Global — managed by CueLane Super Admin only. No tenant_id (not tenant-scoped).
+// Plays on ALL Free tier Big Displays every 5 minutes. Stored under global system-ads/ prefix.
+model SystemAd {
+  id         String   @id @default(cuid())
+  type       AdType
+  title      String
+  videoId    String?  @map("video_id")    // YouTube video ID
+  storageKey String?  @map("storage_key") // MinIO/S3 key for uploaded files
+  fileName   String   @map("file_name")
+  fileSize   Int      @map("file_size")   // bytes
+  duration   Int      // seconds (admin-entered estimate)
+  enabled    Boolean  @default(true)
+  sortOrder  Int      @map("sort_order")  // chronological play order
+  createdAt  DateTime @default(now())     @map("created_at")
+
+  @@map("system_ads")
+}
+
+// Per-tenant ads — Premium only, YouTube LIVE mode only.
+model TenantAd {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  type       AdType
+  title      String
+  videoId    String?  @map("video_id")
+  storageKey String?  @map("storage_key")
+  fileName   String   @map("file_name")
+  fileSize   Int      @map("file_size")
+  duration   Int      // seconds (admin-entered estimate)
+  sortOrder  Int      @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_ads")
+}
+
+model Subscription {
+  id               String        @id @default(cuid())
+  tenantId         String        @unique @map("tenant_id")
+  tier             TenantTier    @default(free)
+  startDate        DateTime      @map("start_date")
+  endDate          DateTime?     @map("end_date")
+  downgradeAt      DateTime?     @map("downgrade_at") // tier reverts to free on this date
+  paymentStatus    PaymentStatus @default(free)        @map("payment_status")
+  xenditPlanId     String?       @map("xendit_plan_id")
+  xenditCustomerId String?       @map("xendit_customer_id")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("subscriptions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tenantId  String    @map("tenant_id")
+  userId    String    @map("user_id")
+  token     String    @unique // SHA-256 hashed reset token
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("password_reset_tokens")
+}
+
+// AuditLog — always active (L5). tenantId nullable: super-admin platform ops have no tenant.
+// EXACT model as specified in phases.md. Survives tenant deletion (onDelete: SetNull).
+// SessionMap: tracked in Valkey (AsyncLocalStorage + pub/sub) — intentionally no Prisma model.
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  userId    String   @map("user_id")
+  action    String   // CREATE | UPDATE | DELETE
+  entity    String   // table name
+  entityId  String   @map("entity_id")
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation("TenantAuditLogs", fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}

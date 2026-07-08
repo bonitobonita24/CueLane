@@ -1,0 +1,37 @@
+{
+  "name": "@cuelane/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./audit": "./src/audit.ts",
+    "./rls": "./src/rls.ts",
+    "./tenant-guard": "./src/middleware/tenant-guard.ts"
+  },
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio --port 41726"
+  },
+  "dependencies": {
+    "@cuelane/shared": "workspace:*",
+    "@prisma/client": "^5.22.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "typescript": "^5",
+    "@types/node": "^22",
+    "tsx": "^4.19.0"
+  },
+  "prisma": {
+    "schema": "./prisma/schema.prisma",
+    "seed": "tsx prisma/seed.ts"
+  }
+}

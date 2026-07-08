@@ -20,6 +20,25 @@
       Working in /mnt/c/ causes severe pnpm and docker performance issues.
 # ---
 
+## 2026-07-08 — 🔴 Prisma $allOperations L6 tenant-guard: three write/read bypass vectors
+- Type:      🔴 gotcha
+- Phase:     Phase 4 Part 3 (packages/db L6 guard) — any phase using Prisma $allOperations
+- Files:     packages/db/src/middleware/tenant-guard.ts
+- Concepts:  prisma, tenant-guard, allOperations, L6, multi-tenant, security
+- Narrative: Three critical bypass vectors in the initial Prisma $allOperations tenant-guard, caught in code review:
+  (1) WHERE conditional guard: original code used `if ('where' in args) { args.where = {...args.where, tenantId} }`.
+      This missed calls like findMany({}) where args has no 'where' key — rows from ALL tenants returned.
+      Fix: unconditional `args.where = { ...args.where, tenantId }` — always safe (spreads undefined cleanly).
+  (2) Upsert bypass: upsert args use 'create' and 'update' sub-keys, NOT the top-level 'data' key.
+      The data-injection branch never matched, so upsert wrote rows without tenantId.
+      Fix: dedicated `if (operation === 'upsert')` branch injecting into args.create and args.update.
+  (3) createMany bypass: original code skipped injection when `Array.isArray(args.data)` (which is always
+      true for createMany). Bulk inserts wrote rows without tenantId.
+      Fix: dedicated `if (operation === 'createMany')` branch mapping tenantId into each array element.
+  Rule: for $allOperations guards, enumerate EVERY write operation explicitly — create/update/upsert/createMany
+  all have different arg shapes. Default to unconditional WHERE injection (never conditional).
+# ---
+
 ## 2026-05-03 — 🟡 Edit tool requires file to be Read in same session before editing
 - Type:      🟡 fix
 - Phase:     Any phase — affects every session

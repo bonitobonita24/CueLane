@@ -1,0 +1,277 @@
+// CueLane dev seed — creates a realistic demo tenant with services, windows, users, and tickets.
+//
+// SUPER ADMIN NOTE:
+// The platform super_admin (webmaster@powerbyteitsolutions.com) is managed by Auth.js v5
+// and its credentials are rolled out separately from Server-Setups/secrets/universal-admin.enc.yaml
+// (SOPS+age encrypted). Do NOT hardcode the password here.
+// Production super_admin seeding is a manual one-time operation, not part of this seed.
+//
+// Run: pnpm --filter @cuelane/db db:seed
+// Requires: DATABASE_URL env var pointing to a running Postgres instance
+
+import { PrismaClient, type Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
+
+const prisma = new PrismaClient();
+
+// Dev-only PIN hash. Production uses bcrypt (implemented in Part 5 auth layer).
+// Never use SHA-256 for passwords in production — bcrypt/argon2 only.
+function hashPinDev(pin: string): string {
+  return createHash('sha256').update(`cuelane_dev_salt_${pin}`).digest('hex');
+}
+
+async function main(): Promise<void> {
+  console.log('🌱 Seeding CueLane dev database...');
+
+  // ─── Demo Tenant ───────────────────────────────────────────────────────────
+
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: 'demo' },
+    update: {},
+    create: {
+      slug: 'demo',
+      companyName: 'Demo Branch Co.',
+      tagline: 'Fast, friendly, and organized service.',
+      tier: 'premium',
+      status: 'active',
+      settings: {
+        videoMode: 'playlist',
+        liveStreamUrl: null,
+        tickerText: 'Welcome to Demo Branch — please take a number and we will serve you shortly.',
+        businessName: 'Demo Branch Co.',
+        theme: {
+          preset: 'indigo',
+        },
+        printerConfig: {
+          enabled: true,
+          paperWidth: '80mm',
+          autoCut: true,
+        },
+      } satisfies Prisma.InputJsonValue,
+    },
+  });
+
+  console.log(`  ✓ Tenant: ${tenant.companyName} (slug: ${tenant.slug})`);
+
+  // ─── Demo Subscription (Premium) ───────────────────────────────────────────
+
+  const sub = await prisma.subscription.upsert({
+    where: { tenantId: tenant.id },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      tier: 'premium',
+      startDate: new Date('2026-01-01'),
+      paymentStatus: 'active',
+    },
+  });
+
+  console.log(`  ✓ Subscription: ${sub.tier} / ${sub.paymentStatus}`);
+
+  // ─── Services (Transaction Types) ──────────────────────────────────────────
+
+  const serviceData = [
+    { name: 'Cash Deposit',    icon: '💰', color: '#3B82F6', avgTime: 5 },
+    { name: 'Loan Inquiry',    icon: '📋', color: '#10B981', avgTime: 15 },
+    { name: 'Account Opening', icon: '📂', color: '#8B5CF6', avgTime: 20 },
+    { name: 'Withdrawal',      icon: '💳', color: '#F59E0B', avgTime: 7 },
+  ];
+
+  const services = await Promise.all(
+    serviceData.map((s) =>
+      prisma.service.upsert({
+        where: { id: `seed-svc-${tenant.id}-${s.name.toLowerCase().replace(/\s+/g, '-')}` },
+        update: {},
+        create: {
+          id: `seed-svc-${tenant.id}-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
+          tenantId: tenant.id,
+          name: s.name,
+          icon: s.icon,
+          color: s.color,
+          avgTime: s.avgTime,
+        },
+      })
+    )
+  );
+
+  console.log(`  ✓ Services: ${services.map((s) => s.name).join(', ')}`);
+
+  // ─── Windows ───────────────────────────────────────────────────────────────
+
+  const windowData = ['Window 1', 'Window 2', 'Window 3'];
+
+  const windows = await Promise.all(
+    windowData.map((name) =>
+      prisma.window.upsert({
+        where: { id: `seed-win-${tenant.id}-${name.toLowerCase().replace(/\s+/g, '-')}` },
+        update: {},
+        create: {
+          id: `seed-win-${tenant.id}-${name.toLowerCase().replace(/\s+/g, '-')}`,
+          tenantId: tenant.id,
+          name,
+        },
+      })
+    )
+  );
+
+  console.log(`  ✓ Windows: ${windows.map((w) => w.name).join(', ')}`);
+
+  // ─── Users ─────────────────────────────────────────────────────────────────
+  // Seed admin uses dev hash of PIN '0000'.
+  // PRODUCTION: roll out the universal-admin credential from Server-Setups separately.
+  // Employee PINs are dev-only values — never use in production.
+
+  const adminUser = await prisma.user.upsert({
+    where: { id: `seed-usr-${tenant.id}-admin` },
+    update: {},
+    create: {
+      id: `seed-usr-${tenant.id}-admin`,
+      tenantId: tenant.id,
+      name: 'Branch Admin',
+      role: 'admin',
+      pin: hashPinDev('0000'),
+    },
+  });
+
+  const employee1 = await prisma.user.upsert({
+    where: { id: `seed-usr-${tenant.id}-emp1` },
+    update: {},
+    create: {
+      id: `seed-usr-${tenant.id}-emp1`,
+      tenantId: tenant.id,
+      name: 'Alice Santos',
+      role: 'employee',
+      pin: hashPinDev('1234'),
+    },
+  });
+
+  const employee2 = await prisma.user.upsert({
+    where: { id: `seed-usr-${tenant.id}-emp2` },
+    update: {},
+    create: {
+      id: `seed-usr-${tenant.id}-emp2`,
+      tenantId: tenant.id,
+      name: 'Bob Reyes',
+      role: 'employee',
+      pin: hashPinDev('5678'),
+    },
+  });
+
+  console.log(`  ✓ Users: ${adminUser.name} (admin), ${employee1.name}, ${employee2.name}`);
+
+  // ─── UserService assignments ────────────────────────────────────────────────
+
+  // Alice handles Cash Deposit and Withdrawal; Bob handles all four services
+  const alice = employee1;
+  const bob = employee2;
+
+  const [svcDeposit, svcLoan, svcAccount, svcWithdrawal] = services as [
+    typeof services[0],
+    typeof services[0],
+    typeof services[0],
+    typeof services[0],
+  ];
+
+  const assignments = [
+    { userId: alice.id, serviceId: svcDeposit.id },
+    { userId: alice.id, serviceId: svcWithdrawal.id },
+    { userId: bob.id, serviceId: svcDeposit.id },
+    { userId: bob.id, serviceId: svcLoan.id },
+    { userId: bob.id, serviceId: svcAccount.id },
+    { userId: bob.id, serviceId: svcWithdrawal.id },
+  ];
+
+  await Promise.all(
+    assignments.map(({ userId, serviceId }) =>
+      prisma.userService.upsert({
+        where: { userId_serviceId: { userId, serviceId } },
+        update: {},
+        create: { tenantId: tenant.id, userId, serviceId },
+      })
+    )
+  );
+
+  console.log(`  ✓ Service assignments: Alice (2), Bob (4)`);
+
+  // ─── Sample Tickets ─────────────────────────────────────────────────────────
+
+  const [win1, win2] = windows as [typeof windows[0], typeof windows[0]];
+
+  const ticket1 = await prisma.ticket.upsert({
+    where: { id: `seed-tkt-${tenant.id}-001` },
+    update: {},
+    create: {
+      id: `seed-tkt-${tenant.id}-001`,
+      tenantId: tenant.id,
+      serviceId: svcDeposit.id,
+      status: 'waiting',
+      priority: false,
+    },
+  });
+
+  const ticket2 = await prisma.ticket.upsert({
+    where: { id: `seed-tkt-${tenant.id}-002` },
+    update: {},
+    create: {
+      id: `seed-tkt-${tenant.id}-002`,
+      tenantId: tenant.id,
+      serviceId: svcLoan.id,
+      status: 'serving',
+      priority: false,
+      windowId: win1.id,
+      servedBy: bob.id,
+      calledAt: new Date(),
+    },
+  });
+
+  const ticket3 = await prisma.ticket.upsert({
+    where: { id: `seed-tkt-${tenant.id}-003` },
+    update: {},
+    create: {
+      id: `seed-tkt-${tenant.id}-003`,
+      tenantId: tenant.id,
+      serviceId: svcDeposit.id,
+      status: 'completed',
+      priority: true, // priority ticket (P-001 format in app logic)
+      windowId: win2.id,
+      servedBy: alice.id,
+      calledAt: new Date(Date.now() - 10 * 60 * 1000),
+      completedAt: new Date(Date.now() - 5 * 60 * 1000),
+    },
+  });
+
+  console.log(`  ✓ Tickets: ${[ticket1, ticket2, ticket3].map((t) => `${t.id}(${t.status})`).join(', ')}`);
+
+  // ─── System Ad placeholder ──────────────────────────────────────────────────
+
+  const existingAd = await prisma.systemAd.findFirst();
+  if (!existingAd) {
+    await prisma.systemAd.create({
+      data: {
+        type: 'youtube',
+        title: 'CueLane — Smart Queue Management',
+        videoId: 'dQw4w9WgXcQ', // placeholder YouTube ID
+        fileName: 'placeholder-ad',
+        fileSize: 0,
+        duration: 30,
+        enabled: true,
+        sortOrder: 1,
+      },
+    });
+    console.log('  ✓ SystemAd: placeholder created');
+  }
+
+  console.log('\n✅ Seed complete.');
+  console.log(`   Tenant: ${tenant.companyName} — access at http://localhost:41716/${tenant.slug}/`);
+  console.log('   Admin PIN: 0000 (dev hash only — production uses Server-Setups universal-admin)');
+  console.log('   Employee PINs: Alice=1234, Bob=5678 (dev only)');
+}
+
+main()
+  .catch((e) => {
+    console.error('Seed failed:', e);
+    process.exit(1);
+  })
+  .finally(() => {
+    void prisma.$disconnect();
+  });

@@ -28,7 +28,16 @@ Current build state. Rewritten after every feature update to reflect what exists
 ### @cuelane/api-client ✅ Phase 4 Part 2 complete (swarm/phase4-scaffold, 2026-07-08)
 - `src/index.ts` — createClient() vanilla tRPC v11 client; trpc = createTRPCReact<AppRouter>(); AppRouter=any placeholder (TODO S5 — replace with import type from apps/web); peerDep react >=18.2.0; no transformer on client (tRPC v11 — lives on server initTRPC)
 
-### @cuelane/db — Not yet scaffolded (Phase 4 Part 3)
+### @cuelane/db ✅ Phase 4 Part 3 complete (swarm/phase4-scaffold, 2026-07-08)
+- `prisma/schema.prisma` — 13 models (Tenant+slug, Service, Window×3 back-relations, User, UserService explicit join table, Ticket, PlaylistEntry, SystemAd, TenantAd, Subscription, PasswordResetToken, AuditLog); 7 enums; all tables @@map("snake_case")
+- `src/client.ts` — PrismaClient singleton with globalThis hot-reload guard; exports prismaRaw (unguarded) + prisma (L6 extended)
+- `src/middleware/tenant-guard.ts` — L6 $allOperations via AsyncLocalStorage: unconditional WHERE injection, upsert create/update branch, createMany array map, GLOBAL_MODELS bypass (AuditLog/Tenant/SystemAd/Subscription)
+- `src/rls.ts` — L2 withTenant(): prismaRaw.$transaction + SET app.current_tenant_id for PG RLS
+- `src/audit.ts` — L5 writeAuditLog(): transaction-scoped; exactOptionalPropertyTypes-safe conditional JSON spread
+- `src/repositories/` — tenant.ts (unguarded, super-admin), service.ts + ticket.ts + user.ts (L6-guarded)
+- `prisma/migrations/20260708000000_init/` — full schema DDL (enums + 13 tables + FK constraints)
+- `prisma/migrations/20260708000001_rls_tenant_isolation/` — RLS ENABLE + tenant_isolation POLICY on 9 tables
+- `prisma/seed.ts` — demo tenant (premium), 4 Services, 3 Windows, 3 Users (dev SHA-256 PINs), 3 Tickets, 1 SystemAd placeholder
 
 ### @cuelane/ui ✅ Phase 4 Part 4 complete (swarm/phase4-scaffold, 2026-07-08)
 - `tailwind.config.ts` — Tailwind v3, CSS-var colour tokens; fontFamily: DM Sans (sans), Outfit (display), Space Mono (mono); tailwindcss-animate plugin

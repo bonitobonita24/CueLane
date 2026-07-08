@@ -5,6 +5,33 @@ Format: Rule 15 — Agent attribution required on every entry.
 
 ---
 
+## 2026-07-08 — Phase 4 Part 3: packages/db (Prisma schema + L6 tenant-guard + RLS + audit helper + seed)
+
+- Agent:               CLAUDE_CODE (swarm S4, headless worker session)
+- Branch:              swarm/phase4-scaffold
+- Session:             S4 — Part 3
+
+### packages/db (@cuelane/db)
+- Added `prisma/schema.prisma` — all 13 entities: Tenant (+ slug @unique for URL routing), Service, Window (3 named back-relations: WindowTickets/TransferredFromWindow/ReturnToWindow), User, UserService (explicit join table with tenantId for L6 coverage), Ticket (all transfer fields), PlaylistEntry, SystemAd (global, no tenantId), TenantAd, Subscription (@unique tenantId), PasswordResetToken, AuditLog (tenantId nullable, onDelete:SetNull per phases.md spec). 7 enums: TenantTier, TenantStatus, VideoMode, UserRole, TicketStatus, PaymentStatus, MediaType, AdType. All tables @@map("snake_case").
+- Added `src/client.ts` — PrismaClient singleton (globalThis guard for hot-reload); exports prismaRaw (unextended) + prisma (L6 extended)
+- Added `src/middleware/tenant-guard.ts` — L6 $allOperations guard via AsyncLocalStorage: unconditional WHERE injection (covers findMany/findFirst/findUnique/update/updateMany/delete/deleteMany/count/aggregate/groupBy); upsert create+update branch; createMany array map; GLOBAL_MODELS bypass set (AuditLog/Tenant/SystemAd/Subscription)
+- Added `src/rls.ts` — L2 withTenant() helper: opens prismaRaw.$transaction + SET app.current_tenant_id for PG RLS
+- Added `src/audit.ts` — L5 writeAuditLog(): runs inside caller's transaction; exactOptionalPropertyTypes-safe conditional spread for nullable JSON fields
+- Added `src/repositories/` — tenant.ts (prismaRaw, super-admin unguarded), service.ts, ticket.ts, user.ts (all prisma, L6-guarded), plus index.ts barrel
+- Added `prisma/migrations/20260708000000_init/migration.sql` — CREATE TYPE for all enums + CREATE TABLE for all 13 models + FK constraints
+- Added `prisma/migrations/20260708000001_rls_tenant_isolation/migration.sql` — ENABLE ROW LEVEL SECURITY + tenant_isolation POLICY on 9 tables; excluded: tenants / system_ads / audit_logs
+- Added `prisma/seed.ts` — demo tenant (slug: 'demo', premium), Subscription, 4 Services, 3 Windows, 3 Users (admin/Alice/Bob with dev SHA-256 PIN hashes), UserService assignments, 3 Tickets (waiting/serving/completed), 1 SystemAd placeholder. Super admin NOT seeded (handled by Auth.js v5 + Server-Setups SOPS).
+
+### Code review fixes (3 critical in-scope guard bypass bugs resolved)
+- Fixed: WHERE injection conditional `if ('where' in args)` missed findMany({}) with no where key → unconditional `args.where = { ...args.where, tenantId }` (data exfiltration bypass)
+- Fixed: upsert args use create/update keys not data — guard never injected → added explicit upsert branch (write bypass)
+- Fixed: createMany with Array.isArray(args.data) blocked injection for bulk inserts → added createMany branch mapping tenantId into each element (multi-row write bypass)
+
+### Hook 3 — Rule 15 attribution: CLAUDE_CODE
+### Hook 18 — Part 3 privacy scan: N/A (no auth/RBAC written; data-layer only); security=none (no gov/LGU flag)
+
+---
+
 ## 2026-07-08 — Phase 4 Part 4: packages/ui + packages/jobs + packages/storage
 
 - Agent:               CLAUDE_CODE (swarm S3, worktree-isolated parallel agents)
