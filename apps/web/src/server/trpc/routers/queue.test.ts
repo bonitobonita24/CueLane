@@ -191,4 +191,78 @@ describe('queueRouter (Wave 7.1)', () => {
     const completed = await staffCaller.queue.complete({ ticketId: issued.ticketId, outcome: 'done' });
     expect(completed.status).toBe('completed');
   });
+
+  // Wave 7.4 — station-facing additions: recallSkipped, listSkipped, listWindows.
+  describe('Wave 7.4 station additions', () => {
+    it('listWindows returns this tenant\'s windows only, ordered by name, and requires a session', async () => {
+      const unauthed = createCaller(ctxFor({}));
+      await expect(unauthed.queue.listWindows()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+      const staffCaller = createCaller(
+        ctxFor({
+          session: { user: { id: premiumEmployeeId } } as unknown as Context['session'],
+          userId: premiumEmployeeId,
+          roles: [Role.Employee],
+          tenantId: premiumTenantId,
+        }),
+      );
+      const windows = await staffCaller.queue.listWindows();
+      expect(windows.some((w) => w.id === premiumWindowId)).toBe(true);
+      expect(windows.every((w) => w.id !== freeWindowId)).toBe(true); // no cross-tenant leakage
+    });
+
+    it('recallSkipped brings a skipped ticket back to serving at the caller\'s window; listSkipped reflects it', async () => {
+      const svc = await prismaRaw.service.create({
+        data: { tenantId: premiumTenantId, number: 77, name: 'Skip Fixture', icon: 'K', color: '#777777', avgTime: 5 },
+      });
+      const employee = await prismaRaw.user.create({
+        data: { tenantId: premiumTenantId, name: 'Skip Fixture Emp', role: 'employee', pin: 'x' },
+      });
+      await prismaRaw.userService.create({ data: { tenantId: premiumTenantId, userId: employee.id, serviceId: svc.id } });
+
+      const kioskCaller = createCaller(ctxFor({}));
+      const issued = await kioskCaller.queue.issue({ tenantSlug: premiumTenantSlug, serviceId: svc.id, priority: false });
+
+      const staffCaller = createCaller(
+        ctxFor({
+          session: { user: { id: employee.id } } as unknown as Context['session'],
+          userId: employee.id,
+          roles: [Role.Employee],
+          tenantId: premiumTenantId,
+        }),
+      );
+
+      const called = await staffCaller.queue.callNext({ windowId: premiumWindowId });
+      expect(called?.id).toBe(issued.ticketId);
+      await staffCaller.queue.skip({ ticketId: issued.ticketId });
+
+      const skippedList = await staffCaller.queue.listSkipped();
+      expect(skippedList.some((t) => t.id === issued.ticketId)).toBe(true);
+
+      const recalled = await staffCaller.queue.recallSkipped({ ticketId: issued.ticketId, windowId: premiumWindowId });
+      expect(recalled.status).toBe('serving');
+      expect(recalled.windowId).toBe(premiumWindowId);
+      expect(recalled.servedBy).toBe(employee.id);
+
+      const skippedAfter = await staffCaller.queue.listSkipped();
+      expect(skippedAfter.some((t) => t.id === issued.ticketId)).toBe(false);
+    });
+
+    it('recallSkipped rejects a ticket that is not skipped (e.g. still waiting)', async () => {
+      const staffCaller = createCaller(
+        ctxFor({
+          session: { user: { id: premiumEmployeeId } } as unknown as Context['session'],
+          userId: premiumEmployeeId,
+          roles: [Role.Employee],
+          tenantId: premiumTenantId,
+        }),
+      );
+      const kioskCaller = createCaller(ctxFor({}));
+      const issued = await kioskCaller.queue.issue({ tenantSlug: premiumTenantSlug, serviceId: premiumServiceId, priority: false });
+
+      await expect(
+        staffCaller.queue.recallSkipped({ ticketId: issued.ticketId, windowId: premiumWindowId }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+  });
 });

@@ -183,6 +183,21 @@ export const skipTicketSchema = z.object({
   ticketId: idSchema, // Ticket.id (cuid)
 });
 
+// Wave 7.4 — "Skipped Tickets (tap to recall)" (PRODUCT.md line 32). Distinct from
+// recallTicketSchema (which re-announces an ALREADY-serving ticket): this brings a `skipped`
+// ticket back into `serving` at the calling employee's OWN window.
+export const recallSkippedTicketSchema = z.object({
+  ticketId: idSchema, // Ticket.id (cuid)
+  windowId: idSchema, // Window.id (cuid) — the calling employee's currently-selected window
+});
+
+// Wave 7.4 — Employee Station per-user selected-window session (Valkey-backed, see
+// apps/web/src/server/station/session.ts). Not persisted in Postgres — a lightweight UI-state
+// pointer, hence its own tiny schema pair rather than reusing createWindowSchema/updateWindowSchema.
+export const setStationWindowSchema = z.object({
+  windowId: idSchema, // Window.id (cuid)
+});
+
 // ─── PlaylistEntry ───────────────────────────────────────────────────────────
 
 export const createPlaylistEntrySchema = z.discriminatedUnion('type', [
@@ -320,6 +335,8 @@ export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type UpdateTicketStatusInput = z.infer<typeof updateTicketStatusSchema>;
 export type TransferTicketInput = z.infer<typeof transferTicketSchema>;
 export type RecallTicketInput = z.infer<typeof recallTicketSchema>;
+export type RecallSkippedTicketInput = z.infer<typeof recallSkippedTicketSchema>;
+export type SetStationWindowInput = z.infer<typeof setStationWindowSchema>;
 
 export type CreatePlaylistEntryInput = z.infer<typeof createPlaylistEntrySchema>;
 export type UpdatePlaylistEntryInput = z.infer<typeof updatePlaylistEntrySchema>;

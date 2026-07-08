@@ -14,6 +14,7 @@ import {
   callNextSchema,
   completeTicketSchema,
   createTicketSchema,
+  recallSkippedTicketSchema,
   recallTicketSchema,
   skipTicketSchema,
   transferTicketSchema,
@@ -30,6 +31,7 @@ import {
   issueTicket as domainIssueTicket,
   QueueDomainError,
   recall as domainRecall,
+  recallSkipped as domainRecallSkipped,
   skip as domainSkip,
   transfer as domainTransfer,
 } from '@/server/domain/queue';
@@ -48,7 +50,9 @@ function rethrow(e: unknown): never {
 // AsyncLocalStorage tenant context (mandatory pattern — see packages/db's tenant-guard) for
 // every downstream resolver's plain `prisma.*` (guarded) calls; mutations additionally wrap
 // their domain call in `withTenant` (RLS tx) for atomicity, same as the kiosk `issue` path.
-const staffProcedure = protectedProcedure
+// Exported (Wave 7.4) so station.ts's window-session router shares the exact same
+// tenant/role/context-narrowing guarantees instead of re-deriving them.
+export const staffProcedure = protectedProcedure
   .use(requireTenant)
   .use(requireRole(Role.Employee, Role.Admin))
   .use(({ ctx, next }) => {
@@ -156,6 +160,21 @@ export const queueRouter = createTRPCRouter({
     }
   }),
 
+  // Wave 7.4 — "Skipped Tickets (tap to recall)" (PRODUCT.md line 32). Distinct from `recall`
+  // above (which only re-announces an ALREADY-serving ticket): brings a `skipped` ticket back
+  // into `serving` at the CALLING employee's currently-selected window.
+  recallSkipped: staffProcedure.input(recallSkippedTicketSchema).mutation(async ({ ctx, input }) => {
+    try {
+      const result = await withTenant(ctx.tenantId, (tx) =>
+        domainRecallSkipped({ ticketId: input.ticketId, windowId: input.windowId, userId: ctx.userId }, { tenantId: ctx.tenantId, tx }),
+      );
+      await publishEvents(result.events);
+      return result.ticket;
+    } catch (e) {
+      rethrow(e);
+    }
+  }),
+
   transfer: staffProcedure.input(transferTicketSchema).mutation(async ({ ctx, input }) => {
     // Premium gate — Return After Done is a Premium-tier feature (PRODUCT.md line 32).
     // Tenant is a GLOBAL_MODEL (bypasses the L6 guard), so this read needs no tenant context.
@@ -182,7 +201,25 @@ export const queueRouter = createTRPCRouter({
     });
   }),
 
+  // Wave 7.4 — the station's "Skipped Tickets (tap to recall)" panel (PRODUCT.md line 32).
+  listSkipped: staffProcedure.input(z.void()).query(async ({ ctx }) => {
+    return prisma.ticket.findMany({
+      where: { tenantId: ctx.tenantId, status: 'skipped' },
+      orderBy: { createdAt: 'asc' },
+    });
+  }),
+
   nowServing: staffProcedure.input(z.void()).query(async ({ ctx }) => {
     return prisma.ticket.findMany({ where: { tenantId: ctx.tenantId, status: 'serving' } });
+  }),
+
+  // Wave 7.4 — window picker for the station (window-selection UI + Transfer's destination
+  // picker). Every window for this tenant, no PII — safe for any staffProcedure caller.
+  listWindows: staffProcedure.input(z.void()).query(async ({ ctx }) => {
+    return prisma.window.findMany({
+      where: { tenantId: ctx.tenantId },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    });
   }),
 });

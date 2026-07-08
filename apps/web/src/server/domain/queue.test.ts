@@ -4,7 +4,18 @@
 // literal values ("1-001" etc.) without colliding with the persistent seeded `demo` tenant.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prismaRaw, withTenant } from '@cuelane/db';
-import { callNext, complete, issueTicket, pad3, QueueDomainError, recall, skip, todayKey, transfer } from './queue';
+import {
+  callNext,
+  complete,
+  issueTicket,
+  pad3,
+  QueueDomainError,
+  recall,
+  recallSkipped,
+  skip,
+  todayKey,
+  transfer,
+} from './queue';
 
 describe('queue domain (Wave 7.1)', () => {
   let tenantId: string;
@@ -150,6 +161,42 @@ describe('queue domain (Wave 7.1)', () => {
     await expect(withTenant(tenantId, (tx) => skip({ ticketId: issued.ticket.id }, { tenantId, tx }))).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
+  });
+
+  // Wave 7.4-T2 — "Skipped Tickets (tap to recall)" (PRODUCT.md line 32). The Wave 7.1 recall()
+  // above only re-announces an ALREADY-serving ticket (its own docstring defers the
+  // skipped-list-tap-to-recall interaction to Wave 7.4) — this is that station-level function:
+  // bring a SKIPPED ticket back into `serving` at the calling employee's window.
+  it('recallSkipped brings a skipped ticket back to serving at the given window', async () => {
+    const svc = await freshService();
+    const issued = await withTenant(tenantId, (tx) => issueTicket({ serviceId: svc.id, priority: false }, { tenantId, tx }));
+    await withTenant(tenantId, (tx) => callNext({ windowId: windowOrigin, userId, serviceIds: [svc.id] }, { tenantId, tx }));
+    await withTenant(tenantId, (tx) => skip({ ticketId: issued.ticket.id }, { tenantId, tx }));
+
+    const recalled = await withTenant(tenantId, (tx) =>
+      recallSkipped({ ticketId: issued.ticket.id, windowId: windowDest, userId }, { tenantId, tx }),
+    );
+    expect(recalled.ticket.status).toBe('serving');
+    expect(recalled.ticket.windowId).toBe(windowDest);
+    expect(recalled.ticket.servedBy).toBe(userId);
+    expect(recalled.ticket.calledAt).not.toBeNull();
+    expect(recalled.events[0]?.type).toBe('ticket.called');
+  });
+
+  it('recallSkipped rejects a ticket that is not currently skipped', async () => {
+    const svc = await freshService();
+    const issued = await withTenant(tenantId, (tx) => issueTicket({ serviceId: svc.id, priority: false }, { tenantId, tx }));
+    await expect(
+      withTenant(tenantId, (tx) => recallSkipped({ ticketId: issued.ticket.id, windowId: windowOrigin, userId }, { tenantId, tx })),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('recallSkipped rejects an unknown ticket id', async () => {
+    await expect(
+      withTenant(tenantId, (tx) =>
+        recallSkipped({ ticketId: 'cknonexistentcuid00000000', windowId: windowOrigin, userId }, { tenantId, tx }),
+      ),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   it('recall re-announces a serving ticket (bumps calledAt) without changing its status', async () => {

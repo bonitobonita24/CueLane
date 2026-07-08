@@ -289,6 +289,46 @@ export interface TransferInput {
   returnToWindowId?: string | undefined;
 }
 
+// ─── recallSkipped ─────────────────────────────────────────────────────────────
+
+export interface RecallSkippedInput {
+  ticketId: string;
+  windowId: string;
+  userId: string;
+}
+
+/**
+ * Wave 7.4 — "Skipped Tickets (tap to recall)" (PRODUCT.md line 32). `recall()` above only
+ * re-announces a ticket that is ALREADY `serving` (its own docstring explicitly defers this
+ * interaction). This is the station-level counterpart: bring a `skipped` ticket back into
+ * `serving` at the CALLING employee's window — observably identical to `callNext` (fresh bell +
+ * voice announce), so it emits `ticket.called`, not a new event type.
+ */
+export async function recallSkipped(
+  input: RecallSkippedInput,
+  ctx: DomainCtx,
+): Promise<{ ticket: TicketRecord; events: DomainEvent[] }> {
+  const { tenantId, tx } = ctx;
+
+  const existing = await findTicket(tx, tenantId, input.ticketId);
+  if (existing == null) {
+    throw new QueueDomainError('NOT_FOUND', `Unknown ticket: ${input.ticketId}`);
+  }
+  if (existing.status !== 'skipped') {
+    throw new QueueDomainError('BAD_REQUEST', 'Only a skipped ticket can be recalled from the skipped list.');
+  }
+
+  const ticket = await tx.ticket.update({
+    where: { id: existing.id },
+    data: { status: 'serving', windowId: input.windowId, servedBy: input.userId, calledAt: new Date() },
+  });
+
+  return {
+    ticket,
+    events: [{ type: 'ticket.called', tenantId, ticketId: ticket.id, payload: { windowId: input.windowId } }],
+  };
+}
+
 /**
  * PRODUCT.md line 32: "employee picks destination → ticket immediately set to serving at target
  * window." Transfer routes a ticket to a WINDOW (a different employee), not to a different
