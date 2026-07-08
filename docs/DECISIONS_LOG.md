@@ -225,3 +225,17 @@ Locked: yes — do not add Turnstile to kiosk or display pages. Those are public
 - Webhook from email provider (delivery receipts) is now N/A — generic SMTP has no callback API
 
 **Locked:** yes — do not re-introduce Resend without explicit decision change. If a future need for provider-specific features (event webhooks, suppression lists) emerges, revisit via Phase 7 Feature Update.
+
+---
+
+## 2026-07-08 — Realtime transport: SSE (not raw WebSocket) for Phase 7 queue sync
+
+**Decision:** Implement the per-tenant realtime queue sync (Wave 7.2) with **Server-Sent Events** (Valkey pub/sub → Next.js Route Handler `ReadableStream`, browser `EventSource`), NOT a raw WebSocket server.
+
+**Decided by:** PM (technical `[HOW]` call — not deferred to owner).
+
+**Rationale:** PRODUCT.md §Realtime says "WebSocket," but the functional requirement is purely server→client fanout: per-tenant channel `tenant:{tenantId}:queue`, six events (ticket.called/completed/skipped/noshow/transferred/recalled), auto-reconnect, no polling. The surfaces (Big Display, Kiosk, Employee Station, Mobile) only *receive* — publishing happens through tRPC mutations, not the socket. `apps/web` runs `next start` (standalone, no custom server), so a WebSocket server would require ejecting to a custom server or a sidecar. SSE meets every functional need with native `EventSource` auto-reconnect and zero server ejection. "WebSocket" in PRODUCT.md is read as the *capability* (live push), not a hard transport mandate.
+
+**Reversible:** yes — if a future feature needs client→server socket messaging (bidirectional), revisit with a WS sidecar or custom server. No such requirement exists in v1.
+
+**Scope note:** does not affect Wave 7.1 (queue-engine backbone has no transport). Applies when Wave 7.2 (Realtime Transport) is built.
