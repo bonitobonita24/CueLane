@@ -7,6 +7,7 @@ import { serviceRouter } from './routers/service';
 import { windowRouter } from './routers/window';
 import { userRouter } from './routers/user';
 import { tenantAdminRouter } from './routers/tenantAdmin';
+import { dashboardRouter } from './routers/dashboard';
 
 // Root application router — extend with feature routers in Phase 4 Parts 5-6
 export const appRouter = createTRPCRouter({
@@ -18,6 +19,7 @@ export const appRouter = createTRPCRouter({
   window: windowRouter,
   user: userRouter,
   tenantAdmin: tenantAdminRouter,
+  dashboard: dashboardRouter,
 });
 
 // Export the router type — used by api-client and apps/web typed client

@@ -331,6 +331,17 @@ export const consumePasswordResetSchema = z.object({
   newPassword: z.string().min(8).max(100),
 });
 
+// ─── Dashboard (Wave 7.7a) ─────────────────────────────────────────────────────
+
+export const dashboardRangeSchema = z.object({
+  range: z.enum(['daily', 'monthly', 'yearly']),
+});
+
+export const dashboardTicketLogSchema = z.object({
+  range: z.enum(['daily', 'monthly', 'yearly']),
+  search: z.string().max(200).optional(),
+});
+
 // ─── Inferred input types ─────────────────────────────────────────────────────
 
 export type CreateTenantInput = z.infer<typeof createTenantSchema>;
@@ -366,3 +377,6 @@ export type UpgradeSubscriptionInput = z.infer<typeof upgradeSubscriptionSchema>
 export type XenditWebhookInput = z.infer<typeof xenditWebhookSchema>;
 export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
 export type ConsumePasswordResetInput = z.infer<typeof consumePasswordResetSchema>;
+
+export type DashboardRangeInput = z.infer<typeof dashboardRangeSchema>;
+export type DashboardTicketLogInput = z.infer<typeof dashboardTicketLogSchema>;
