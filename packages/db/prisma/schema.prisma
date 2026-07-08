@@ -6,6 +6,10 @@
 
 generator client {
   provider = "prisma-client-js"
+  // native  = the build/dev host engine.
+  // linux-musl-openssl-3.0.x = the Docker runtime (node:22-alpine, musl + OpenSSL 3).
+  // Without the musl target the container fails: "Query Engine for runtime linux-musl not found".
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
