@@ -8,6 +8,23 @@
 //
 // Run: pnpm --filter @cuelane/db db:seed
 // Requires: DATABASE_URL env var pointing to a running Postgres instance
+//
+// T0 FIX (Wave 7.3 pre-flight, was a hard BLOCKER — see Wave 7.1-T4's
+// queue.integration.test.ts header comment + prisma/seed.test.ts): every shared zod input schema
+// validates id fields with `z.string().cuid()`, so a kiosk/staff procedure referencing a literal
+// seeded id (the old `seed-svc-<tenantId>-cash-deposit` style strings) would 400 at input
+// validation before ever reaching a resolver. Fix: NEVER assign a literal string id. Every row
+// below is created with no `id` field, so Prisma's `@default(cuid())` mints a real cuid —
+// idempotency on reseed is instead keyed on a NATURAL field per model:
+//   - Tenant         → `slug`                              (real DB `@unique`)
+//   - Subscription   → `tenantId`                           (real DB `@unique`)
+//   - Service        → `(tenantId, number)`                 (real DB `@@unique`)
+//   - Window / User  → `(tenantId, name)` via findFirst+create/update (no DB unique constraint
+//                       exists for these two models — adding one is out of scope for a seed fix,
+//                       so idempotency is enforced by the script, not the database)
+//   - Ticket         → `(tenantId, serviceId, priority, sequence)` via findFirst+create/update
+//                       (same rationale as Window/User — good enough to distinguish the 3 fixed
+//                       sample tickets below without inventing a DB constraint)
 
 import { PrismaClient, type Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -19,6 +36,21 @@ const prisma = new PrismaClient();
 // failed every login because the provider never SHA-hashes the input.)
 function hashPin(pin: string): string {
   return bcrypt.hashSync(pin, 10);
+}
+
+/** Find-or-create-or-update by a natural key that has NO DB-level unique constraint (Window,
+ *  User). Prisma's `upsert()` requires a unique `where` clause, which these models don't have —
+ *  this is the deliberate fallback the T0 fix comment above describes. Not race-safe across
+ *  concurrent seed runs (fine: this seed is a single sequential dev-only script, never run
+ *  concurrently with itself). */
+async function findOrUpsert<TFind, TResult>(
+  find: () => Promise<TFind | null>,
+  create: () => Promise<TResult>,
+  update: (existing: TFind) => Promise<TResult>,
+): Promise<TResult> {
+  const existing = await find();
+  if (existing != null) return update(existing);
+  return create();
 }
 
 async function main(): Promise<void> {
@@ -70,6 +102,12 @@ async function main(): Promise<void> {
   console.log(`  ✓ Subscription: ${sub.tier} / ${sub.paymentStatus}`);
 
   // ─── Services (Transaction Types) ──────────────────────────────────────────
+  // Natural key = (tenantId, number) — a real DB `@@unique` — so this is a true Prisma `upsert`
+  // and Prisma mints a real cuid `id` on first create. No id/number collision dance needed: the
+  // old two-phase negative-scratch-number workaround existed only because the previous version of
+  // this seed upserted by a literal `id`, which meant renumbering had to avoid colliding with the
+  // live (tenantId, number) constraint on unrelated rows. Upserting BY that same constraint
+  // directly removes the need for the workaround entirely.
 
   const serviceData = [
     { name: 'Cash Deposit',    icon: '💰', color: '#3B82F6', avgTime: 5 },
@@ -78,34 +116,21 @@ async function main(): Promise<void> {
     { name: 'Withdrawal',      icon: '💳', color: '#F59E0B', avgTime: 7 },
   ];
 
-  // number = 1-based per-tenant ordinal in serviceData order — matches the ROW_NUMBER()
-  // backfill in migration 20260708120000_queue_engine_backbone for pre-existing rows, and
-  // seeds it correctly for a fresh tenant. Two-phase + sequential (not Promise.all): a reseed's
-  // `number` reassignment can collide with the live (tenant_id, number) unique constraint if the
-  // existing DB order (by created_at, set by a prior concurrent seed run) differs from
-  // serviceData's declared order — phase 1 moves every row to a negative scratch number (never
-  // collides with a real 1..N), phase 2 assigns the final positive numbers.
-  const serviceIds = serviceData.map(
-    (s) => `seed-svc-${tenant.id}-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
-  );
-  for (const [idx, id] of serviceIds.entries()) {
-    await prisma.service.upsert({
-      where: { id },
-      update: { number: -(idx + 1) },
+  const services: Awaited<ReturnType<typeof prisma.service.upsert>>[] = [];
+  for (const [idx, data] of serviceData.entries()) {
+    const number = idx + 1;
+    const svc = await prisma.service.upsert({
+      where: { tenantId_number: { tenantId: tenant.id, number } },
+      update: { name: data.name, icon: data.icon, color: data.color, avgTime: data.avgTime },
       create: {
-        id,
         tenantId: tenant.id,
-        number: -(idx + 1),
-        name: serviceData[idx]!.name,
-        icon: serviceData[idx]!.icon,
-        color: serviceData[idx]!.color,
-        avgTime: serviceData[idx]!.avgTime,
+        number,
+        name: data.name,
+        icon: data.icon,
+        color: data.color,
+        avgTime: data.avgTime,
       },
     });
-  }
-  const services: Awaited<ReturnType<typeof prisma.service.upsert>>[] = [];
-  for (const [idx, id] of serviceIds.entries()) {
-    const svc = await prisma.service.update({ where: { id }, data: { number: idx + 1 } });
     services.push(svc);
   }
 
@@ -117,16 +142,12 @@ async function main(): Promise<void> {
 
   const windows = await Promise.all(
     windowData.map((name) =>
-      prisma.window.upsert({
-        where: { id: `seed-win-${tenant.id}-${name.toLowerCase().replace(/\s+/g, '-')}` },
-        update: {},
-        create: {
-          id: `seed-win-${tenant.id}-${name.toLowerCase().replace(/\s+/g, '-')}`,
-          tenantId: tenant.id,
-          name,
-        },
-      })
-    )
+      findOrUpsert(
+        () => prisma.window.findFirst({ where: { tenantId: tenant.id, name } }),
+        () => prisma.window.create({ data: { tenantId: tenant.id, name } }),
+        (existing) => prisma.window.update({ where: { id: existing.id }, data: {} }),
+      ),
+    ),
   );
 
   console.log(`  ✓ Windows: ${windows.map((w) => w.name).join(', ')}`);
@@ -136,47 +157,24 @@ async function main(): Promise<void> {
   // PRODUCTION: roll out the universal-admin credential from Server-Setups separately.
   // Employee PINs are dev-only values — never use in production.
 
-  const adminUser = await prisma.user.upsert({
-    where: { id: `seed-usr-${tenant.id}-admin` },
-    update: {},
-    create: {
-      id: `seed-usr-${tenant.id}-admin`,
-      tenantId: tenant.id,
-      name: 'Branch Admin',
-      role: 'admin',
-      pin: hashPin('0000'),
-    },
-  });
+  async function findOrUpsertUser(name: string, role: 'admin' | 'employee', pin: string) {
+    return findOrUpsert(
+      () => prisma.user.findFirst({ where: { tenantId: tenant.id, name } }),
+      () => prisma.user.create({ data: { tenantId: tenant.id, name, role, pin: hashPin(pin) } }),
+      (existing) => prisma.user.update({ where: { id: existing.id }, data: { role, pin: hashPin(pin) } }),
+    );
+  }
 
-  const employee1 = await prisma.user.upsert({
-    where: { id: `seed-usr-${tenant.id}-emp1` },
-    update: {},
-    create: {
-      id: `seed-usr-${tenant.id}-emp1`,
-      tenantId: tenant.id,
-      name: 'Alice Santos',
-      role: 'employee',
-      pin: hashPin('1234'),
-    },
-  });
-
-  const employee2 = await prisma.user.upsert({
-    where: { id: `seed-usr-${tenant.id}-emp2` },
-    update: {},
-    create: {
-      id: `seed-usr-${tenant.id}-emp2`,
-      tenantId: tenant.id,
-      name: 'Bob Reyes',
-      role: 'employee',
-      pin: hashPin('5678'),
-    },
-  });
+  const adminUser = await findOrUpsertUser('Branch Admin', 'admin', '0000');
+  const employee1 = await findOrUpsertUser('Alice Santos', 'employee', '1234');
+  const employee2 = await findOrUpsertUser('Bob Reyes', 'employee', '5678');
 
   console.log(`  ✓ Users: ${adminUser.name} (admin), ${employee1.name}, ${employee2.name}`);
 
   // ─── UserService assignments ────────────────────────────────────────────────
+  // Alice handles Cash Deposit and Withdrawal; Bob handles all four services.
+  // Real DB `@@unique([userId, serviceId])` — a true Prisma upsert.
 
-  // Alice handles Cash Deposit and Withdrawal; Bob handles all four services
   const alice = employee1;
   const bob = employee2;
 
@@ -209,60 +207,60 @@ async function main(): Promise<void> {
   console.log(`  ✓ Service assignments: Alice (2), Bob (4)`);
 
   // ─── Sample Tickets ─────────────────────────────────────────────────────────
+  // No DB unique constraint on Ticket beyond `id` — idempotency key here is
+  // (tenantId, serviceId, priority, sequence), which is enough to distinguish these 3 fixed
+  // sample rows (see T0 fix comment at the top of this file).
 
   const [win1, win2] = windows as [typeof windows[0], typeof windows[0]];
 
-  // number/sequence backfilled to match the same scheme as migration
-  // 20260708120000_queue_engine_backbone: regular tickets sequence per tenant+service,
-  // priority tickets sequence per tenant, both "P-NNN" / "{service.number}-NNN" 3-digit padded.
-  const ticket1 = await prisma.ticket.upsert({
-    where: { id: `seed-tkt-${tenant.id}-001` },
-    update: { number: `${svcDeposit.number}-001`, sequence: 1 },
-    create: {
-      id: `seed-tkt-${tenant.id}-001`,
-      tenantId: tenant.id,
-      serviceId: svcDeposit.id,
-      number: `${svcDeposit.number}-001`,
-      sequence: 1,
-      status: 'waiting',
-      priority: false,
-    },
-  });
+  async function findOrUpsertTicket(
+    lookup: { serviceId: string; priority: boolean; sequence: number },
+    data: Record<string, unknown>,
+  ) {
+    return findOrUpsert(
+      () => prisma.ticket.findFirst({ where: { tenantId: tenant.id, ...lookup } }),
+      () =>
+        prisma.ticket.create({
+          data: { tenantId: tenant.id, ...lookup, ...data } as Prisma.TicketUncheckedCreateInput,
+        }),
+      (existing) =>
+        prisma.ticket.update({
+          where: { id: (existing as { id: string }).id },
+          data: data as Prisma.TicketUpdateInput,
+        }),
+    );
+  }
 
-  const ticket2 = await prisma.ticket.upsert({
-    where: { id: `seed-tkt-${tenant.id}-002` },
-    update: { number: `${svcLoan.number}-001`, sequence: 1 },
-    create: {
-      id: `seed-tkt-${tenant.id}-002`,
-      tenantId: tenant.id,
-      serviceId: svcLoan.id,
+  const ticket1 = await findOrUpsertTicket(
+    { serviceId: svcDeposit.id, priority: false, sequence: 1 },
+    {
+      number: `${svcDeposit.number}-001`,
+      status: 'waiting',
+    },
+  );
+
+  const ticket2 = await findOrUpsertTicket(
+    { serviceId: svcLoan.id, priority: false, sequence: 1 },
+    {
       number: `${svcLoan.number}-001`,
-      sequence: 1,
       status: 'serving',
-      priority: false,
       windowId: win1.id,
       servedBy: bob.id,
       calledAt: new Date(),
     },
-  });
+  );
 
-  const ticket3 = await prisma.ticket.upsert({
-    where: { id: `seed-tkt-${tenant.id}-003` },
-    update: { number: 'P-001', sequence: 1 },
-    create: {
-      id: `seed-tkt-${tenant.id}-003`,
-      tenantId: tenant.id,
-      serviceId: svcDeposit.id,
+  const ticket3 = await findOrUpsertTicket(
+    { serviceId: svcDeposit.id, priority: true, sequence: 1 },
+    {
       number: 'P-001',
-      sequence: 1,
       status: 'completed',
-      priority: true,
       windowId: win2.id,
       servedBy: alice.id,
       calledAt: new Date(Date.now() - 10 * 60 * 1000),
       completedAt: new Date(Date.now() - 5 * 60 * 1000),
     },
-  });
+  );
 
   console.log(`  ✓ Tickets: ${[ticket1, ticket2, ticket3].map((t) => `${t.id}(${t.status})`).join(', ')}`);
 

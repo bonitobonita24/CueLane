@@ -102,6 +102,17 @@ describe('queueRouter (Wave 7.1)', () => {
     expect(typeof counts.serving).toBe('number');
   });
 
+  it('kiosk listActive returns this tenant\'s services, ordered by number, with NO session', async () => {
+    const caller = createCaller(ctxFor({}));
+    const services = await caller.queue.listActive({ tenantSlug: premiumTenantSlug });
+    expect(services.length).toBeGreaterThanOrEqual(1);
+    expect(services.some((s) => s.id === premiumServiceId)).toBe(true);
+    const numbers = services.map((s) => s.number);
+    expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
+    // Never leaks another tenant's services (L6 tenant-isolation lesson).
+    expect(services.every((s) => s.id !== freeServiceId)).toBe(true);
+  });
+
   it('callNext is UNAUTHORIZED without a session', async () => {
     const caller = createCaller(ctxFor({}));
     await expect(caller.queue.callNext({ windowId: premiumWindowId })).rejects.toMatchObject({

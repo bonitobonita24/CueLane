@@ -81,6 +81,19 @@ export const queueRouter = createTRPCRouter({
       }
     }),
 
+  // Kiosk transaction-grid data — every service for this tenant, ordered for stable tile layout.
+  // The Service model has no enabled/disabled flag yet (schema.prisma), so "active" here means
+  // "exists for this tenant" — every row returned is safe for the public kiosk (no PII, no
+  // cross-tenant leakage: `ctx.tenantId` is server-resolved from tenantSlug by kioskProcedure,
+  // never client-supplied — the L6 tenant-isolation lesson).
+  listActive: kioskProcedure.query(async ({ ctx }) => {
+    return prisma.service.findMany({
+      where: { tenantId: ctx.tenantId },
+      orderBy: { number: 'asc' },
+      select: { id: true, name: true, number: true, icon: true, color: true, avgTime: true },
+    });
+  }),
+
   // Live waiting/serving counts — safe for the public kiosk display (no ticket-level detail).
   counts: kioskProcedure.query(async ({ ctx }) => {
     const [waiting, serving] = await Promise.all([
