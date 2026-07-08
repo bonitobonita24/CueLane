@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./styles": "./src/styles/globals.css"
+    "./styles": "./src/styles/globals.css",
+    "./toaster": "./src/components/ui/sonner.tsx",
+    "./form": "./src/components/ui/form.tsx"
   },
   "main": "./src/index.ts",
   "scripts": {
