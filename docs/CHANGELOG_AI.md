@@ -5,6 +5,28 @@ Format: Rule 15 — Agent attribution required on every entry.
 
 ---
 
+## 2026-07-08 — Phase 4 Part 6: apps/worker (BullMQ worker boot — email/reports/webhooks)
+
+- Agent:               CLAUDE_CODE (swarm S6, headless worker session)
+- Branch:              swarm/phase4-scaffold
+- Session:             S6 — Part 6
+
+### apps/worker (@cuelane/worker)
+- Added `package.json` — @cuelane/worker; runtime deps: bullmq, nodemailer, zod, @cuelane/jobs, @cuelane/db, @cuelane/shared, @cuelane/storage; devDeps: @types/nodemailer, tsx, typescript
+- Added `tsconfig.json` — extends tsconfig.base.json (strict + Bundler moduleResolution + exactOptionalPropertyTypes)
+- Added `src/env.ts` — Zod-validated startup env: VALKEY_URL (dev default: redis://localhost:41708), DATABASE_URL, SMTP_HOST/PORT/SECURE/USER/PASS/FROM/FROM_NAME, MINIO_ENDPOINT/PORT/USE_SSL/ACCESS_KEY/SECRET_KEY/BUCKET; process.exit(1) on validation failure
+- Added `src/index.ts` — BullMQ Worker per queue (email concurrency=5, reports=2, webhooks=10); getConnectionOptions() from @cuelane/jobs; completed/failed event listeners; graceful shutdown on SIGTERM/SIGINT with double-shutdown guard and error-tolerant Promise.all
+- Added `src/processors/email.processor.ts` — nodemailer SMTP transporter; renderTemplate() switch (email_verification, password_reset, subscription_confirmation, subscription_cancellation, subscription_renewal_reminder, default); escapeHtml() helper prevents HTML injection in all interpolated fields; SMTP_SECURE env-driven (fixes port-465 TLS); removed unnecessary withTenant DB coupling (email sends are pure SMTP, no DB query)
+- Added `src/processors/reports.processor.ts` — skeleton withTenant(tenantId) scoped; console.log stub; TODO Phase 8
+- Added `src/processors/webhooks.processor.ts` — skeleton withTenant(tenantId) scoped; TODO Phase 8 Xendit signature validation
+
+### Code review gate (S6)
+- 3 findings confirmed and fixed: (1) HTML injection via unescaped template data → fixed with escapeHtml(); (2) `secure: false` hardcoded regardless of SMTP port → fixed via SMTP_SECURE env var; (3) `withTenant` DB transaction wrapping pure SMTP send — DB outage blocks email delivery → removed withTenant from email processor
+- 1 finding fixed proactively: double-shutdown on concurrent SIGTERM+SIGINT → shutdown guard flag added
+- typecheck: 0 errors; build: 0 errors
+
+---
+
 ## 2026-07-08 — Phase 4 Part 3: packages/db (Prisma schema + L6 tenant-guard + RLS + audit helper + seed)
 
 - Agent:               CLAUDE_CODE (swarm S4, headless worker session)

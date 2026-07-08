@@ -3,10 +3,10 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 4 Part 5 complete → Phase 4 Part 6 NEXT** (apps/worker)
-LAST_DONE:    Phase 4 Part 5 — apps/web: Next.js 15 App Router boot + tRPC v11 server/context/routers + Auth.js v5 (admin name+bcrypt-pin + super-admin env) + tenant subdirectory middleware + security (headers/rate-limit/sanitize + L1 routing guard) (2026-07-08, swarm S5 run-12).
-              Code review: 6 confirmed findings fixed: (1) pathname.includes('.') auth bypass; (2) cross-tenant admin findFirst missing tenantId scope; (3) X-Forwarded-For spoofable rate-limit key; (4) empty-string userId passes null guard; (5) startsWith prefix too broad; (6) tabnapping via missing rel=noopener noreferrer hook. Typecheck/build = 0 errors.
-NEXT:         Phase 4 Part 6 — apps/worker (BullMQ workers + tRPC worker router).
+PHASE:        **Phase 4 Part 6 complete → Phase 4 Part 7 NEXT** (Docker Compose app services)
+LAST_DONE:    Phase 4 Part 6 — apps/worker: BullMQ worker boot (email/reports/webhooks queues) consuming @cuelane/jobs + db + storage (2026-07-08, swarm S6 run-14).
+              Code review: 3 confirmed findings fixed: (1) HTML injection via unescaped template data → escapeHtml(); (2) secure:false hardcoded → SMTP_SECURE env var; (3) withTenant wrapping pure SMTP send → removed DB coupling from email processor. Double-shutdown guard added proactively. Typecheck/build = 0 errors.
+NEXT:         Phase 4 Part 7 — Docker Compose app services (apps/web + apps/worker containers).
 EVIDENCE:     Framework sync verified — grep CLAUDE_compact.md = V32.24; 28/28 deliverables
               deployed; spec-gap-check ran (all findings expected pre-scaffold).
 BLOCKERS:     Human ⏳ in CREDENTIALS.md before Phase 5 deploy (NOT Phase 4 dev): Docker Hub

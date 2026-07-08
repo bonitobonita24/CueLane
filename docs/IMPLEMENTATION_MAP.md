@@ -61,7 +61,18 @@ Current build state. Rewritten after every feature update to reflect what exists
 - `src/storage.ts` — validatePathSegment() (tenantId+entityType against SEGMENT_RE, prevents traversal); validateUpload() (blocklist→allowlist→path→size via body.byteLength); buildStorageKey (MIME_TO_EXT not originalFilename extension); assertTenantKey() (cross-tenant guard on read/delete/sign); putObject/getObject(tenantId)/deleteObject(tenantId)/getSignedDownloadUrl
 
 ## Apps
-_Not yet scaffolded — Phase 4 Parts 5-6_
+
+### @cuelane/web ✅ Phase 4 Part 5 complete (swarm/phase4-scaffold, 2026-07-08)
+- Next.js 15 App Router, tRPC v11 server + routers (tenant, auth, service, window, ticket, queue), Auth.js v5 (bcrypt-PIN admin + super-admin env), tenant subdirectory middleware, security (CSP headers, rate-limit, DOMPurify sanitize, L1 routing guard). 6 security fixes applied post-review.
+
+### @cuelane/worker ✅ Phase 4 Part 6 complete (swarm/phase4-scaffold, 2026-07-08)
+- `package.json` — @cuelane/worker; deps: bullmq, nodemailer, zod, @cuelane/jobs/db/shared/storage; devDeps: @types/nodemailer, tsx
+- `tsconfig.json` — extends tsconfig.base.json; strict; Bundler moduleResolution
+- `src/env.ts` — Zod-validated env: VALKEY_URL (dev:41708), DATABASE_URL, SMTP_HOST/PORT/SECURE/USER/PASS/FROM/FROM_NAME, MINIO_* vars; process.exit(1) on invalid
+- `src/index.ts` — BullMQ Worker per queue (email:concurrency=5, reports:2, webhooks:10); shared connection options; completed/failed event logging; graceful shutdown (SIGTERM/SIGINT, double-shutdown guard, error-tolerant Promise.all)
+- `src/processors/email.processor.ts` — nodemailer SMTP send; renderTemplate() switch (email_verification, password_reset, subscription_confirmation, subscription_cancellation, subscription_renewal_reminder, default); escapeHtml() prevents HTML injection; SMTP_SECURE env-driven; no unnecessary withTenant DB coupling
+- `src/processors/reports.processor.ts` — skeleton; withTenant(tenantId) scoped; TODO Phase 8
+- `src/processors/webhooks.processor.ts` — skeleton; withTenant(tenantId) scoped; TODO Phase 8 (Xendit validation)
 
 ## Infrastructure
 _Not yet scaffolded — Phase 4 Part 7_
