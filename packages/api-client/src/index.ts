@@ -1,11 +1,11 @@
 import { createTRPCClient, httpBatchLink, type HTTPHeaders } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
 
-/**
- * TODO(S5): Replace this placeholder with the real AppRouter type.
- * Import path: import type { AppRouter } from '../../../apps/web/src/server/api/root.js'
- * Do NOT import from packages/db — Rule 13 prohibits it in api-client.
- */
+// AppRouter is kept as `any` here to avoid a circular dependency:
+// apps/web depends on @cuelane/api-client, so api-client cannot import from apps/web.
+// For strongly-typed usage IN apps/web, import from '@/lib/trpc' instead:
+//   import { trpc } from '@/lib/trpc';   ← typed with real AppRouter
+// This any-typed export is for cross-package consumers (e.g. apps/worker).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppRouter = any;
 
@@ -33,10 +33,7 @@ export function createClient({ url, getHeaders }: ClientOptions) {
 }
 
 /**
- * Typed tRPC React hooks.
- * Usage in apps/web:
- *   import { trpc, createClient } from '@cuelane/api-client';
- *   const client = createClient({ url: '/api/trpc', getHeaders });
- *   <trpc.Provider client={client} queryClient={queryClient}>...</trpc.Provider>
+ * Untyped tRPC React hooks — for use outside apps/web.
+ * In apps/web, use the typed version from '@/lib/trpc' instead.
  */
 export const trpc = createTRPCReact<AppRouter>();

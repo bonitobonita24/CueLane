@@ -208,3 +208,54 @@ Format: Rule 15 — Agent attribution required on every entry.
 - Code review:         4 confirmed findings fixed in-scope: (1) transferTicketSchema missing cross-field guard for returnAfterDone=true+no returnToWindowId; (2) updatePlaylistEntrySchema allowed isLive on Local entries; (3) reorder schemas unbounded arrays; (4) orphaned superjson dep + missing react peer dep. 2 deferred findings raised as bucket-A questions for conductor.
 
 ---
+
+---
+
+## Phase 4 Part 5 — apps/web: Next.js 15 App Router + tRPC v11 + Auth.js v5 + Security
+
+- Date:                2026-07-08
+- Agent:               CLAUDE_CODE (swarm S5, run-12)
+- Branch:              swarm/phase4-scaffold
+- Files added:
+  - `apps/web/package.json` — @cuelane/web; next@^15.1.0, react@^19, @trpc/server+client+react-query@^11, @tanstack/react-query@^5, superjson@^2, next-auth@^5.0.0-beta.28, @auth/prisma-adapter@^2, zod@^3, lru-cache@^11, isomorphic-dompurify@^2, bcryptjs@^2; all @cuelane/* workspace:*
+  - `apps/web/tsconfig.json` — extends ../../tsconfig.base.json; dom+ES2022 libs; paths @/*; Next.js plugin; allowJs+noEmit (Next.js auto-set)
+  - `apps/web/next.config.ts` — output:standalone; security headers (X-Frame-Options, HSTS, CSP, Permissions-Policy, Referrer-Policy, X-Content-Type-Options, X-XSS-Protection); transpilePackages all @cuelane/*; serverExternalPackages @prisma/client; webpack extensionAlias (.js→.ts) for ESM workspace packages
+  - `apps/web/tailwind.config.ts` — content: src/**+packages/ui/src/**; require() for tailwindcss-animate (no @types)
+  - `apps/web/src/env.ts` — Zod-validated env schema (DATABASE_URL, AUTH_SECRET, NEXTAUTH_URL, SUPER_ADMIN_EMAIL/PASSWORD_HASH, TURNSTILE_SECRET_KEY, MINIO_*, VALKEY_URL, NEXT_PUBLIC_*); SKIP_ENV_VALIDATION bypass for Docker build; NEXT_PHASE guard
+  - `apps/web/src/server/lib/rate-limit.ts` — LRUCache-backed per-IP rate limiter; rateLimiters: {public:30, auth:10, pinAuth:10, api:120, upload:20, passwordReset:5}
+  - `apps/web/src/server/lib/sanitize.ts` — isomorphic-dompurify; ALLOWED_TAGS/ATTR; afterSanitizeAttributes hook: rel=noopener noreferrer on target=_blank (tabnapping guard); sanitizePlainText() strips all HTML
+  - `apps/web/src/types/next-auth.d.ts` — module augmentation: Session.user+JWT gain tenantId:string|null, roles:Role[]
+  - `apps/web/src/server/auth/config.ts` — NextAuthConfig; Credentials provider admin-credentials (name lookup scoped by tenantSlug→tenant.id → prevents cross-tenant auth; bcrypt compare on pin; roleMap); super-admin-credentials (env SUPER_ADMIN_EMAIL+PASSWORD_HASH); JWT/session callbacks (block-disable any casts for Auth.js v5 type limitations); jwt uses trigger=signIn guard; cookies: httpOnly, sameSite:lax, secure:prod
+  - `apps/web/src/server/auth/index.ts` — re-exports NextAuth(authConfig) → auth, handlers, signIn, signOut
+  - `apps/web/src/server/trpc/context.ts` — createTRPCContext: auth() no-arg call → Session|null; ctx: {session, userId, roles, tenantId, req}
+  - `apps/web/src/server/trpc/trpc.ts` — initTRPC+superjson; extractClientIp (x-real-ip primary → last x-forwarded-for entry → unknown; SECURITY: first XFF entry not used — attacker-controlled); publicProcedure (rate limit); protectedProcedure (session==null || userId==null || userId==='' → UNAUTHORIZED; empty-string guard catches stale JWTs)
+  - `apps/web/src/server/trpc/middleware/rbac.ts` — requireRole(...allowedRoles): middleware checks ctx.roles, throws FORBIDDEN if missing
+  - `apps/web/src/server/trpc/middleware/tenant.ts` — requireTenant: super-admin bypass (Role.SuperAdmin); throws UNAUTHORIZED if tenantId==null for non-super-admin
+  - `apps/web/src/server/trpc/root.ts` — appRouter: {health, tenant}; exports AppRouter type
+  - `apps/web/src/server/trpc/routers/health.ts` — health.ping: 'pong' + timestamp
+  - `apps/web/src/server/trpc/routers/tenant.ts` — tenant.getCurrent (requireTenant, Prisma findUnique); tenant.listAll (requireRole(SuperAdmin), paginated cursor, conditional spread for exactOptionalPropertyTypes)
+  - `apps/web/src/lib/trpc.ts` — createTRPCReact<AppRouter> (typed); createClient (httpBatchLink+superjson)
+  - `apps/web/src/middleware.ts` — Auth.js v5 auth() callback middleware; isInternalPath: fixed to STATIC_EXT_RE (trailing extension regex) instead of pathname.includes('.') which bypassed super-admin auth; super-admin role check; tenant-slug extraction; matchesSegment guard (exact-segment prefix to avoid '/stationery' false-positive); protected/public path routing
+  - `apps/web/src/app/layout.tsx` — root layout + Geist fonts + globals.css
+  - `apps/web/src/app/page.tsx` — home placeholder
+  - `apps/web/src/app/[tenant]/layout.tsx` — tenant shell layout
+  - `apps/web/src/app/[tenant]/kiosk/page.tsx` — kiosk surface placeholder
+  - `apps/web/src/app/[tenant]/display/page.tsx` — display surface placeholder
+  - `apps/web/src/app/[tenant]/station/page.tsx` — employee station placeholder
+  - `apps/web/src/app/[tenant]/admin/page.tsx` — admin panel placeholder
+  - `apps/web/src/app/super-admin/dashboard/page.tsx` — super-admin dashboard placeholder (static path, not under [tenant])
+  - `apps/web/src/app/api/auth/[...nextauth]/route.ts` — Auth.js v5 handlers
+  - `apps/web/src/app/api/trpc/[trpc]/route.ts` — fetchRequestHandler; two code paths for exactOptionalPropertyTypes (dev: with onError, prod: without)
+  - `apps/web/Dockerfile` — 3-stage (deps→builder→runner); standalone output; SKIP_ENV_VALIDATION=true in builder; non-root user
+  - `apps/web/.dockerignore`
+  - `apps/web/components.json` — shadcn/ui config
+  - `apps/web/postcss.config.mjs`
+  - `apps/web/next-env.d.ts`
+- Files modified:
+  - `packages/api-client/src/index.ts` — updated TODO comment: AppRouter=any intentional (circular-dep prevention); direct apps/web to @/lib/trpc for typed client
+  - `pnpm-lock.yaml` — new deps for apps/web
+- Schema/migrations:   none
+- Errors encountered:  packages/shared ESM .js imports unresolvable → webpack extensionAlias; Auth.js v5 JWT base Record<string,unknown> type conflict → block eslint-disable + trigger=signIn guard; exactOptionalPropertyTypes throughout (onError, cursor, httpBatchLink transformer) → conditional spreads + two code paths; @typescript-eslint/strict-boolean-expressions for all nullable string checks → explicit ==null; @typescript-eslint/require-await on non-async callbacks → removed async; rbac/tenant had duplicate initTRPC → export middleware from trpc.ts; tailwindcss-animate no @types → require()
+- Errors resolved:     All — lint/typecheck/build/ESLint green
+- Code review:         6 confirmed findings fixed: (1) pathname.includes('.') bypassed super-admin auth for dot-paths → STATIC_EXT_RE trailing extension; (2) admin findFirst no tenantId scope → added tenantSlug credential + tenant.id lookup; (3) X-Forwarded-For spoofable rate-limit key → x-real-ip primary + last-XFF entry; (4) String(tok.userId??'') empty string passes null guard → added ==='' check; (5) startsWith('/station') too broad → matchesSegment exact-segment; (6) tabnapping no rel=noopener noreferrer → DOMPurify afterSanitizeAttributes hook
+- Schema gaps (TODO):  User has `pin` (not `email`) → admin auth uses `name` as identifier + bcrypt against `pin`; tracked in lessons.md. UserRole has no super_admin value → super-admin is env-only, not DB-stored.

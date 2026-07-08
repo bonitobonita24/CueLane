@@ -1,0 +1,46 @@
+{
+  "name": "@cuelane/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 41716",
+    "build": "next build",
+    "start": "next start --port 41716",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cuelane/shared": "workspace:*",
+    "@cuelane/ui": "workspace:*",
+    "@cuelane/db": "workspace:*",
+    "@cuelane/api-client": "workspace:*",
+    "@cuelane/jobs": "workspace:*",
+    "@cuelane/storage": "workspace:*",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@trpc/server": "^11.0.0",
+    "@trpc/client": "^11.0.0",
+    "@trpc/react-query": "^11.0.0",
+    "@tanstack/react-query": "^5.62.0",
+    "superjson": "^2.2.2",
+    "next-auth": "^5.0.0-beta.28",
+    "@auth/prisma-adapter": "^2.7.0",
+    "zod": "^3.23.8",
+    "lru-cache": "^11.0.2",
+    "isomorphic-dompurify": "^2.21.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/node": "^20",
+    "@types/bcryptjs": "^2.4.6",
+    "typescript": "^5",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8",
+    "autoprefixer": "^10",
+    "eslint": "^9",
+    "eslint-config-next": "^15.1.0"
+  }
+}
