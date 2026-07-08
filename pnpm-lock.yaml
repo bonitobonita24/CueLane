@@ -65,6 +65,9 @@ importers:
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
+      ioredis:
+        specifier: ^5.10.1
+        version: 5.10.1
       isomorphic-dompurify:
         specifier: ^2.21.0
         version: 2.36.0

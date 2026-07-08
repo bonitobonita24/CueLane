@@ -30,7 +30,8 @@
     "zod": "^3.23.8",
     "lru-cache": "^11.0.2",
     "isomorphic-dompurify": "^2.21.0",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "ioredis": "^5.10.1"
   },
   "devDependencies": {
     "@types/react": "^18",
