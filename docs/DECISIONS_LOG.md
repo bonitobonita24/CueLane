@@ -443,3 +443,38 @@ legible), not a computed-contrast-ratio guarantee for all 8 presets. Flagged as 
 future accessibility pass wants a per-preset computed check.
 
 **Reversible:** yes — a single CSS custom property; reverting to hardcoded gold is a 1-line diff.
+
+---
+
+## 2026-07-09 — Wave 7.7d-T3: large-upload gap (Wave 7.7c-T3) — PARTIALLY VERIFIED
+
+**Follow-up to the Wave 7.7c-T3 entry above.** `route.large.test.ts` now drives the REAL
+`media/upload` Route Handler (Auth.js `auth()` mocked — the only piece with no HTTP session to
+drive in a test process; storage/DB are 100% real, no mocks) with a genuine 60MB multipart body
+containing a deterministic byte pattern (not zeros — rules out any accidental sparse-buffer
+special-casing).
+
+**Result: PASSES.** 60MB round-trips (multipart parse → in-memory buffer → real MinIO PUT →
+`PlaylistEntry` row) in ~374–657ms, with byte-exact content verified via an independent
+`getObject()` re-download (not just a "the DB row exists" check).
+
+**On the specific ambiguity the prior entry raised** — an `experimental.proxyClientMaxBodySize`
+Next.js Route Handler config option (default 10MB) that would reject an un-configured large body:
+context7 (`/vercel/next.js/v15.1.8`) surfaces this option, but its own source attribution is the
+`canary` branch, NOT the pinned `15.1.8` release this app runs — i.e. still not confirmed to exist
+at this app's actual version. This test now gives an EMPIRICAL answer for that same version,
+independent of the docs ambiguity: a 60MB body is NOT rejected by the framework in this app,
+full stop.
+
+**Still NOT verified (flagged, not fixed — genuinely out of a single test's reach):**
+1. The full 800MB Premium cap specifically (this test uses 60MB — large enough to prove the code
+   path is sound, not a full-cap load test, which would make the suite prohibitively slow).
+2. Reverse-proxy (Traefik) body-size behavior in staging/prod — dev has no proxy in front of the
+   app port, so this is untestable without a real staging deploy. Traefik has no default body-size
+   cap (unlike nginx's `client_max_body_size`) unless explicitly configured, so the a priori risk
+   is lower than originally flagged, but this is an assumption, not a verified fact.
+3. Concurrent-upload memory pressure (multiple simultaneous large in-memory buffers) — still
+   unverified; the streaming-multipart-upload alternative from the original Wave 7.7c-T3 entry
+   remains a valid future improvement if this ever becomes a real production concern.
+
+**Reversible:** n/a — test-only change, no production code touched by this entry.
