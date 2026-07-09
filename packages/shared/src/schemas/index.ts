@@ -121,6 +121,13 @@ export const updateTenantStatusSchema = z.object({
   status: z.nativeEnum(TenantStatus),
 });
 
+// Wave 7.8-T1 — Super Admin manual tier override (docs/PRODUCT.md "Tier management: toggle
+// Free/Premium per tenant (manual override of Xendit state)").
+export const setTenantTierSchema = z.object({
+  tenantId: idSchema,
+  tier: z.nativeEnum(TenantTier),
+});
+
 // ─── Service (Transaction Type) ──────────────────────────────────────────────
 
 // Decision 4 — icon/color are constrained to the PM-authored option lists (packages/shared
@@ -371,6 +378,7 @@ export const dashboardTicketLogSchema = z.object({
 export type CreateTenantInput = z.infer<typeof createTenantSchema>;
 export type UpdateTenantSettingsInput = z.infer<typeof updateTenantSettingsSchema>;
 export type UpdateTenantStatusInput = z.infer<typeof updateTenantStatusSchema>;
+export type SetTenantTierInput = z.infer<typeof setTenantTierSchema>;
 
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;
 export type UpdateServiceInput = z.infer<typeof updateServiceSchema>;

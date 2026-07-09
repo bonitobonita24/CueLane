@@ -21,7 +21,7 @@ import {
   Role,
 } from '@cuelane/shared';
 import { prisma, withTenant, withTenantContext } from '@cuelane/db';
-import { createTRPCRouter, kioskProcedure, protectedProcedure } from '../trpc';
+import { createTRPCRouter, kioskProcedure, protectedProcedure, assertTenantActive } from '../trpc';
 import { requireTenant } from '../middleware/tenant';
 import { requireRole } from '../middleware/rbac';
 import { publishEvents } from '@/server/realtime/publisher';
@@ -55,7 +55,7 @@ function rethrow(e: unknown): never {
 export const staffProcedure = protectedProcedure
   .use(requireTenant)
   .use(requireRole(Role.Employee, Role.Admin))
-  .use(({ ctx, next }) => {
+  .use(async ({ ctx, next }) => {
     // requireTenant/requireRole are standalone middleware typed against the base Context
     // (userId/tenantId nullable) — they pass ctx through unnarrowed even though protectedProcedure
     // already guarantees non-null at runtime. Re-narrow explicitly here so every downstream
@@ -65,6 +65,11 @@ export const staffProcedure = protectedProcedure
     if (tenantId == null || userId == null) {
       throw new TRPCError({ code: 'UNAUTHORIZED' });
     }
+    // Wave 7.8-T2 — a suspended tenant's Employee Station must be blocked mid-session, same as
+    // adminProcedure (trpc.ts's `assertTenantActive`). Employee sessions never carry
+    // Role.SuperAdmin, so no bypass is needed here (unlike adminProcedure, which super-admin can
+    // also hit through shared admin routers).
+    await assertTenantActive(tenantId);
     return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));
   });
 

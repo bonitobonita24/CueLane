@@ -74,7 +74,22 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 // middleware/rbac.ts) to avoid a circular import: those two files import `middleware` FROM this
 // file, so importing them back into trpc.ts would create a cycle. Inlined equivalent logic
 // instead — same L1 tenant-guard + L3 RBAC checks, just expressed directly.
-export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+// Wave 7.8-T2 — suspension enforcement, shared by adminProcedure (below) and queue.ts's
+// staffProcedure. A `suspended` tenant (Super Admin action) must be blocked on every one of its
+// own tenant surfaces at the tenant-RESOLUTION layer, not page-by-page — kioskProcedure already
+// enforces this for the unauthenticated kiosk/display path (it resolves the tenant itself); this
+// is the equivalent check for the SESSION-based paths (Admin Panel + Employee Station), so a
+// suspension takes effect immediately even mid-session, without requiring the user to log out.
+// Uses `prismaRaw` (unguarded) — no AsyncLocalStorage tenant context exists yet at this point in
+// the middleware chain (same rationale as kioskProcedure's tenant lookup).
+export async function assertTenantActive(tenantId: string): Promise<void> {
+  const tenant = await prismaRaw.tenant.findUnique({ where: { id: tenantId }, select: { status: true } });
+  if (tenant == null || tenant.status !== 'active') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'This branch is suspended.' });
+  }
+}
+
+export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   const isSuperAdmin = ctx.roles.includes(Role.SuperAdmin);
   if (!isSuperAdmin && ctx.tenantId == null) {
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'No tenant context in session.' });
@@ -88,7 +103,25 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (tenantId == null || userId == null) {
     throw new TRPCError({ code: 'UNAUTHORIZED' });
   }
+  if (!isSuperAdmin) {
+    await assertTenantActive(tenantId);
+  }
   return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));
+});
+
+// Super Admin procedure — platform-level, cross-tenant, env-based credential (Role.SuperAdmin,
+// tenantId=null in session — see auth/config.ts's 'super-admin-credentials' provider). Deliberately
+// does NOT wrap in `withTenantContext`: Super Admin operates GLOBALLY across every tenant, so
+// establishing a single tenant's AsyncLocalStorage context here would be wrong (it would either
+// scope reads to one arbitrary tenant or, for non-GLOBAL_MODELS, still throw "No tenant context" —
+// see packages/db tenant-guard). Every superAdminRouter resolver reads/writes via `prismaRaw`
+// (unguarded), matching the tenant-guard GLOBAL_MODELS convention for Tenant/SystemAd/Subscription
+// and explicit `where: { tenantId }` filters for any per-tenant aggregate.
+export const superAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.roles.includes(Role.SuperAdmin)) {
+    throw new TRPCError({ code: 'FORBIDDEN' });
+  }
+  return next({ ctx });
 });
 
 export const kioskProcedure = t.procedure

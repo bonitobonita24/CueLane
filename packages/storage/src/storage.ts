@@ -150,6 +150,73 @@ export async function getObject(tenantId: string, key: string, bucket?: string):
  * Delete an object. `tenantId` is asserted against the key prefix to prevent
  * cross-tenant deletion. (Finding #3)
  */
+// Wave 7.8-T1 — GLOBAL (non-tenant) upload/delete pair for the Super Admin System Ads Manager.
+// System ads live outside any tenant (see packages/db tenant-guard GLOBAL_MODELS + this file's
+// `assertGlobalKey`), so the storage key has no {tenantId} segment at all — mirrors
+// `putObject`/`deleteObject` exactly, minus tenant-path validation, plus the `system-ads/` prefix.
+
+function validateGlobalUpload(input: { mimeType: string; body: Buffer | Uint8Array; maxBytes?: number }): void {
+  if ((BLOCKED_MIME_TYPES as readonly string[]).includes(input.mimeType)) {
+    throw new StorageValidationError(`MIME type '${input.mimeType}' is blocked for security reasons`);
+  }
+  if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(input.mimeType)) {
+    throw new StorageValidationError(
+      `MIME type '${input.mimeType}' is not allowed. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`
+    );
+  }
+  const cap = input.maxBytes ?? MAX_FILE_SIZE_BYTES;
+  const actualSize = input.body.byteLength;
+  if (actualSize > cap) {
+    const sizeMb = (actualSize / 1024 / 1024).toFixed(2);
+    const capMb = (cap / 1024 / 1024).toFixed(0);
+    throw new StorageValidationError(`File size ${sizeMb}MB exceeds the ${capMb}MB limit`);
+  }
+}
+
+function buildGlobalStorageKey(mimeType: string): string {
+  const ext = MIME_TO_EXT[mimeType as AllowedMimeType];
+  return `system-ads/${randomUUID()}${ext}`;
+}
+
+/** Upload a GLOBAL object (no tenantId) — used only for Super Admin System Ads. */
+export async function putGlobalObject(
+  input: { body: Buffer | Uint8Array; mimeType: string; originalFilename: string; maxBytes?: number },
+  bucket?: string,
+): Promise<UploadResult> {
+  validateGlobalUpload(input);
+
+  const client = getS3Client();
+  const bucketName = bucket ?? getDefaultBucket();
+  const key = buildGlobalStorageKey(input.mimeType);
+
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    Body: input.body,
+    ContentType: input.mimeType,
+    ContentLength: input.body.byteLength,
+  });
+
+  const response = await client.send(command);
+
+  return {
+    key,
+    url: `${process.env['MINIO_ENDPOINT'] ?? 'http://localhost:41709'}/${bucketName}/${key}`,
+    etag: response.ETag,
+  };
+}
+
+/** Delete a GLOBAL object (no tenantId) — used only for Super Admin System Ads. */
+export async function deleteGlobalObject(key: string, bucket?: string): Promise<void> {
+  assertGlobalKey(key);
+
+  const client = getS3Client();
+  const bucketName = bucket ?? getDefaultBucket();
+
+  const command = new DeleteObjectCommand({ Bucket: bucketName, Key: key });
+  await client.send(command);
+}
+
 export async function deleteObject(tenantId: string, key: string, bucket?: string): Promise<void> {
   assertTenantKey(tenantId, key);
 
