@@ -57,6 +57,18 @@ export const TIER_LIMITS = {
   premium: null,
 } as const;
 
+/** Wave 7.7c (Media Manager) — per-tenant Big Display media caps, from docs/PRODUCT.md
+ *  §"Media limits by tier": "Max saved video files (uploaded to storage): Free = 1 file. Premium
+ *  = 5 files." + "Max playlist items (uploaded files + YouTube links combined): Free = 3 items.
+ *  Premium = 10 items." Byte caps live in `@cuelane/storage` (`MAX_UPLOAD_BYTES_BY_TIER`) — not
+ *  duplicated here to avoid a shared→storage circular concern; these two are item-COUNT caps
+ *  only. Same block-AT-cap semantics as `TIER_LIMITS` — see
+ *  apps/web/src/server/domain/media.ts. */
+export const MEDIA_LIMITS = {
+  free: { maxPlaylistItems: 3, maxUploadedFiles: 1 },
+  premium: { maxPlaylistItems: 10, maxUploadedFiles: 5 },
+} as const;
+
 /** The 9 CSS custom-property vars every theme (preset OR custom) resolves to. Values are bare
  *  HSL triplet strings ("H S% L%", NO `hsl()` wrapper) — the exact format `packages/ui`'s
  *  Tailwind config expects (`hsl(var(--primary))` etc.) and `globals.css` already uses for the
