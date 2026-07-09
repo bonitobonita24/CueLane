@@ -78,7 +78,10 @@ export const mediaRouter = createTRPCRouter({
     await prisma.playlistEntry.delete({ where: { id: input.id } });
     // Local entries own an uploaded object in storage — clean it up. YouTube entries have no
     // storageKey (null) so this is a no-op for them.
-    if (existing.type === MediaType.Local && existing.storageKey != null) {
+    // Cast: Prisma's generated MediaType enum (from `@prisma/client`) is a distinct nominal type
+    // from `@cuelane/shared`'s MediaType even though the string values match — eslint's
+    // no-unsafe-enum-comparison rule flags a bare cross-enum ===, so cast the DB-sourced value.
+    if ((existing.type as MediaType) === MediaType.Local && existing.storageKey != null) {
       await deleteObject(ctx.tenantId, existing.storageKey);
     }
     return { id: input.id };

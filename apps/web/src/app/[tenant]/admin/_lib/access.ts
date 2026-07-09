@@ -25,6 +25,7 @@ export const ADMIN_TABS: readonly AdminTab[] = [
   { id: 'services', label: 'Services', href: 'services' },
   { id: 'windows', label: 'Windows', href: 'windows' },
   { id: 'users', label: 'Users', href: 'users' },
+  { id: 'media', label: 'Media', href: 'media' },
   { id: 'settings', label: 'Printer', href: 'settings' },
   { id: 'theme', label: 'Theme', href: 'theme' },
   { id: 'usage', label: 'Usage', href: 'usage' },

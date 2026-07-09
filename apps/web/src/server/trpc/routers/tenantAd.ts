@@ -18,7 +18,10 @@ import { deleteObject } from '@cuelane/storage';
 // and re-widens tenantId to nullable, breaking every downstream procedure's type-checking.
 const premiumAdminProcedure = adminProcedure.use(async ({ ctx, next }) => {
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { tier: true } });
-  if (tenant.tier !== TenantTier.Premium) {
+  // Cast: Prisma's generated TenantTier (from `@prisma/client`) is a distinct nominal type from
+  // `@cuelane/shared`'s TenantTier — eslint's no-unsafe-enum-comparison rule flags a bare
+  // cross-enum !==, so cast the DB-sourced value before comparing.
+  if ((tenant.tier as TenantTier) !== TenantTier.Premium) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Tenant Ads are a Premium feature.' });
   }
   return next({ ctx });
