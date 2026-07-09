@@ -9,7 +9,6 @@ import crypto from 'node:crypto';
 import { prismaRaw } from '@cuelane/db';
 import { appRouter } from '../root';
 import { createCallerFactory } from '../trpc';
-import type { Context } from '../context';
 
 const createCaller = createCallerFactory(appRouter);
 
@@ -110,10 +109,11 @@ describe('authRouter (Wave 7.9-T1)', () => {
 
       const tenant = await prismaRaw.tenant.findUnique({ where: { slug: result.slug } });
       expect(tenant).not.toBeNull();
-      expect(tenant?.status).toBe('active');
-      expect(tenant?.tier).toBe('free');
+      if (tenant == null) throw new Error('unreachable — asserted above');
+      expect(tenant.status).toBe('active');
+      expect(tenant.tier).toBe('free');
 
-      const admin = await prismaRaw.user.findFirst({ where: { tenantId: tenant?.id, name: 'Signup Admin' } });
+      const admin = await prismaRaw.user.findFirst({ where: { tenantId: tenant.id, name: 'Signup Admin' } });
       expect(admin).not.toBeNull();
       expect(admin?.role).toBe('admin');
 
@@ -123,8 +123,8 @@ describe('authRouter (Wave 7.9-T1)', () => {
       expect(valid).toBe(true);
 
       // A brand-new tenant must be immediately usable: at least one service + one window.
-      const serviceCount = await prismaRaw.service.count({ where: { tenantId: tenant?.id } });
-      const windowCount = await prismaRaw.window.count({ where: { tenantId: tenant?.id } });
+      const serviceCount = await prismaRaw.service.count({ where: { tenantId: tenant.id } });
+      const windowCount = await prismaRaw.window.count({ where: { tenantId: tenant.id } });
       expect(serviceCount).toBeGreaterThanOrEqual(1);
       expect(windowCount).toBeGreaterThanOrEqual(1);
     });

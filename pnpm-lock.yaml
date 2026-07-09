@@ -80,6 +80,9 @@ importers:
       lru-cache:
         specifier: ^11.0.2
         version: 11.5.2
+      lucide-react:
+        specifier: ^0.513.0
+        version: 0.513.0(react@19.2.7)
       next:
         specifier: ^15.1.0
         version: 15.5.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
