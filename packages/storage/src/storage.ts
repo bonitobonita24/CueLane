@@ -68,11 +68,15 @@ function validateUpload(input: UploadInput): void {
   validatePathSegment(input.tenantId, 'tenantId');
   validatePathSegment(input.entityType, 'entityType');
 
-  // Size check — use body.byteLength as the authoritative value, not caller-supplied sizeBytes
+  // Size check — use body.byteLength as the authoritative value, not caller-supplied sizeBytes.
+  // `maxBytes` lets callers pass a tier-derived cap (Wave 7.7c-T1, e.g. Media Manager uploads);
+  // defaults to MAX_FILE_SIZE_BYTES (10MB) so existing avatar/attachment callers are unaffected.
+  const cap = input.maxBytes ?? MAX_FILE_SIZE_BYTES;
   const actualSize = input.body.byteLength;
-  if (actualSize > MAX_FILE_SIZE_BYTES) {
+  if (actualSize > cap) {
     const sizeMb = (actualSize / 1024 / 1024).toFixed(2);
-    throw new StorageValidationError(`File size ${sizeMb}MB exceeds the 10MB limit`);
+    const capMb = (cap / 1024 / 1024).toFixed(0);
+    throw new StorageValidationError(`File size ${sizeMb}MB exceeds the ${capMb}MB limit`);
   }
 }
 
