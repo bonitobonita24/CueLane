@@ -213,3 +213,44 @@ file in memory + real 300-800MB upload / Traefik-Next.js body-size-limit interpl
 with an actual large file. Both recorded in docs/DECISIONS_LOG.md 2026-07-09.
 NEXT: Wave 7.8 (Super Admin: tenant directory, tier override, SystemAd CRUD) → 7.9 Landing/Signup.
 Nothing owner-gated open for 7.7c.
+
+---
+## Wave 7.7d (Display Video/Ads Interrupt Engine) — DONE + PM-VERIFIED (2026-07-09)
+Commits 5120291(T1 storage public-URL+global ns) 78f7368(T1 env wiring) e12a226(T1 CSP)
+6944279(T1 displayRouter) 49348e3(T3a MinIO bucket auto-init) 19803ca(T2 VideoPanel+ad engine+theming)
+07b2ba7(T3 large-upload verify) bcef97a(T4 integration) 5be166d(lint/typecheck fixes).
+Closes both Wave 7.7c deferrals: MinIO bucket now auto-created on a fresh `start.sh dev up`
+(idempotent `minio-init` one-shot service); large-upload path verified end-to-end with a real 60MB
+file (byte-exact round trip, ~400-650ms — no framework-level body-size rejection observed at this
+app's pinned next@15.1.x).
+New: `displayRouter.media` (public kioskProcedure, one round trip: videoMode/liveStreamUrl,
+playlist w/ presigned local-media URLs, tier-gated ads — Free=SystemAd interrupt always, Premium+
+LIVE=TenantAd interrupt, Premium+Playlist=none, per PRODUCT.md exactly); `VideoPanel` client
+component (YouTube IFrame API via a lean custom hook, local `<video>`, 5-minute ad-interrupt timer
+w/ local-playback-position resume, live-embed dwell fallback); CSP extended (frame-src youtube(-
+nocookie), script-src youtube.com for the IFrame bootstrap, media-src env-derived public storage
+origin); `--display-accent` (packages/ui) replaces hardcoded `#FCD34D` gold with the tenant's theme
+primary lightened via color-mix() for dark-bg legibility — also fixes a real pre-existing spec
+deviation (ticket numbers were gold, PRODUCT.md says white — now `#efeff1`).
+[HOW] decisions (docs/DECISIONS_LOG.md): public-vs-internal MinIO endpoint split (browser can't
+resolve the container-network hostname); YouTube embeds use the standard youtube.com IFrame API
+path, NOT an unverified `host` nocookie param (context7 didn't confirm it for next@15.1.8);
+color-mix ratio for `--display-accent` is a heuristic, not a per-preset computed-contrast guarantee.
+PM ground-truth: typecheck 8/8, `pnpm -w test` 210/210 (storage15/shared18/db5/web172), build 8/8
+(no RSC/CSP/barrel regressions). Container rebuilt (`start.sh dev up -d --build`) — `/api/health`
+200, `minio-init` succeeded (bucket auto-created). LIVE Playwright verification: `/demo/display`
+(premium, no playlist) → "No video playing" placeholder, no Powerbyte branding, ZERO console
+errors/warnings; `/clinic/display` (free, 1 YouTube playlist entry seeded for the check) → video
+panel renders + plays the real YouTube embed, Powerbyte branding footer present, only console
+entries were a pre-existing unrelated `/favicon.ico` 404 and a benign YouTube-internal
+`web-share` permissions-policy warning (from inside their own iframe) — **zero CSP violations**.
+All verification fixtures cleaned up (playlist_entries + tenant_ads both 0 rows post-cleanup,
+confirmed via psql; demo tenant settings byte-exact restored to pristine baseline).
+NOT independently verified (flagged, not fixed): staging/prod `MINIO_PUBLIC_ENDPOINT`/
+`STORAGE_PUBLIC_ENDPOINT` are placeholders (`CHANGE_ME_public_storage_origin`) — local-upload
+Display playback will be broken there until an owner fills in the real public storage origin;
+the full 800MB Premium upload cap and Traefik proxy body-size behavior (staging/prod only, no
+proxy in dev) remain unverified; `--display-accent` contrast is heuristic-tested on 2 of 8 presets,
+not computed per-preset.
+NEXT: this was flagged as the FINAL piece of the Big Display — Wave 7.8 (Super Admin: tenant
+directory, tier override, SystemAd CRUD) is next. Nothing owner-gated open for 7.7d.
