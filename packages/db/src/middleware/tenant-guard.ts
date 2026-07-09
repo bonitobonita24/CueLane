@@ -46,10 +46,23 @@ export const tenantGuardExtension = Prisma.defineExtension({
         if (GLOBAL_MODELS.has(model as string)) return await query(args);
         const tenantId = currentTenantId();
 
-        // Always inject tenantId into WHERE — unconditional so findMany({}) with no where also
-        // gets scoped. Covers: findMany, findFirst, findUnique, update, updateMany, delete,
-        // deleteMany, count, aggregate, groupBy.
-        args.where = { ...args.where, tenantId };
+        // Inject tenantId into WHERE — unconditional (even an empty where) so findMany({}) with
+        // no where also gets scoped. Covers: findMany, findFirst, findUnique, update, updateMany,
+        // delete, deleteMany, count, aggregate, groupBy.
+        //
+        // EXCEPT create/createMany (Wave 7.7c-T3 fix, discovered via a real 500 in the Media
+        // upload route): those two operations have NO `where` argument in their Prisma input
+        // shape at all — unconditionally setting `args.where` on a `create` throws
+        // "PrismaClientValidationError: Unknown argument `where`" the moment ANY caller invokes
+        // `prisma.<model>.create()` directly against the guarded client (every other create() in
+        // this codebase happened to go through `tx.<model>.create()` inside `withTenant()` — the
+        // RAW transaction client, which never passes through this extension — so this was a
+        // latent bug that had never been triggered until the upload route's `withTenantContext`
+        // + guarded-`prisma`-create combination hit it). `data.tenantId` (injected below) is
+        // sufficient scoping for create/createMany; there is no row to filter FROM yet.
+        if (operation !== 'create' && operation !== 'createMany') {
+          args.where = { ...args.where, tenantId };
+        }
 
         // Inject tenantId into create/update data. Skip updateMany data to avoid
         // stamping tenantId on bulk-updated rows (WHERE already scopes the update).
