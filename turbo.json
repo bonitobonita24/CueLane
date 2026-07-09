@@ -26,7 +26,10 @@
       // container's real credentials (STORAGE_ACCESS_KEY/STORAGE_SECRET_KEY from .env), so the
       // MINIO_* vars must be passed through the same way, or the tests hit
       // "InvalidAccessKeyId"/"NoSuchBucket" even though the invoking shell has them.
-      "env": ["DATABASE_URL", "VALKEY_URL", "MINIO_ENDPOINT", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "MINIO_BUCKET", "MINIO_REGION"]
+      // Wave 7.7d: MINIO_PUBLIC_ENDPOINT (getSignedDownloadUrl/getSignedGlobalUrl's public-origin
+      // presign client) needs the same pass-through, or a test asserting the signed URL's origin
+      // silently falls back to MINIO_ENDPOINT instead of the intended public value.
+      "env": ["DATABASE_URL", "VALKEY_URL", "MINIO_ENDPOINT", "MINIO_PUBLIC_ENDPOINT", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "MINIO_BUCKET", "MINIO_REGION"]
     },
     "dev": {
       "cache": false,

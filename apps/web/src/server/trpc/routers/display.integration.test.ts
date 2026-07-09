@@ -33,7 +33,6 @@ describe('displayRouter.media integration (Wave 7.7d-T4, against seeded demo+cli
   let demoTenantId: string;
   let demoAdminId: string;
   let demoOriginalSettings: unknown;
-  let clinicTenantId: string;
 
   const createdPlaylistEntryIds: string[] = [];
   const createdTenantAdIds: string[] = [];
@@ -52,9 +51,8 @@ describe('displayRouter.media integration (Wave 7.7d-T4, against seeded demo+cli
     });
     demoAdminId = demoAdmin.id;
 
-    const clinicTenant = await prismaRaw.tenant.findUniqueOrThrow({ where: { slug: 'clinic' }, select: { id: true, tier: true } });
+    const clinicTenant = await prismaRaw.tenant.findUniqueOrThrow({ where: { slug: 'clinic' }, select: { tier: true } });
     expect(clinicTenant.tier).toBe('free');
-    clinicTenantId = clinicTenant.id;
   });
 
   afterAll(async () => {

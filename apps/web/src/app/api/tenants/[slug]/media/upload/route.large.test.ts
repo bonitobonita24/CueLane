@@ -59,7 +59,12 @@ describe('media upload route — large real-file round trip (Wave 7.7d-T3)', () 
   it('uploads a real ~60MB video file end-to-end and it lands in MinIO + the playlist', async () => {
     const { auth } = await import('@/server/auth');
     const { Role } = await import('@cuelane/shared');
-    vi.mocked(auth).mockResolvedValue({
+    // `auth` is NextAuth v5's overloaded export (callable both as a route-handler-returning
+    // middleware wrapper AND as a plain `() => Promise<Session | null>`) — `vi.mocked` can only
+    // pick one overload's mock shape, so assert the specific callable signature this route
+    // actually uses before mocking it.
+    const mockedAuth = auth as unknown as ReturnType<typeof vi.fn<() => Promise<Session | null>>>;
+    vi.mocked(mockedAuth).mockResolvedValue({
       user: { id: demoAdminId, roles: [Role.Admin], tenantId: demoTenantId },
     } as unknown as Session);
 
@@ -108,7 +113,6 @@ describe('media upload route — large real-file round trip (Wave 7.7d-T3)', () 
 
     // Evidence for the report — not an assertion, just visibility on how long a 60MB
     // in-memory-buffered upload actually takes in this environment.
-    // eslint-disable-next-line no-console
     console.log(`[Wave 7.7d-T3] 60MB upload round trip took ${elapsedMs}ms`);
   }, 60_000); // generous timeout — a real 60MB buffer + MinIO PUT is slower than the suite's default 5s
 });
