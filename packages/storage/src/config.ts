@@ -59,3 +59,53 @@ export function getS3Client(): S3Client {
 export function getDefaultBucket(): string {
   return requireEnv('MINIO_BUCKET', 'cuelane-dev');
 }
+
+/**
+ * Wave 7.7d — the BROWSER-reachable storage origin, used ONLY when presigning a download URL
+ * that a public client (the Big Display's `<video>`/iframe tags) will fetch directly. This is
+ * deliberately a SEPARATE endpoint from `getS3Client()` above: in every non-dev environment
+ * `MINIO_ENDPOINT` is the container-network hostname (e.g. `http://minio:9000` in staging/prod
+ * compose — see `.env.staging.example`/`.env.prod.example`), which a browser can never resolve.
+ * `MINIO_PUBLIC_ENDPOINT` is the externally-reachable origin (dev: `http://localhost:41709` —
+ * the host-mapped MinIO port; staging/prod: the public S3/R2/CDN origin fronting the bucket).
+ * Falls back to `MINIO_ENDPOINT` with a one-time console warning if unset, so a misconfigured
+ * deploy degrades to a broken (but same-signature) video panel rather than silently mismatching.
+ */
+let _warnedMissingPublicEndpoint = false;
+export function getPublicEndpoint(): string {
+  const explicit = process.env['MINIO_PUBLIC_ENDPOINT'];
+  if (explicit !== undefined && explicit !== '') return explicit;
+  if (!_warnedMissingPublicEndpoint) {
+    _warnedMissingPublicEndpoint = true;
+    // eslint-disable-next-line no-console -- operator-facing config warning, not app telemetry
+    console.warn(
+      '[storage] MINIO_PUBLIC_ENDPOINT is not set — falling back to MINIO_ENDPOINT for signed ' +
+      'URLs. Fine in dev (both point at localhost) but produces a browser-unreachable URL in ' +
+      'staging/prod if MINIO_ENDPOINT is the internal container hostname.',
+    );
+  }
+  return requireEnv('MINIO_ENDPOINT', 'http://localhost:41709');
+}
+
+let _publicClient: S3Client | null = null;
+
+/** A second S3Client identical to `getS3Client()` except its `endpoint` is the public origin —
+ *  used ONLY to presign URLs (never to actually PUT/GET/DELETE server-side; those always go
+ *  through the internal `getS3Client()` so server-to-MinIO traffic stays on the container
+ *  network). Presigned-URL signatures are endpoint-relative, so a URL signed against the wrong
+ *  origin fails signature verification at the browser — this second client must exist. */
+export function getPublicS3Client(): S3Client {
+  if (!_publicClient) {
+    const cfg = getStorageConfig();
+    _publicClient = new S3Client({
+      endpoint: getPublicEndpoint(),
+      region: cfg.region,
+      credentials: {
+        accessKeyId: cfg.accessKeyId,
+        secretAccessKey: cfg.secretAccessKey,
+      },
+      forcePathStyle: cfg.forcePathStyle,
+    });
+  }
+  return _publicClient;
+}

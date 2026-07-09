@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
-import { getS3Client, getDefaultBucket } from './config.js';
+import { getS3Client, getDefaultBucket, getPublicS3Client } from './config.js';
 import {
   ALLOWED_MIME_TYPES,
   BLOCKED_MIME_TYPES,
@@ -46,6 +46,17 @@ function assertTenantKey(tenantId: string, key: string): void {
     throw new StorageAuthorizationError(
       `Key '${key}' does not belong to tenant '${tenantId}'`
     );
+  }
+}
+
+/** GLOBAL_MODEL prefix (System Ads — docs/PRODUCT.md "Stored under global `system-ads/`
+ *  prefix"). No tenantId to check against (SystemAd is not tenant-scoped — see packages/db
+ *  tenant-guard GLOBAL_MODELS), so this asserts the key stays inside its own reserved namespace
+ *  and rejects traversal, mirroring `assertTenantKey`'s intent for the non-tenant case. */
+const GLOBAL_KEY_RE = /^system-ads\/[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;
+function assertGlobalKey(key: string): void {
+  if (!GLOBAL_KEY_RE.test(key) || key.includes('..')) {
+    throw new StorageAuthorizationError(`Key '${key}' is not a valid global system-ads object key`);
   }
 }
 
@@ -152,14 +163,35 @@ export async function deleteObject(tenantId: string, key: string, bucket?: strin
 /**
  * Generate a pre-signed download URL. `tenantId` in the input is asserted against
  * the key prefix to prevent cross-tenant URL generation. (Finding #3)
+ *
+ * Wave 7.7d — presigns against `getPublicS3Client()` (the BROWSER-reachable origin), not the
+ * internal `getS3Client()` — this URL is handed to a public, unauthenticated client (the Big
+ * Display's `<video>` tag) to fetch directly, so it must be signed for the origin the browser
+ * can actually resolve. Every other accessor in this file (`getObject`/`deleteObject`) stays on
+ * the internal client — those only ever run server-to-MinIO.
  */
 export async function getSignedDownloadUrl(input: GetSignedUrlInput, bucket?: string): Promise<string> {
   assertTenantKey(input.tenantId, input.key);
 
-  const client = getS3Client();
+  const client = getPublicS3Client();
   const bucketName = bucket ?? getDefaultBucket();
   const expiresIn = input.expiresIn ?? 3600;
 
   const command = new GetObjectCommand({ Bucket: bucketName, Key: input.key });
   return getSignedUrl(client, command, { expiresIn });
+}
+
+/**
+ * Generate a pre-signed download URL for a GLOBAL object (System Ads — `system-ads/` prefix, no
+ * tenantId). Same public-origin rationale as `getSignedDownloadUrl` above: a Free-tier Big
+ * Display fetches a system ad's uploaded file directly from the browser.
+ */
+export async function getSignedGlobalUrl(key: string, expiresIn?: number, bucket?: string): Promise<string> {
+  assertGlobalKey(key);
+
+  const client = getPublicS3Client();
+  const bucketName = bucket ?? getDefaultBucket();
+
+  const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
+  return getSignedUrl(client, command, { expiresIn: expiresIn ?? 3600 });
 }

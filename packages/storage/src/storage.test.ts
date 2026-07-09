@@ -3,10 +3,14 @@
 // throw synchronously without touching MinIO. The one "accepted" happy-path test performs a real
 // round-trip against the dev MinIO instance (no mocks, per framework convention) — requires the
 // dev stack's MinIO reachable at MINIO_ENDPOINT (defaults to http://localhost:41709 in non-prod).
+import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   putObject,
   deleteObject,
+  getSignedDownloadUrl,
+  getSignedGlobalUrl,
+  StorageAuthorizationError,
   StorageValidationError,
   MAX_FILE_SIZE_BYTES,
   MAX_UPLOAD_BYTES_BY_TIER,
@@ -133,5 +137,63 @@ describe('putObject — widened video mime allowlist (Wave 7.7c-T1)', () => {
         sizeBytes: body.byteLength,
       }),
     ).rejects.toBeInstanceOf(StorageValidationError);
+  });
+});
+
+describe('getSignedDownloadUrl — public-origin presign (Wave 7.7d-T1)', () => {
+  it('presigns against the public endpoint (MINIO_PUBLIC_ENDPOINT / MINIO_ENDPOINT fallback) and is fetchable', async () => {
+    const body = Buffer.from('display-media-bytes');
+    const uploaded = await putObject({
+      tenantId: TENANT,
+      entityType: 'media',
+      body,
+      mimeType: 'video/mp4',
+      originalFilename: 'clip.mp4',
+      sizeBytes: body.byteLength,
+    });
+    const url = await getSignedDownloadUrl({ tenantId: TENANT, key: uploaded.key });
+    // Same public origin every browser client uses (defaults to MINIO_ENDPOINT in dev/test —
+    // both point at the same MinIO instance in this environment).
+    const expectedOrigin = new URL(process.env['MINIO_PUBLIC_ENDPOINT'] ?? process.env['MINIO_ENDPOINT'] ?? 'http://localhost:41709').origin;
+    expect(new URL(url).origin).toBe(expectedOrigin);
+
+    const res = await fetch(url);
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe('display-media-bytes');
+
+    await deleteObject(TENANT, uploaded.key);
+  });
+
+  it('rejects a key that does not belong to the asserted tenant (cross-tenant URL forgery)', async () => {
+    await expect(
+      getSignedDownloadUrl({ tenantId: TENANT, key: 'some-other-tenant/media/x.mp4' }),
+    ).rejects.toBeInstanceOf(StorageAuthorizationError);
+  });
+});
+
+describe('getSignedGlobalUrl — System Ad global namespace (Wave 7.7d-T1)', () => {
+  it('presigns a real system-ads/ object and round-trips a fetch', async () => {
+    const body = Buffer.from('system-ad-bytes');
+    // System Ads live under the global `system-ads/` prefix (docs/PRODUCT.md), not the per-tenant
+    // {tenantId}/{entityType}/ layout — build the key directly rather than via putObject's
+    // tenant-scoped buildStorageKey.
+    const key = `system-ads/${randomUUID()}.mp4`;
+    const { getS3Client, getDefaultBucket } = await import('./config.js');
+    const { PutObjectCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+    const client = getS3Client();
+    const bucket = getDefaultBucket();
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: 'video/mp4' }));
+
+    const url = await getSignedGlobalUrl(key);
+    const res = await fetch(url);
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe('system-ad-bytes');
+
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  });
+
+  it('rejects a key outside the system-ads/ namespace (path-escape attempt)', async () => {
+    await expect(getSignedGlobalUrl('some-tenant/media/x.mp4')).rejects.toBeInstanceOf(StorageAuthorizationError);
+    await expect(getSignedGlobalUrl('system-ads/../secrets.txt')).rejects.toBeInstanceOf(StorageAuthorizationError);
   });
 });
