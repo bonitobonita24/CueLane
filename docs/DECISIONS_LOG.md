@@ -308,3 +308,17 @@ here (deferred-fix-at-task-boundary discipline).
 
 **Reversible:** yes — additive schema widening (union, not a breaking change) + a UI-gating
 reversal (trivial to re-add `'theme'` to `FREE_GATED_TAB_IDS` if the owner wants the old gate back).
+
+---
+
+## 2026-07-09 — Wave 7.7c-T1: Media upload tier-cap byte conversion
+
+**Decision:** `MAX_UPLOAD_BYTES_BY_TIER` (packages/storage/src/types.ts) = `{ free: 300 * 1024 * 1024, premium: 800 * 1024 * 1024 }` — i.e. binary MB (MiB), not decimal MB.
+
+**Rationale:** `docs/PRODUCT.md` §"Media limits by tier" states "Free = 300MB per file. Premium = 800MB per file." but does not specify binary vs. decimal MB. Followed the same convention already used by the pre-existing `MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024` (10MiB) constant in the same file, for internal consistency.
+
+**Affected files:** `packages/storage/src/types.ts` (`MAX_UPLOAD_BYTES_BY_TIER`, `getMaxUploadBytesForTier`), `packages/storage/src/storage.ts` (`validateUpload` now honors an optional per-call `maxBytes` override).
+
+**Reversible:** yes — trivial constant change, no schema/migration impact.
+
+**Also noted (not fixed, out of scope for T1):** the dev MinIO stack (`deploy/compose/dev/docker-compose.infra.yml`) has no bucket auto-creation step (no `mc mb` init sidecar) — a fresh `docker volume` has zero buckets, so ANY upload (avatars, logos, media) fails with `NoSuchBucket` until one is created manually. Worked around for this session by creating the `cuelane-dev` bucket directly against the running MinIO container; flagging as a pre-existing infra gap for a future wave/follow-up, not part of the Media Manager scope.
