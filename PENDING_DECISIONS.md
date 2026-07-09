@@ -14,3 +14,13 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
   - **Question for owner:** Is showing Free tenants the Theme tab (presets yes, custom no) the intended product
     behavior, or should the whole tab stay hidden from Free (revert to 7.6-T7)?
   - **Impact if unanswered:** cosmetic/product-positioning only; no functional or security impact. Loop proceeds.
+
+- [ ] **Public storage origin for staging/prod Display media (raised Wave 7.7d, 2026-07-09).**
+  The Big Display plays locally-uploaded media via a presigned URL fetched **by the browser**, which needs a
+  browser-reachable public storage origin (`MINIO_PUBLIC_ENDPOINT` / `STORAGE_PUBLIC_ENDPOINT`). Dev is wired
+  (host-mapped MinIO :41709). **Staging/prod `.env.example` values are placeholders `CHANGE_ME_public_storage_origin`.**
+  - **Question for owner (deploy-time, `[WHAT]`/infra-config):** what is the real public S3/R2/CDN origin for
+    staging and prod object storage? (Also: the ~800MB premium upload cap needs a matching Traefik
+    `client-body-size` at Phase-6 — only 60MB was load-tested in dev, which has no proxy.)
+  - **Impact if unanswered:** **dev-only build is unaffected** (HARD HOLD = dev). Only blocks local-upload Display
+    playback in staging/prod, which are owner-gated deploys anyway. Loop proceeds.
