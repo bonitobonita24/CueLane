@@ -180,3 +180,36 @@ multi-tenancy proven live. Only test baseline needing update was seed.test.ts (a
 WAVE 7.6 COMPLETE (backend+UI+demo). NEXT: Wave 7.7 (Dashboard + Media + Display video/ads; incl. wiring theme presets
 to runtime CSS — the T7 deferral). Then 7.8 Super Admin → 7.9 Landing/Signup.
 New demo logins: demo(premium) Branch Admin/0000 · clinic(free) Nurse Admin/0001 · super-admin webmaster@localhost.com.
+
+---
+## Wave 7.7c (Media Manager) — DONE + PM-VERIFIED (2026-07-09)
+Commits c818f80(T1 storage tier caps+widened mime) fc01226(T1 decision log) efc43f4(T2a media domain)
+0646e10(T2 media+tenantAd routers) ef09b13(T3 upload route+T4 admin UI) 3a24ae5(T3 decision log)
+721d1a3(T5 integration test) + fix(db) tenant-guard create/createMany bug found+fixed during live
+verification (regression test added, packages/db/src/middleware/tenant-guard.test.ts).
+Schema was ALREADY COMPLETE (PlaylistEntry/SystemAd/TenantAd) — no migration this wave. New:
+`@cuelane/storage` tier-aware upload caps (free=300MB/premium=800MB) + widened video mime allowlist
+(mp4/webm/mov/avi/mkv); `mediaRouter`+`tenantAdRouter` tRPC (list/createYoutube/reorder/delete,
+Premium-gated ads); multipart upload Route Handler (`/api/tenants/[slug]/media/upload`, manual
+adminProcedure-equivalent guard, tier cap enforcement, real MinIO round-trip); Media admin tab
+(VideoMode toggle, playlist manager w/ YouTube-URL parser + XHR upload progress + up/down reorder,
+Tenant Ads section Premium+LIVE-only).
+PM ground-truth: typecheck 8/8, `pnpm -w test` 196/196 (storage11/shared18/db5/web162), build 8/8.
+Container rebuilt (`start.sh dev up -d --build`). LIVE verified via real HTTP session (Auth.js
+credentials login as Branch Admin/0000@demo, not super-admin): unauth `/demo/admin/media`→307→
+/login; authed→200; `media.createYoutube`→200 real row persisted+listed; multipart upload (2MB
+fake video/mp4)→201, real row w/ correct fileSize+storageKey, verified present in MinIO then
+absent after `media.delete` (storage cleanup confirmed); cross-tenant upload attempt (demo session
+→ clinic slug)→403; unauthenticated upload→401. All test artifacts cleaned from demo/clinic
+(playlist_entries + tenant_ads both 0 rows post-cleanup, confirmed via psql).
+REAL BUG FOUND+FIXED: L6 tenant-guard (`packages/db/src/middleware/tenant-guard.ts`) unconditionally
+injected `where:{tenantId}` into EVERY Prisma op including create/createMany (which have no `where`
+arg) — 500 the moment ANY code calls the guarded `prisma.<model>.create()` directly (every prior
+caller happened to go through `tx.<model>.create()` inside `withTenant()`, a different raw client,
+so this was latent). Fixed + regression-tested (3 new tests) + logged to global lessons ledger.
+Deferred (not fixed, flagged): (1) dev MinIO has no bucket auto-create step in compose — a fresh
+volume has zero buckets (worked around manually this session); (2) upload route buffers the whole
+file in memory + real 300-800MB upload / Traefik-Next.js body-size-limit interplay not verified
+with an actual large file. Both recorded in docs/DECISIONS_LOG.md 2026-07-09.
+NEXT: Wave 7.8 (Super Admin: tenant directory, tier override, SystemAd CRUD) → 7.9 Landing/Signup.
+Nothing owner-gated open for 7.7c.
