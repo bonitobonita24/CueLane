@@ -1,0 +1,48 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@cuelane/ui';
+import { ForgotPasswordForm } from './forgot-password-form';
+
+export const metadata: Metadata = {
+  title: 'Reset password · CueLane',
+};
+
+interface ForgotPasswordPageProps {
+  searchParams: Promise<{ tenantSlug?: string }>;
+}
+
+export default async function ForgotPasswordPage({ searchParams }: ForgotPasswordPageProps) {
+  const params = await searchParams;
+  const initialTenantSlug = params.tenantSlug ?? '';
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+      <div className="flex w-full max-w-sm flex-col gap-8">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-foreground">
+            CueLane
+          </Link>
+          <p className="text-sm text-muted-foreground">Reset your admin password.</p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-display text-xl">Forgot password</CardTitle>
+            <CardDescription>
+              Enter your workspace and username. If it matches an account, we&apos;ll email a reset link.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ForgotPasswordForm initialTenantSlug={initialTenantSlug} />
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-sm text-muted-foreground">
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            Back to sign in
+          </Link>
+        </p>
+      </div>
+    </main>
+  );
+}

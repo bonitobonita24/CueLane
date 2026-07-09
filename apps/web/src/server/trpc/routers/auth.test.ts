@@ -52,6 +52,27 @@ describe('authRouter (Wave 7.9-T1)', () => {
     await prismaRaw.tenant.delete({ where: { id: preexistingTenantId } });
   });
 
+  describe('checkSlugAvailability', () => {
+    it('flags a reserved slug as unavailable', async () => {
+      const caller = publicCaller();
+      const result = await caller.auth.checkSlugAvailability({ slug: 'login' });
+      expect(result).toEqual({ candidate: 'login', available: false, reason: 'reserved' });
+    });
+
+    it('flags an already-taken slug as unavailable', async () => {
+      const caller = publicCaller();
+      const result = await caller.auth.checkSlugAvailability({ slug: preexistingSlug });
+      expect(result).toEqual({ candidate: preexistingSlug, available: false, reason: 'taken' });
+    });
+
+    it('flags a fresh, well-formed slug as available', async () => {
+      const caller = publicCaller();
+      const candidate = `brand-new-co-${Date.now()}`;
+      const result = await caller.auth.checkSlugAvailability({ slug: candidate });
+      expect(result).toEqual({ candidate, available: true, reason: null });
+    });
+  });
+
   describe('signup', () => {
     it('rejects a reserved slug', async () => {
       const caller = publicCaller();

@@ -4,6 +4,7 @@
 import crypto from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import {
   signupSchema,
   requestPasswordResetSchema,
@@ -35,12 +36,39 @@ function hashToken(rawToken: string): string {
   return crypto.createHash('sha256').update(rawToken).digest('hex');
 }
 
-function resetUrlFor(tenantSlug: string, rawToken: string): string {
+// Top-level route (matches docs/PRODUCT.md's top-level `/forgot-password` convention) — the
+// hashed token alone resolves the tenant+user server-side, so the URL doesn't need to carry the
+// tenant slug.
+function resetUrlFor(rawToken: string): string {
   const base = process.env['NEXT_PUBLIC_APP_URL'] ?? 'http://localhost:3000';
-  return `${base}/${tenantSlug}/reset-password?token=${rawToken}`;
+  return `${base}/reset-password?token=${rawToken}`;
 }
 
 export const authRouter = createTRPCRouter({
+  // Live availability hint for the signup form's slug field. Read-only, no side effects — the
+  // `signup` mutation ALWAYS re-validates + re-checks uniqueness itself (this is a UX convenience,
+  // never the authority — a slug can still race between this check and the actual signup submit,
+  // which is why `signup` handles the CONFLICT case independently).
+  checkSlugAvailability: publicProcedure
+    .input(z.object({ slug: z.string().min(1).max(100) }))
+    .query(async ({ input }) => {
+      const candidate = slugify(input.slug);
+
+      if (!isValidSlugShape(candidate)) {
+        return { candidate, available: false, reason: 'invalid' as const };
+      }
+      if (isReservedSlug(candidate)) {
+        return { candidate, available: false, reason: 'reserved' as const };
+      }
+
+      const existing = await prismaRaw.tenant.findUnique({ where: { slug: candidate }, select: { id: true } });
+      if (existing != null) {
+        return { candidate, available: false, reason: 'taken' as const };
+      }
+
+      return { candidate, available: true, reason: null };
+    }),
+
   // Public signup: create a Tenant + its admin User in ONE transaction so a partial failure never
   // leaves an orphan tenant (mission brief requirement). Free tier by default (Xendit upgrade is
   // a separate, later flow — see tenantAdmin/subscription routers). A brand-new tenant gets one
@@ -152,7 +180,7 @@ export const authRouter = createTRPCRouter({
       to: adminEmail,
       subject: '',
       templateId: 'password_reset',
-      templateData: { url: resetUrlFor(input.tenantSlug, rawToken) },
+      templateData: { url: resetUrlFor(rawToken) },
     });
 
     return SUCCESS;

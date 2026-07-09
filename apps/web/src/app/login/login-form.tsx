@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { Button, Input, Label, cn } from '@cuelane/ui';
 
@@ -151,7 +152,17 @@ export function LoginForm({ callbackUrl, initialError }: LoginFormProps) {
       )}
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          {isTenantMode && tenantSlug != null ? (
+            <Link
+              href={`/forgot-password?tenantSlug=${encodeURIComponent(tenantSlug)}`}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          ) : null}
+        </div>
         <Input
           id="password"
           name="password"
