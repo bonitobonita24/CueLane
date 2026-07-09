@@ -322,3 +322,33 @@ reversal (trivial to re-add `'theme'` to `FREE_GATED_TAB_IDS` if the owner wants
 **Reversible:** yes — trivial constant change, no schema/migration impact.
 
 **Also noted (not fixed, out of scope for T1):** the dev MinIO stack (`deploy/compose/dev/docker-compose.infra.yml`) has no bucket auto-creation step (no `mc mb` init sidecar) — a fresh `docker volume` has zero buckets, so ANY upload (avatars, logos, media) fails with `NoSuchBucket` until one is created manually. Worked around for this session by creating the `cuelane-dev` bucket directly against the running MinIO container; flagging as a pre-existing infra gap for a future wave/follow-up, not part of the Media Manager scope.
+
+---
+
+## 2026-07-09 — Wave 7.7c-T3: Media upload route — buffering + body-size limit not fully verified
+
+**Decision:** `apps/web/src/app/api/tenants/[slug]/media/upload/route.ts` reads the whole multipart
+upload into memory (`await file.arrayBuffer()` → `Buffer.from(...)`) rather than streaming it
+directly into an S3 multipart upload.
+
+**Rationale:** Simplicity for this wave — Next.js Route Handlers expose the Fetch API
+`Request.formData()`, which already buffers the body; a true streaming parser (busboy/formidable
+piping straight into `@aws-sdk/client-s3`'s multipart upload API) is more complex and was not
+required to prove the feature end-to-end.
+
+**Known gap — NOT verified in this session:** PRODUCT.md's 300MB(free)/800MB(premium) per-file
+caps were implemented and unit/integration-tested with small synthetic payloads only. Two
+real-world constraints were NOT exercised with an actual multi-hundred-MB file:
+1. Next.js Route Handler / reverse-proxy (Traefik in staging/prod) body-size limits — an
+   experimental `proxyClientMaxBodySize` config option exists in newer Next.js canaries but its
+   applicability to this app's pinned `next@15.1.x` / self-hosted (`output: 'standalone'`, Docker,
+   not Vercel) deployment was not confirmed.
+2. In-memory buffering of an 800MB file per concurrent upload request — a real memory-pressure
+   risk under concurrent uploads that was not load-tested.
+
+**Follow-up (not fixed here, flagged for a future wave):** verify an actual ~300-800MB upload
+against the dev stack, and if Next.js/Traefik reject or truncate it, either raise the relevant
+config limit or replace the buffering approach with a true streaming multipart upload.
+
+**Reversible:** yes — an implementation detail, no schema/API contract change if swapped for
+streaming later (the Route Handler's request/response shape stays the same).
