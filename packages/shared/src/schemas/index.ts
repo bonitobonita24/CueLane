@@ -351,10 +351,35 @@ export const xenditWebhookSchema = z.object({
   }),
 });
 
+// ─── Public signup (Wave 7.9-T1) ───────────────────────────────────────────────
+// User.name is the login identifier (see server/auth/config.ts's schema-gap note — no `email`
+// column exists on User without a migration, which is out of scope for this wave). `adminEmail`
+// is a real contact address for password-reset delivery; since Tenant has no dedicated email
+// column either, it is stored in Tenant.settings JSON (`settings.adminEmail`) — no migration
+// needed, `settings` is already a permissive Json column. `slug` is client-supplied (live-preview
+// derived from companyName via `slugify()`, editable) — the ROUTER re-derives + re-validates it
+// server-side (never trust client-side slugify as the authority).
+
+export const signupSchema = z.object({
+  companyName: z.string().min(1).max(100),
+  slug: z.string().min(1).max(100),
+  adminName: z.string().min(1).max(100),
+  adminEmail: z.string().email(),
+  password: z.string().min(8).max(100),
+  // Cloudflare Turnstile token — optional in dev (no-op seam, see server/lib/turnstile.ts).
+  turnstileToken: z.string().optional(),
+});
+
 // ─── PasswordResetToken ───────────────────────────────────────────────────────
+// identifier + tenantSlug (not `email`) — matches the ACTUAL login model (User.name scoped by
+// tenant), the same schema-gap the signin credentials provider already documents. A tenant's
+// `adminEmail` (see signupSchema above) is looked up server-side once the user is found; it is
+// never accepted as client input here, which would let a caller probe by email instead of by the
+// tenant+identifier pair the anti-enumeration contract is built around.
 
 export const requestPasswordResetSchema = z.object({
-  email: z.string().email(),
+  identifier: z.string().min(1),
+  tenantSlug: z.string().min(1),
 });
 
 export const consumePasswordResetSchema = z.object({

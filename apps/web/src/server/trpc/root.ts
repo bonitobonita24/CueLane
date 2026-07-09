@@ -12,6 +12,7 @@ import { mediaRouter } from './routers/media';
 import { tenantAdRouter } from './routers/tenantAd';
 import { displayRouter } from './routers/display';
 import { superAdminRouter } from './routers/superAdmin';
+import { authRouter } from './routers/auth';
 
 // Root application router — extend with feature routers in Phase 4 Parts 5-6
 export const appRouter = createTRPCRouter({
@@ -28,6 +29,7 @@ export const appRouter = createTRPCRouter({
   tenantAd: tenantAdRouter,
   display: displayRouter,
   superAdmin: superAdminRouter,
+  auth: authRouter,
 });
 
 // Export the router type — used by api-client and apps/web typed client
