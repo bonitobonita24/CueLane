@@ -352,3 +352,45 @@ config limit or replace the buffering approach with a true streaming multipart u
 
 **Reversible:** yes — an implementation detail, no schema/API contract change if swapped for
 streaming later (the Route Handler's request/response shape stays the same).
+
+---
+
+## 2026-07-09 — Wave 7.7d-T1: public-origin signed URLs for Big Display media
+
+**Decision:** `getSignedDownloadUrl`/new `getSignedGlobalUrl` in `@cuelane/storage` now presign
+against a SECOND S3 client (`getPublicS3Client()`), configured with a new `MINIO_PUBLIC_ENDPOINT`
+env var, instead of the existing internal `getS3Client()`.
+
+**Rationale:** `MINIO_ENDPOINT` is the container-network hostname (`http://minio:9000` in every
+compose stack — dev's `docker-compose.app.yml` `x-cuelane-runtime-env` anchor, and staging/prod's
+`.env.staging`/`.env.prod`). Every existing storage consumer (Media upload route, admin CRUD) is
+server-to-server, so that hostname is fine. The Big Display video panel is the FIRST caller that
+hands a signed URL to a public, unauthenticated BROWSER (`<video src>` / local-media playback) —
+a browser can never resolve `minio:9000`, so presigning against the internal client would produce
+a URL that 100% fails to load. Presigned URLs are endpoint-bound (the signature covers the host),
+so this requires a distinct client/endpoint, not just a string substitution after signing.
+
+**New env var `MINIO_PUBLIC_ENDPOINT`** (optional — falls back to `MINIO_ENDPOINT` with a
+console warning if unset): dev wired to `http://localhost:${STORAGE_PORT:-41709}` in
+`deploy/compose/dev/docker-compose.app.yml`'s runtime-env anchor (the host-mapped MinIO port a
+browser on the dev machine can reach). `.env.staging.example`/`.env.prod.example` +
+the local `.env.staging`/`.env.prod` files gained a matching `STORAGE_PUBLIC_ENDPOINT` — **staging/
+prod values are placeholders (`CHANGE_ME_public_storage_origin` in the `.example` files)** and
+MUST be set to the real public S3/R2/CDN origin before the Big Display's local-upload playback
+will work in those environments. Until then, local (uploaded-file) playlist entries will render a
+broken video element on staging/prod Displays — YouTube playlist/live entries are unaffected (no
+signed URL involved).
+
+**Known pre-existing gap flagged, NOT fixed here (out of Wave 7.7d scope):**
+`.env.staging`/`.env.prod` (and their `.example` counterparts) define ONLY `STORAGE_*`-prefixed
+keys, never `MINIO_*` — but `apps/web/src/env.ts`'s zod schema requires `MINIO_ENDPOINT` etc, and
+`@cuelane/storage`'s `config.ts` reads `MINIO_*` directly from `process.env`. Dev's compose file
+bridges this with an explicit `x-cuelane-runtime-env` anchor (`MINIO_ENDPOINT: "http://minio:9000"`
+etc, overriding the `STORAGE_*`-named `.env.dev`); **staging/prod's compose files have no such
+bridge** (`env_file: .env.staging`/`.env.prod` passes `STORAGE_*` keys straight through, and there
+is no `MINIO_*` translation anywhere in those two stacks). This predates Wave 7.7d and affects the
+WHOLE storage layer (uploads, avatars, everything `@cuelane/storage` touches), not just Display
+media — flagging for a future infra wave to add the same runtime-env bridge dev has, or rename
+`config.ts`/`env.ts` to read `STORAGE_*` consistently everywhere.
+
+**Reversible:** yes — additive env var + a second S3Client; no schema/API contract change.

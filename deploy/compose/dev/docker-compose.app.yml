@@ -24,6 +24,10 @@ x-cuelane-runtime-env: &cuelane-runtime-env
   VALKEY_URL: "redis://:${REDIS_PASSWORD}@valkey:6379"
   REDIS_URL: "redis://:${REDIS_PASSWORD}@valkey:6379"
   MINIO_ENDPOINT: "http://minio:9000"
+  # Wave 7.7d — Big Display <video>/iframe media is fetched by the BROWSER on the host machine,
+  # not by the app container, so its presigned URL must use the host-mapped port (STORAGE_PORT,
+  # .env.dev), not the in-network `minio:9000` hostname above.
+  MINIO_PUBLIC_ENDPOINT: "http://localhost:${STORAGE_PORT:-41709}"
   MINIO_PORT: "9000"
   MINIO_USE_SSL: "false"
   MINIO_ACCESS_KEY: "${STORAGE_ACCESS_KEY}"

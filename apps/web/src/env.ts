@@ -11,6 +11,12 @@ const envSchema = z.object({
   NEXTAUTH_URL: z.string().url().optional(),
   // MinIO / S3 storage
   MINIO_ENDPOINT: z.string().min(1),
+  // Wave 7.7d — the BROWSER-reachable origin for presigned Big Display media URLs. Optional:
+  // @cuelane/storage's getPublicEndpoint() falls back to MINIO_ENDPOINT (with a console warning)
+  // when unset, so this env var is not required to boot — but MUST be set in staging/prod to the
+  // public S3/R2/CDN origin, or local-media playback on the Big Display will be broken (the
+  // in-container MINIO_ENDPOINT hostname is unreachable from a browser).
+  MINIO_PUBLIC_ENDPOINT: z.string().min(1).optional(),
   MINIO_PORT: z.coerce.number().int().positive().default(9000),
   MINIO_USE_SSL: z
     .string()
