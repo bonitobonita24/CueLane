@@ -112,6 +112,31 @@ services:
       retries: 5
       start_period: 15s
 
+  # ── MinIO bucket auto-init (Wave 7.7d-T3a) ────────────────────────────
+  # Provisions the app's dev bucket (STORAGE_BUCKET, e.g. `cuelane-dev`) on a FRESH `start.sh dev
+  # up` — MinIO does not auto-create buckets, and until this wave nobody had automated it (the
+  # bucket happened to already exist locally from earlier manual/ad-hoc testing — Wave 7.7c-T1
+  # DECISIONS_LOG flagged this as an unverified gap). `mc mb --ignore-existing` is idempotent — a
+  # re-run against an already-provisioned bucket is a no-op, safe on every `up`. Dev-only (this
+  # compose file is never used in staging/prod); runs once to completion and exits (no restart
+  # policy, no healthcheck — its own exit code IS the signal).
+  minio-init:
+    image: minio/mc:latest
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY}
+      STORAGE_BUCKET: ${STORAGE_BUCKET}
+    entrypoint: >
+      sh -c "
+      mc alias set local http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" &&
+      mc mb --ignore-existing \"local/$$STORAGE_BUCKET\" &&
+      echo \"[minio-init] bucket ready: $$STORAGE_BUCKET\"
+      "
+
   # ── MailHog (dev SMTP intercept + web UI) ─────────────────────────────
   mailhog:
     image: mailhog/mailhog:latest
