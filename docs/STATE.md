@@ -319,3 +319,80 @@ load-bearing anywhere external.
 NEXT: nothing owner-gated open for Wave 7.8. Continue Phase 7 buildout per PRODUCT.md remaining
 gaps (Xendit billing webhooks, mobile employee station, printer template editor, etc. — check
 docs/IMPLEMENTATION_MAP.md for the current gap list).
+
+## Wave 7.9 — Landing + Signup + Auth Polish (FINAL Phase-7 wave)
+
+**T1 — Signup + password-reset backend.** `packages/shared/src/slug.ts` (slugify + reserved-slug
+set + shape validation, 14 tests) + `signupSchema`/`requestPasswordResetSchema` (redefined as
+`{identifier, tenantSlug}` — User has no `email` column without a migration, same schema-gap
+`server/auth/config.ts` already documents; NOT the PRODUCT.md-literal `email` field)/
+`consumePasswordResetSchema` in `packages/shared/src/schemas/index.ts`. New public `authRouter`
+(`apps/web/src/server/trpc/routers/auth.ts`): `signup` (transactional Tenant+admin User+default
+Service+Window create, server-side slug re-derivation/re-validation, reserved/taken rejection),
+`checkSlugAvailability` (live UX hint, never authoritative), `requestPasswordReset`
+(anti-enumeration — identical `{success:true}` for unknown tenant/user/no-contact-email-on-file;
+SHA-256-hashed single-use token, 1h expiry, enqueues the existing `password_reset` email template
+via `@cuelane/jobs`), `confirmPasswordReset` (validates hash/expiry/used, bcrypt-updates
+`User.pin`, marks token used). Turnstile seam: `server/lib/turnstile.ts` no-ops on the dev dummy
+key, real `siteverify` call wired for when the owner supplies a live key at Phase-6 (recorded in
+DECISIONS_LOG). Xendit: signup always creates a FREE tenant — the upgrade-to-Premium payment path
+is untouched/still a separate, later flow (unchanged from Wave 7.8).
+
+**T2 — Public marketing landing page `/`.** Replaced the Phase-4 placeholder with a real page:
+sticky header, hero (shape-accurate Big Display mockup, no stock photo/invented metric), a
+4-module features grid (Kiosk/Station/Display/Dashboard — real shipped modules only), a
+Free-vs-Premium comparison table sourced from the actual `TIER_LIMITS`/`MEDIA_LIMITS` constants +
+PRODUCT.md tier prose (no invented price — PRODUCT.md itself leaves the number unspecified), a
+closing CTA, and a footer. Added `lucide-react` as a direct `apps/web` dependency (icons, not
+emoji, per the anti-slop D3 rule). `lint-design.sh --report-only`: 0 findings.
+
+**T3 — Signup + reset UI + auth polish.** `/signup` (company/slug/adminName/adminEmail/password;
+slug auto-derives from company name until edited, debounced live availability check),
+`/forgot-password` (workspace+username request, prefillable via `?tenantSlug=`, identical
+post-submit message regardless of match), `/reset-password` (reads `?token=`, new+confirm
+password). Added a "Forgot password?" link on `/login` (tenant mode only) carrying the current
+tenant slug. `resetUrlFor()` targets the top-level `/reset-password` route (matches PRODUCT.md's
+top-level `/forgot-password` convention) rather than a tenant-scoped path.
+
+**T4 — Integration + live verification (Playwright, real dev stack, no mocks).**
+PM ground truth: typecheck 8/8 (`pnpm -w typecheck`); `pnpm -w test` — apps/web 200/200 (+18
+auth.test.ts incl. checkSlugAvailability + 1 new `auth.e2e.integration.test.ts` full-journey test),
+shared 32/32 (+14 slug.test.ts), storage 15/15, db 5/5, all unchanged suites still green; `pnpm -w
+build` 8/8 (no RSC/barrel regressions; `/` and `/signup` prerender static, `/login` /
+`/forgot-password` / `/reset-password` dynamic as expected). Dev container rebuilt (app + worker —
+`packages/jobs`-adjacent surface touched), `/api/health` 200. LIVE Playwright end-to-end: signed up
+a brand-new tenant (`verify-test-co`) at `/signup` → redirected to `/login?callbackUrl=/verify-test-co/admin`
+→ logged in as the new admin with the just-created password → landed on `/verify-test-co/admin`
+(correct company name in the page title) → navigated to `/forgot-password?tenantSlug=verify-test-co`
+(prefilled) → submitted → confirmed via MailHog API (`:41712`) the real email arrived: To
+`verify-admin@example.test`, Subject "Reset your CueLane password", body containing the correct
+`http://localhost:41716/reset-password?token=…` link → opened that exact link → set a new password
+→ redirected to `/login?reset=success` → logged in again with the NEW password → success. DB
+verified pristine after cleanup (`DELETE FROM tenants WHERE slug='verify-test-co'`): exactly `demo`
+(premium/active) + `clinic` (free/active), no stray rows.
+
+[HOW]/stub decisions (docs/DECISIONS_LOG.md "Wave 7.9 stub seams"): Turnstile — dev/test runs
+against Cloudflare's official dummy always-pass key, `verifyTurnstile()` no-ops on it; the signup
+form only mounts the widget placeholder once a real `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is configured.
+Xendit — untouched this wave; every new signup is Free-tier only, the paid-upgrade flow remains
+Wave 7.8's existing (separate) surface. Both are OWNER-KEY-GATED — do not wire live credentials
+without the owner's explicit CREDENTIALS.md rollout at Phase-6.
+
+NOT built this wave (flagged, not fixed): no rate-limit-specific UI messaging (a 429 surfaces as
+the form's generic "Something went wrong" — matches existing app-wide error handling, not a Wave
+7.9 regression); the signup form does not yet collect/display a Turnstile challenge in dev (by
+design — see stub decision above); no dedicated confirmation toast on `/login?reset=success` (the
+query param is present but unused — a fast-follow if the owner wants an explicit "password updated"
+banner on the login page).
+
+## Phase 7 completeness — Waves 7.1 through 7.9 (Landing + Signup + Auth Polish) are ALL DONE.
+
+Every Phase-7 wave (Kiosk, Employee Station, Admin Core CRUD, Media Manager, Dashboard, Super
+Admin, Landing/Signup/Auth) has shipped, is PM-verified against a live dev stack (not just
+typecheck/build), and leaves the `demo`+`clinic` seed baseline pristine. Remaining known gaps are
+owner-key-gated (Xendit live billing, Turnstile live site key) or explicit fast-follow items noted
+per-wave above — none block using the app end-to-end today. Phase 6 (Docker/deploy) stays gated on
+the owner's CREDENTIALS.md rollout + explicit go-ahead (HARD HOLD, unchanged).
+
+NEXT: Phase 6 deploy prep is owner-gated. Otherwise, work the fast-follow list above or return to
+docs/IMPLEMENTATION_MAP.md for any remaining PRODUCT.md gap.

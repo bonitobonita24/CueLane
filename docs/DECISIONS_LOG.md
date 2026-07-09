@@ -525,3 +525,46 @@ predates this wave and is the de facto path), or explicitly request the rename.
 
 **Reversible:** yes — a route rename (`app/super-admin/` → `app/superadmin/` + middleware.ts path
 check) is mechanical, no data migration involved.
+
+---
+
+## 2026-07-09 — Wave 7.9-T1: signup/password-reset identifier is `{identifier, tenantSlug}`, not `email`
+
+docs/PRODUCT.md's signup/password-reset flows (lines 14, 16) describe "email + password" and
+"enters registered email." The User model has no `email` column (see `server/auth/config.ts`'s
+pre-existing "TODO(schema-gap)" note — the real `admin-credentials` Auth.js provider already
+authenticates by `User.name` scoped to `tenantSlug`, not email) — adding one requires a Prisma
+migration, out of scope for this schema-frozen wave. `signupSchema.adminName` is the LOGIN
+identifier (matches the existing provider exactly); `signupSchema.adminEmail` is a real contact
+address stored in `Tenant.settings.adminEmail` (JSON, no migration needed) used ONLY to deliver the
+password-reset email. `requestPasswordResetSchema` was redefined from `{email}` to
+`{identifier, tenantSlug}` to match this reality. Password-reset request/confirm test/verify clean
+against the real flow (see docs/STATE.md Wave 7.9-T4 evidence).
+
+**Reversible:** yes — adding a real `User.email` column + backfilling from
+`Tenant.settings.adminEmail` is a normal additive migration whenever the owner wants email-based
+login; the current identifier-based login continues to work unchanged either way.
+
+---
+
+## 2026-07-09 — Wave 7.9-T1/T3: Turnstile + Xendit stub seams (owner-key-gated)
+
+**Turnstile:** `server/lib/turnstile.ts`'s `verifyTurnstile()` no-ops (returns `true`) whenever
+`TURNSTILE_SECRET_KEY` is unset OR is Cloudflare's official dummy always-pass key
+(`1x0000...`, `.env.dev`'s current value) — this is intentional, not a bug: dev/test never renders
+a real challenge, so the server-side check must not block signup/login there. The signup form only
+mounts the Turnstile widget placeholder once `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is a real (non-dummy)
+key. The real `https://challenges.cloudflare.com/turnstile/v0/siteverify` call IS implemented and
+will fire automatically the moment the owner rolls a live key into `.env.staging`/`.env.prod` at
+Phase-6 — no code change needed then, only the CREDENTIALS.md key rollout.
+
+**Xendit:** untouched this wave. Every signup creates a Free-tier tenant only; the paid-upgrade
+flow (Xendit-hosted payment linking, webhooks) remains Wave 7.8's existing, separate surface,
+unaffected by Wave 7.9.
+
+**Owner action needed (deferred, not blocking):** none until Phase-6 deploy prep — both seams work
+correctly in dev/test today. When the owner is ready to go live, supply real
+`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` (and, separately, live Xendit keys per the existing
+Wave 7.8 arrangement) via CREDENTIALS.md — no further code change is required for Turnstile.
+
+**Reversible:** yes — purely a config/key change, no code path needs to be revisited.
