@@ -394,3 +394,52 @@ media — flagging for a future infra wave to add the same runtime-env bridge de
 `config.ts`/`env.ts` to read `STORAGE_*` consistently everywhere.
 
 **Reversible:** yes — additive env var + a second S3Client; no schema/API contract change.
+
+---
+
+## 2026-07-09 — Wave 7.7d-T2: YouTube embed via standard IFrame API (no unverified `host` param)
+
+**Decision:** the Big Display video panel's `useYouTubePlayer` hook embeds YouTube playlist/ad/
+live entries via the STANDARD `https://www.youtube.com/iframe_api` bootstrap + `new YT.Player(id,
+{videoId, playerVars, events})` path, not the youtube-nocookie.com privacy-enhanced domain.
+
+**Rationale:** context7 (`/websites/developers_google_youtube`, "iframe_api_reference" +
+"player_parameters") was queried for a documented way to point the IFrame Player API at
+`youtube-nocookie.com` (a commonly-repeated `host: 'https://www.youtube-nocookie.com'`
+constructor option exists in community blog posts) — the OFFICIAL docs returned by context7 do
+NOT confirm this option for the JS constructor path (only the manually-authored `<iframe src=.../>`
+embed pattern documents the domain swap, via a differently-shaped setup this hook doesn't use).
+Per the context7/"don't guess the API" discipline, an unverified option was not used. The CSP
+(`next.config.ts`) still allow-lists `https://www.youtube-nocookie.com` in `frame-src` as a
+no-cost defensive placeholder for a future switch if a verified path is found; today's actual
+embeds go through `https://www.youtube.com`, which the same `frame-src`/`script-src` entries
+permit.
+
+**Reversible:** yes — swapping the bootstrap/embed domain later is a same-shaped change inside
+`use-youtube-player.ts` only.
+
+---
+
+## 2026-07-09 — Wave 7.7d-T2: `--display-accent` (theme-primary lightened for dark background)
+
+**Decision:** the Big Display replaces its hardcoded `#FCD34D` gold accent (window-name labels,
+priority badge, up-next border/dot, waiting-bar label) with a new CSS var `--display-accent` —
+NOT a direct `hsl(var(--primary))` substitution.
+
+**Rationale:** `--primary`/`THEME_PRESETS` (packages/shared) are contrast-checked against a LIGHT
+background + white foreground (Kiosk/Station/Admin — Wave 7.7b), not the Display's near-black
+background. Several presets are dark hues at low lightness (e.g. 'slate' 27%, 'ocean' 32%) that
+would nearly disappear as small accent text on `rgba(0,0,0,0.3)`. `--display-accent` is defined in
+`packages/ui/src/styles/globals.css` as `color-mix(in hsl, hsl(var(--primary)) 60%, white 40%)` —
+lightens ANY preset toward white by a fixed ratio, guaranteeing a legible-on-dark result without
+per-preset hardcoding. A `@supports not (color: color-mix(...))` fallback restores the original
+`#FCD34D`-equivalent (the 'amber-gold' preset's primary value) for any browser without color-mix
+support. Ticket numbers, service names, and body text stay their existing white/light-gray —
+`--display-accent` only replaces what was PREVIOUSLY hardcoded gold, nothing else.
+
+**Not independently WCAG-contrast-verified per preset in this session** — color-mix's 60/40 ratio
+is a reasonable heuristic (tested visually against the 'emerald' and 'slate' presets, both stayed
+legible), not a computed-contrast-ratio guarantee for all 8 presets. Flagged as a fast-follow if a
+future accessibility pass wants a per-preset computed check.
+
+**Reversible:** yes — a single CSS custom property; reverting to hardcoded gold is a 1-line diff.

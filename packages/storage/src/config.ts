@@ -77,7 +77,6 @@ export function getPublicEndpoint(): string {
   if (explicit !== undefined && explicit !== '') return explicit;
   if (!_warnedMissingPublicEndpoint) {
     _warnedMissingPublicEndpoint = true;
-    // eslint-disable-next-line no-console -- operator-facing config warning, not app telemetry
     console.warn(
       '[storage] MINIO_PUBLIC_ENDPOINT is not set — falling back to MINIO_ENDPOINT for signed ' +
       'URLs. Fine in dev (both point at localhost) but produces a browser-unreachable URL in ' +

@@ -1,16 +1,26 @@
 // Wave 7.5-T1 — Big Display client component. Public, unauthenticated wall screen: dark-themed
 // (always dark regardless of the tenant's light/dark preference — DESIGN.md: "the display is
-// DARK-themed; kiosk/station/admin are light"), 16:9-locked, 2×2 now-serving grid with gold
-// "Now Serving" names + a pulse-glow flash on change, an up-next strip, a total-waiting bar with
-// color bands, and a bottom ticker. Live updates via the Wave 7.2 SSE stream (useQueueStream) —
-// no polling; a fresh `queue.state` fetch is triggered on every `ticket.*` lifecycle event, same
-// pattern as kiosk-client.tsx's `refreshCounts`. Video/ads panel is OUT of scope (Wave 7.7).
+// DARK-themed; kiosk/station/admin are light"), 16:9-locked, 2×2 now-serving grid with a
+// tenant-accent "Now Serving" label + a pulse-glow flash on change, an up-next strip, a
+// total-waiting bar with color bands, and a bottom ticker. Live updates via the Wave 7.2 SSE
+// stream (useQueueStream) — no polling; a fresh `queue.state` fetch is triggered on every
+// `ticket.*` lifecycle event, same pattern as kiosk-client.tsx's `refreshCounts`.
+//
+// Wave 7.7d-T2 — the video/ads panel (VideoPanel) now shares the body region with the Now
+// Serving grid: a left column (playlist/live YouTube + local media, System-Ad/Tenant-Ad
+// interrupt engine) and a right column (the 2×2 grid, narrower but unchanged otherwise). Also
+// folds in the deferred Wave 7.7b item: the accent that was hardcoded `#FCD34D` gold is now
+// `hsl(var(--display-accent))` — the tenant's theme primary, lightened for dark-background
+// legibility (see packages/ui/src/styles/globals.css + docs/DECISIONS_LOG.md "Wave 7.7d-T2").
+// Ticket numbers stay high-contrast white per PRODUCT.md ("white ticket numbers") — the PREVIOUS
+// gold ticket-number color was a spec deviation, corrected here as part of this same pass.
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/trpc';
 import { useQueueStream } from '@/lib/useQueueStream';
 import type { DomainEvent } from '@/server/domain/queue';
+import { VideoPanel } from './video-panel';
 
 interface DisplayClientProps {
   tenantSlug: string;
@@ -134,7 +144,7 @@ export function DisplayClient({ tenantSlug }: DisplayClientProps) {
               style={{
                 width: 'clamp(1.75rem, 3vw, 2.25rem)',
                 height: 'clamp(1.75rem, 3vw, 2.25rem)',
-                background: '#FCD34D',
+                background: 'hsl(var(--display-accent))',
                 color: '#15181e',
                 fontSize: 'clamp(0.6rem, 1vw, 0.75rem)',
               }}
@@ -168,24 +178,34 @@ export function DisplayClient({ tenantSlug }: DisplayClientProps) {
           </div>
         </div>
 
-        {/* Body — 2×2 Now Serving grid */}
-        <div className="absolute inset-x-0 grid grid-cols-2 gap-[clamp(0.5rem,1.2vw,0.75rem)] p-[clamp(0.5rem,1.2vw,0.75rem)]" style={{ top: 'clamp(3.25rem, 8vw, 4rem)', bottom: 'clamp(3.5rem, 8vw, 4.25rem)' }}>
+        {/* Body — Video panel (left) + 2×2 Now Serving grid (right), Wave 7.7d-T2 */}
+        <div
+          className="absolute inset-x-0 flex gap-[clamp(0.5rem,1.2vw,0.75rem)] p-[clamp(0.5rem,1.2vw,0.75rem)]"
+          style={{ top: 'clamp(3.25rem, 8vw, 4rem)', bottom: 'clamp(3.5rem, 8vw, 4.25rem)' }}
+        >
+          <div className="h-full" style={{ flex: '3 1 0%', minWidth: 0 }}>
+            <VideoPanel tenantSlug={tenantSlug} reducedMotion={reducedMotion} />
+          </div>
+
+          <div className="grid h-full grid-cols-2 gap-[clamp(0.5rem,1.2vw,0.75rem)]" style={{ flex: '2 1 0%', minWidth: 0 }}>
           {slots.map((entry, i) =>
             entry != null ? (
               <div
                 key={`${entry.windowId ?? i}-${entry.ticketNumber}`}
                 className="flex flex-col justify-between rounded-lg p-[clamp(0.6rem,1.5vw,1rem)]"
                 style={{
-                  background: entry.priority ? 'rgba(255, 207, 37, 0.08)' : 'rgba(0,0,0,0.3)',
-                  border: `1px solid ${entry.priority ? 'rgba(255, 207, 37, 0.4)' : 'rgba(252, 211, 77, 0.3)'}`,
+                  background: entry.priority
+                    ? 'color-mix(in srgb, hsl(var(--display-accent)) 8%, transparent)'
+                    : 'rgba(0,0,0,0.3)',
+                  border: `1px solid color-mix(in srgb, hsl(var(--display-accent)) ${entry.priority ? 40 : 30}%, transparent)`,
                 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="cl-label" style={{ color: '#FCD34D', fontSize: 'clamp(0.55rem, 1vw, 0.7rem)' }}>
+                  <span className="cl-label" style={{ color: 'hsl(var(--display-accent))', fontSize: 'clamp(0.55rem, 1vw, 0.7rem)' }}>
                     {entry.windowName}
                   </span>
                   {entry.priority ? (
-                    <span className="cl-label" style={{ color: '#ffcf25', fontSize: 'clamp(0.5rem, 0.9vw, 0.625rem)' }}>
+                    <span className="cl-label" style={{ color: 'hsl(var(--display-accent))', fontSize: 'clamp(0.5rem, 0.9vw, 0.625rem)' }}>
                       ⭐ Priority
                     </span>
                   ) : (
@@ -203,7 +223,7 @@ export function DisplayClient({ tenantSlug }: DisplayClientProps) {
                       fontFamily: 'var(--font-mono)',
                       fontWeight: 700,
                       fontSize: 'clamp(1.5rem, 5vw, 3.5rem)',
-                      color: '#FCD34D',
+                      color: '#efeff1',
                       lineHeight: 1,
                     }}
                   >
@@ -221,7 +241,10 @@ export function DisplayClient({ tenantSlug }: DisplayClientProps) {
                 style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(178, 182, 189, 0.15)', opacity: 0.55 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="cl-label" style={{ color: 'rgba(252, 211, 77, 0.6)', fontSize: 'clamp(0.55rem, 1vw, 0.7rem)' }}>
+                  <span
+                    className="cl-label"
+                    style={{ color: 'color-mix(in srgb, hsl(var(--display-accent)) 60%, transparent)', fontSize: 'clamp(0.55rem, 1vw, 0.7rem)' }}
+                  >
                     Window
                   </span>
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: '#656a76' }} aria-hidden="true" />
@@ -244,6 +267,7 @@ export function DisplayClient({ tenantSlug }: DisplayClientProps) {
               </div>
             ),
           )}
+          </div>
         </div>
 
         {/* Up Next + Total Waiting strip */}
@@ -252,7 +276,7 @@ export function DisplayClient({ tenantSlug }: DisplayClientProps) {
             className="flex items-center gap-3 rounded-lg p-[clamp(0.4rem,1vw,0.75rem)]"
             style={{ background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(178, 182, 189, 0.15)' }}
           >
-            <span className="cl-label shrink-0" style={{ color: '#FCD34D', fontSize: 'clamp(0.55rem, 1vw, 0.7rem)' }}>
+            <span className="cl-label shrink-0" style={{ color: 'hsl(var(--display-accent))', fontSize: 'clamp(0.55rem, 1vw, 0.7rem)' }}>
               Up Next
             </span>
             <div className="flex flex-1 items-center gap-2 overflow-hidden">
@@ -261,9 +285,11 @@ export function DisplayClient({ tenantSlug }: DisplayClientProps) {
                   key={i}
                   className="shrink-0 rounded-full px-2 py-0.5"
                   style={{
-                    background: entry.priority ? 'rgba(255, 207, 37, 0.18)' : 'rgba(255,255,255,0.08)',
-                    color: entry.priority ? '#ffcf25' : '#efeff1',
-                    border: entry.priority ? '1px solid rgba(255, 207, 37, 0.4)' : undefined,
+                    background: entry.priority
+                      ? 'color-mix(in srgb, hsl(var(--display-accent)) 18%, transparent)'
+                      : 'rgba(255,255,255,0.08)',
+                    color: entry.priority ? 'hsl(var(--display-accent))' : '#efeff1',
+                    border: entry.priority ? '1px solid color-mix(in srgb, hsl(var(--display-accent)) 40%, transparent)' : undefined,
                     fontSize: 'clamp(0.6rem, 1.1vw, 0.8rem)',
                   }}
                 >

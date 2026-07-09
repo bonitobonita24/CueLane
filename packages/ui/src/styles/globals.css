@@ -214,6 +214,51 @@
   }
 }
 
+/* Wave 7.7d — Big Display tenant-accent-on-dark-background. `--primary` is authored/contrast-
+   checked against a LIGHT background + white foreground (Kiosk/Station/Admin — see THEME_PRESETS
+   in packages/shared), which is not guaranteed to stay legible as small accent text on the
+   Display's near-black background (e.g. a dark preset like 'slate' at 27% lightness would nearly
+   disappear). `--display-accent` lightens `--primary` toward white specifically for this
+   dark-background use — [HOW] decision, docs/DECISIONS_LOG.md "Wave 7.7d-T2": color-mix() has
+   solid modern-browser support (Chrome/Edge 111+, Firefox 113+, Safari 16.4+) — acceptable for a
+   wall-mounted display screen (a controlled, known browser target, not the general public).
+   `@supports` guards a same-hue static fallback (the old hardcoded gold) for any older engine. */
+@layer base {
+  :root {
+    --display-accent: color-mix(in hsl, hsl(var(--primary)) 60%, white 40%);
+  }
+
+  @supports not (color: color-mix(in hsl, red, blue)) {
+    :root {
+      --display-accent: 45 97% 64%; /* matches the amber-gold theme's --primary — closest to the original hardcoded #FCD34D */
+    }
+  }
+}
+
+@layer utilities {
+  /* Wave 7.7d — Big Display ad-interrupt cross-fade (System Ad / Tenant Ad taking over the video
+     panel, and resuming). Respects the R13/motion.md prefers-reduced-motion gate — falls back to
+     an instant cut (still functionally correct, just no animated transition). */
+  .cl-fade-in {
+    animation: cl-fade-in-kf 400ms ease-out 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cl-fade-in {
+      animation: none;
+    }
+  }
+}
+
+@keyframes cl-fade-in-kf {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
