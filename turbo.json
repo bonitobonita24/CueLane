@@ -21,7 +21,12 @@
       // Wave 7.4: station/session.ts's real-Valkey code path (its ioredis singleton falls back
       // to a plain localhost:41708 default with NO auth) needs VALKEY_URL passed through too,
       // same reasoning — without it the station tests hit "NOAUTH Authentication required."
-      "env": ["DATABASE_URL", "VALKEY_URL"]
+      // Wave 7.7c: @cuelane/storage's tests round-trip real objects against dev MinIO — its
+      // fallback creds (config.ts `minioadmin`/`localhost:41709`) don't match the actual dev
+      // container's real credentials (STORAGE_ACCESS_KEY/STORAGE_SECRET_KEY from .env), so the
+      // MINIO_* vars must be passed through the same way, or the tests hit
+      // "InvalidAccessKeyId"/"NoSuchBucket" even though the invoking shell has them.
+      "env": ["DATABASE_URL", "VALKEY_URL", "MINIO_ENDPOINT", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "MINIO_BUCKET", "MINIO_REGION"]
     },
     "dev": {
       "cache": false,

@@ -3,6 +3,7 @@
 // Free tenant AND a fresh Premium tenant) — mirrors admin.test.ts's conventions exactly.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prismaRaw } from '@cuelane/db';
+import { TenantTier } from '@cuelane/shared';
 import { AdminDomainError } from './admin';
 import {
   assertWithinPlaylistLimit,
@@ -34,7 +35,7 @@ describe('media domain (Wave 7.7c-T2)', () => {
   describe('assertWithinPlaylistLimit', () => {
     it('free tenant: allows up to 3 playlist entries, blocks the 4th', async () => {
       for (let i = 0; i < 3; i++) {
-        await expect(assertWithinPlaylistLimit(prismaRaw, freeTenantId, 'free')).resolves.toBeUndefined();
+        await expect(assertWithinPlaylistLimit(prismaRaw, freeTenantId, TenantTier.Free)).resolves.toBeUndefined();
         await prismaRaw.playlistEntry.create({
           data: {
             tenantId: freeTenantId,
@@ -48,12 +49,12 @@ describe('media domain (Wave 7.7c-T2)', () => {
           },
         });
       }
-      await expect(assertWithinPlaylistLimit(prismaRaw, freeTenantId, 'free')).rejects.toBeInstanceOf(AdminDomainError);
+      await expect(assertWithinPlaylistLimit(prismaRaw, freeTenantId, TenantTier.Free)).rejects.toBeInstanceOf(AdminDomainError);
     });
 
     it('premium tenant: allows up to 10, blocks the 11th', async () => {
       for (let i = 0; i < 10; i++) {
-        await expect(assertWithinPlaylistLimit(prismaRaw, premiumTenantId, 'premium')).resolves.toBeUndefined();
+        await expect(assertWithinPlaylistLimit(prismaRaw, premiumTenantId, TenantTier.Premium)).resolves.toBeUndefined();
         await prismaRaw.playlistEntry.create({
           data: {
             tenantId: premiumTenantId,
@@ -67,14 +68,14 @@ describe('media domain (Wave 7.7c-T2)', () => {
           },
         });
       }
-      await expect(assertWithinPlaylistLimit(prismaRaw, premiumTenantId, 'premium')).rejects.toBeInstanceOf(AdminDomainError);
+      await expect(assertWithinPlaylistLimit(prismaRaw, premiumTenantId, TenantTier.Premium)).rejects.toBeInstanceOf(AdminDomainError);
     });
   });
 
   describe('assertWithinUploadedFilesLimit', () => {
     it("free tenant: allows 1 LOCAL entry, blocks the 2nd (YouTube entries don't count)", async () => {
       // freeTenantId already has 3 youtube entries from the prior test — none of them are 'local'.
-      await expect(assertWithinUploadedFilesLimit(prismaRaw, freeTenantId, 'free')).resolves.toBeUndefined();
+      await expect(assertWithinUploadedFilesLimit(prismaRaw, freeTenantId, TenantTier.Free)).resolves.toBeUndefined();
       await prismaRaw.playlistEntry.create({
         data: {
           tenantId: freeTenantId,
@@ -87,7 +88,7 @@ describe('media domain (Wave 7.7c-T2)', () => {
           sortOrder: 99,
         },
       });
-      await expect(assertWithinUploadedFilesLimit(prismaRaw, freeTenantId, 'free')).rejects.toBeInstanceOf(AdminDomainError);
+      await expect(assertWithinUploadedFilesLimit(prismaRaw, freeTenantId, TenantTier.Free)).rejects.toBeInstanceOf(AdminDomainError);
     });
   });
 
