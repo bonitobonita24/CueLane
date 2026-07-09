@@ -254,3 +254,68 @@ proxy in dev) remain unverified; `--display-accent` contrast is heuristic-tested
 not computed per-preset.
 NEXT: this was flagged as the FINAL piece of the Big Display — Wave 7.8 (Super Admin: tenant
 directory, tier override, SystemAd CRUD) is next. Nothing owner-gated open for 7.7d.
+
+---
+## Wave 7.8 (Super Admin) — DONE + PM-VERIFIED (2026-07-09)
+Commits: storage global put/delete (`putGlobalObject`/`deleteGlobalObject`), shared
+`setTenantTierSchema`, `superAdminProcedure` + `assertTenantActive` (trpc.ts), staffProcedure
+suspension check (queue.ts), `superAdminRouter` (routers/superAdmin.ts, TDD), suspension
+integration tests, global upload Route Handler (`/api/system-ads/upload`), Super Admin UI
+(layout + nav + dashboard/tenants/system-ads pages+clients).
+
+**T1 — `superAdminProcedure` + `superAdminRouter`.** New procedure asserts `Role.SuperAdmin`,
+deliberately NOT wrapped in `withTenantContext` (platform-global, no single tenant). Router:
+`listTenants`/`getTenant` (counts via Prisma `_count`), `setTier`/`setStatus` (manual override),
+`platformStats` (tenant-by-tier/status, total users, tickets today/all-time — every KPI pinned to
+an exact field, no invented metrics), `listSystemAds`/`createSystemAd`/`setSystemAdEnabled`/
+`reorderSystemAds`/`deleteSystemAd`. All resolvers use `prismaRaw` (unguarded) — no single-tenant
+AsyncLocalStorage context exists for a platform-wide query.
+
+**T2 — Suspension enforcement.** New shared helper `assertTenantActive(tenantId)` (trpc.ts),
+called from `adminProcedure` (Admin Panel) and `staffProcedure` (queue.ts, Employee Station) —
+both throw `FORBIDDEN "This branch is suspended."` for a suspended tenant's session-based calls,
+mid-session, no re-login needed. `kioskProcedure` already enforced this for the unauth kiosk/
+display path (pre-existing). Uniform coverage across all 4 tenant surfaces now confirmed by test
++ live verification.
+
+**T3 — UI.** `/super-admin/layout.tsx` (role-guard + 3-tab nav) + `/super-admin/dashboard`
+(6 KPI cards + Recharts "Tenants by Tier" bar chart, `prefers-reduced-motion` gated) +
+`/super-admin/tenants` (directory table, tier-toggle + suspend/reactivate each behind an
+AlertDialog confirm) + `/super-admin/system-ads` (list, enabled Switch, up/down reorder,
+Add-YouTube dialog, Upload dialog via the new global upload route, delete-with-confirm).
+
+**T4 — Integration + live verification (Playwright, real dev stack, no mocks).**
+PM ground truth: typecheck 8/8; `pnpm -w test` 184/184 web (+5 db, unchanged shared/storage) —
+new files `superAdmin.test.ts` (8 tests, incl. FORBIDDEN/UNAUTHORIZED matrix) +
+`suspension.integration.test.ts` (4 tests); `pnpm -w build` 8/8 (no RSC/barrel regressions).
+Dev container rebuilt (`start.sh dev up -d --build`), `/api/health` 200. LIVE Playwright:
+logged in as `webmaster@localhost.com` (super-admin) → dashboard renders real counts (2 tenants,
+15 users, 9 tickets today) → suspended `clinic` via the Tenants UI (confirm dialog) → verified via
+`curl` that `display.media` for `clinic` now returns 403 FORBIDDEN "Tenant is suspended." →
+reactivated → 200 OK confirmed → added a real YouTube SystemAd via the UI → confirmed via curl it
+appears in `clinic`'s (Free tier) `display.media.ads[]` → deleted it. Then logged out, logged in as
+`Branch Admin`/`0000` (demo tenant admin, NOT super-admin) → page nav to `/super-admin/dashboard`
+redirected to `/login` (middleware) → direct `fetch('/api/trpc/superAdmin.listTenants')` from that
+session → 403 FORBIDDEN (proves the tRPC guard itself denies, not just the page redirect).
+Post-verification DB state confirmed pristine: `clinic` free/active, `demo` premium/active, exactly
+1 SystemAd row (the original seed) — no stray rows left behind.
+
+[HOW] decisions (docs/DECISIONS_LOG.md): Tenant.tier (not Subscription.tier) is the tier
+source-of-truth for `setTier` — Subscription.tier is mirrored best-effort if a row exists, never
+blocking; suspended-tenant UX is a plain `FORBIDDEN` tRPC error surfaced per-call (no dedicated
+"branch suspended" screen built this wave — flagged as a fast-follow if the owner wants a friendlier
+page); System Ads Manager exposes ONE discriminated-union `createSystemAd` (mirrors tenantAdRouter's
+convention) rather than split youtube/upload mutations; System Ad uploads reuse the Premium 800MB
+cap (not gated by any tenant's tier — Super Admin isn't a tenant).
+
+NOT built this wave (flagged, not fixed): a dedicated "this branch is suspended" end-user page for
+kiosk/station/admin (currently a raw tRPC FORBIDDEN error, caught generically by existing toast/error
+handling — not verified to render a friendly message on every surface); System Ads reorder uses a
+simple up/down control, not drag-and-drop; the PRODUCT.md route is `/superadmin` while the actual
+(pre-existing, Wave-7.7-scaffolded) route is `/super-admin` — this wave built on the EXISTING scaffold
+path per explicit task instruction, discrepancy flagged for an owner call if the PRODUCT.md path is
+load-bearing anywhere external.
+
+NEXT: nothing owner-gated open for Wave 7.8. Continue Phase 7 buildout per PRODUCT.md remaining
+gaps (Xendit billing webhooks, mobile employee station, printer template editor, etc. — check
+docs/IMPLEMENTATION_MAP.md for the current gap list).

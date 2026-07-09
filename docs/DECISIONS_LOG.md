@@ -478,3 +478,50 @@ full stop.
    remains a valid future improvement if this ever becomes a real production concern.
 
 **Reversible:** n/a — test-only change, no production code touched by this entry.
+
+---
+
+## 2026-07-09 — Wave 7.8-T1: Tenant.tier as tier source-of-truth for Super Admin `setTier`
+
+Super Admin's manual tier override (`superAdmin.setTier`) writes `Tenant.tier` — the field every
+tenant-facing surface already reads (kioskProcedure's suspension check reads `Tenant.status`;
+`displayRouter.media`, `tenantAdRouter`'s premium gate, and the Admin Panel's usage limits all read
+`Tenant.tier`, never `Subscription.tier` — same convention `tenantAd.ts` already documented). If a
+`Subscription` row exists for the tenant, `setTier` best-effort mirrors `tier` onto it (so a future
+billing UI stays display-consistent), via `updateMany` (a no-op, 0 rows, if no Subscription row
+exists yet — expected for a tenant that never went through the Xendit flow). The mirror write is
+NEVER required for the toggle to succeed.
+
+**Reversible:** yes — swapping which field is authoritative is a resolver-level change, no schema
+migration involved.
+
+---
+
+## 2026-07-09 — Wave 7.8-T2: suspended-tenant UX is a plain FORBIDDEN error, no dedicated screen
+
+A suspended tenant's Admin Panel / Employee Station calls now throw
+`TRPCError({ code: 'FORBIDDEN', message: 'This branch is suspended.' })` from a new shared
+`assertTenantActive()` helper (trpc.ts), called from `adminProcedure` and `staffProcedure`. This
+wave does NOT build a dedicated "this branch is suspended" full-screen UI — the error surfaces via
+whatever generic error/toast handling each page already has (same posture as any other TRPCError).
+Chosen to keep the wave scoped to the CRUD platform surface; flagged in docs/STATE.md as a
+fast-follow if the owner wants a friendlier suspended-tenant experience (e.g. a branded "Contact
+your administrator" page instead of a raw error toast).
+
+**Reversible:** yes — a dedicated error boundary/page can be layered on top without touching the
+enforcement logic itself.
+
+---
+
+## 2026-07-09 — Wave 7.8-T3: System Ads route path `/super-admin` (not PRODUCT.md's `/superadmin`)
+
+docs/PRODUCT.md line 38/107 specifies the Super Admin route as `/superadmin` (no hyphen). The
+ACTUAL scaffolded route (Wave 7.7-era placeholder, already present in the codebase before this
+wave, and named explicitly in this wave's task brief) is `/super-admin/dashboard`. This wave built
+out the Super Admin surface on the EXISTING `/super-admin` path rather than migrating it to match
+PRODUCT.md, since renaming would touch `middleware.ts`'s route matcher and any bookmarked/shared
+links. Flagged for an owner call: either treat this as PRODUCT.md needing a correction (the code
+predates this wave and is the de facto path), or explicitly request the rename.
+
+**Reversible:** yes — a route rename (`app/super-admin/` → `app/superadmin/` + middleware.ts path
+check) is mechanical, no data migration involved.
