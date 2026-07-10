@@ -52,6 +52,18 @@
     --chart-3: 270 46% 49%;
     --chart-4: 45 97% 64%;
     --chart-5: 213 100% 59%;
+
+    /* App-shell sidebar surface (shadcn sidebar). Its own token family so the sidebar can read
+       as a distinct chrome panel independent of the page --background. Light: a hair off-white
+       cooler than --background, --sidebar-accent tracks the primary hue for the active nav item. */
+    --sidebar-background: 210 12% 97%;
+    --sidebar-foreground: 228 8% 25%;
+    --sidebar-primary: 217 70% 49%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 8% 91%;
+    --sidebar-accent-foreground: 217 70% 40%;
+    --sidebar-border: 216 8% 85%;
+    --sidebar-ring: 217 70% 49%;
   }
 
   .dark {
@@ -89,6 +101,17 @@
     --chart-3: 270 46% 58%;
     --chart-4: 45 97% 64%;
     --chart-5: 213 100% 65%;
+
+    /* App-shell sidebar surface — dark. Slightly deeper than --card so the chrome panel reads as
+       distinct from the content area; --sidebar-accent lifts the active nav item off the panel. */
+    --sidebar-background: 224 13% 12%;
+    --sidebar-foreground: 0 0% 88%;
+    --sidebar-primary: 217 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 224 13% 20%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 224 13% 20%;
+    --sidebar-ring: 217 70% 55%;
   }
 }
 
