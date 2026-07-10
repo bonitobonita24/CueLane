@@ -4,25 +4,33 @@ _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
 PHASE:        **Phase 7 (Feature Buildout) COMPLETE — waves 7.1–7.9 DONE + PM-verified. Now in Phase 8 completeness sweep + regression.**
-CURRENT:      Phase 7 Wave 7.7b — Theme runtime CSS wiring + custom color picker (2026-07-09). Single Sonnet worker,
-              TDD real dev stack. Commits bcc4fdc (T1 — @cuelane/shared: real HSL values on all 8 THEME_PRESETS,
-              CustomTheme type + themeSettingSchema [preset-id string OR {custom} obj, legacy bare theme:'indigo'
-              string STILL validates], src/theme/resolveThemeVars.ts + test), 359d837 (T2 — server-side CSS-var
-              injection on [tenant]/layout.tsx: resolves tenant settings via prismaRaw, inline style in server HTML so
-              Kiosk/Station/Admin inherit per-tenant theme, NO flash; Display .dark still wins), dc6aa9d (T3 — Premium
-              custom 9-color picker in admin/theme/theme-client.tsx, scoped preview via ref not documentElement,
-              persist via tenantAdmin.updateSettings JSON RMW; tier from Tenant.tier). PM re-verified INDEPENDENTLY:
-              typecheck 8/8 ✓; pnpm -w test 150/150 ✓ (18 shared + 2 db + 130 web — needs host-mapped
-              DATABASE_URL@localhost:41706 + authed VALKEY_URL@localhost:41708, derive by swapping in-network host:port
-              from `docker exec cuelane_dev_app env`); pnpm -w build 8/8 ✓. LIVE curl of server HTML (proves no-flash,
-              zero JS): demo(premium)→Ocean --primary:201 96% 32%, clinic(free)→Emerald --primary:163 94% 24% — differs
-              per tenant; custom picker E2E'd (#22c55e→persisted→server-resolved 142 71% 45%). Evidence
-              test-artifacts/phase7-theme/. Logged LESSONS_GLOBAL footgun: Object.entries() on a non-indexed TS
-              interface returns any (passes tsc --noEmit, fails next build eslint). 77 commits ahead, 0 pushed (HARD
-              HOLD). ⚠️ FLAGGED [WHAT] (PENDING_DECISIONS.md, non-blocking): un-gated Theme tab for Free tier, reverses
-              Wave 7.6-T7. DEFERRED (technical): Big Display consumes zero CSS vars (theme not visible there yet) → 7.7d;
-              custom-picker first-open seeds from Indigo not active preset. NEXT = Wave 7.7c (Media manager). Full 7.7
-              plan (4 sub-waves 7.7a-d, Architect 2026-07-09) tracked in memory project_cuelane_build_state.
+CURRENT:      Post-Phase-7 polish + Phase-8 sweep (2026-07-10). Phase 7 (waves 7.1–7.9) is COMPLETE; this session
+              added four things on top:
+              (1) **Phase-8 completeness sweep DONE** — 031f0af docs(state) + 1516d78 docs(impl-map). Gates green
+                  (typecheck 8/8, test 252/252, build 8/8); data canonical (demo 9 / clinic 6, 2 tenants, system_ads 1);
+                  full Playwright regression both tenants + super-admin; IMPLEMENTATION_MAP reconciled to built reality.
+              (2) **Cross-tenant page-guard HARDENING** — 7dae7ca. middleware now enforces URL-tenant ↔ session-tenant
+                  match (JWT carries tenantSlug; a mismatched non-superadmin redirects to their own tenant; super-admin
+                  exempt). DB/L6/RLS guard intact (defense-in-depth). +6 TDD tests (suite 252→258).
+              (3) **SIDEBAR APP-SHELL REDESIGN** — b1598b3 / d59003b / f4998bd / 0ed0787. Admin + Super-Admin moved off
+                  top-tabs onto a collapsible left-sidebar shell (shadcn `sidebar`, RSC-safe SUBPATH export
+                  `@cuelane/ui/sidebar` — NEVER the barrel; hamburger + off-canvas on mobile; content in
+                  `mx-auto max-w-7xl px-4 sm:px-6 lg:px-8` gutter container). Employee Station = NON-OBTRUSIVE
+                  collapsed icon-rail (max working area). Kiosk + Display stay full-bleed. Embodies the new global design
+                  defaults. build 8/8; tier-gating/theme/auth preserved; live-verified desktop+mobile both tenants.
+                  Evidence test-artifacts/phase8-sidebar/.
+              (4) **SUPER-ADMIN LOGIN RE-SEEDED** — platform super-admin is now the fleet `tenant_manager` =
+                  **`tenantadmin@powerbyteitsolutions.com`** (was webmaster@localhost.com). bcrypt cost 10 in gitignored
+                  `.env.dev` — ⚠ the hash MUST be `$$`-escaped (compose `env_file` interpolates `$`; see LESSONS_GLOBAL
+                  `docker-compose.env-file.bcrypt-hash-dollar-interpolation`). Password ONLY in the vault
+                  (`Server-Setups/secrets/universal-login-credentials.enc.yaml`, nested schema). Tenant admins unchanged
+                  (demo `Branch Admin`/0000 · clinic `Nurse Admin`/0001).
+              Dev stack UP + healthy (app http://localhost:41716). **113 commits ahead of origin, 0 pushed (HARD HOLD —
+              local dev only; no staging/prod without explicit owner word).**
+              NEXT: continue Phase-7/8 follow-ups + fix any bugs; keep gates green. Eventual **fleet 3-tier RBAC retrofit**
+              (Scenario 42 · `.ai_prompt/rbac.md` · MG `feat/tenant-rbac-3tier`) — CueLane is tenant-based but not yet on
+              `tenant_manager`/`tenant_superadmin`/`tenant_admin`; adopt on owner word, dev-first. Phase-6 deploy prep is
+              OWNER-GATED (needs Docker Hub / SMTP / Xendit / Turnstile creds).
               ── history ──
 PREV_DONE:    Phase 7 Wave 7.7a — Admin Dashboard (2026-07-09). 146ecbd/d2531ba/8595d4f. 8 KPIs, tier-gated advanced
               blocks, searchable ticket log. Barrel/RSC bug found+fixed (ToggleGroup → dedicated subpaths). PM-verified
