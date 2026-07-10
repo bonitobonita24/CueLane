@@ -1,11 +1,18 @@
-// Wave 7.4-T1 — Employee Station server shell. middleware.ts already gates `/station` behind ANY
-// valid session (see PROTECTED_TENANT_PATHS); this page adds the role check (defense-in-depth,
-// same pattern as admin/page.tsx) and resolves the tenant's windows for the client component's
-// window-selection step.
+// Wave 7.4-T1 / Wave 8-sidebar — Employee Station server shell. middleware.ts already gates
+// `/station` behind ANY valid session (see PROTECTED_TENANT_PATHS); this page adds the role check
+// (defense-in-depth, same pattern as admin/page.tsx) and resolves the tenant's windows for the
+// client component's window-selection step.
+//
+// Wave 8-sidebar: the station is a focused serve console, so it gets the shared AppShell but as a
+// NON-OBTRUSIVE thin icon-rail — collapsible="icon" + defaultOpen={false} so it opens COLLAPSED
+// and the operator keeps maximum working area (the queue/serve panels stay the large right
+// region). On mobile the rail is off-canvas (hidden until the hamburger). All serve/skip/transfer/
+// window logic in StationClient is untouched — only the chrome changed.
 import { redirect } from 'next/navigation';
 import { auth } from '@/server/auth';
 import { prisma, withTenantContext } from '@cuelane/db';
 import { Role } from '@cuelane/shared';
+import { AppShell, type AppShellNavItem } from '@/components/AppShell';
 import { StationClient } from './station-client';
 
 interface StationPageProps {
@@ -25,7 +32,7 @@ export default async function StationPage({ params }: StationPageProps) {
   // same pattern as kiosk/page.tsx) purely for the window list the client needs up front.
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { id: true, status: true },
+    select: { id: true, status: true, companyName: true },
   });
   if (tenant == null || tenant.status !== 'active') {
     redirect('/login');
@@ -54,5 +61,29 @@ export default async function StationPage({ params }: StationPageProps) {
     }),
   );
 
-  return <StationClient tenantSlug={tenantSlug} windows={windows} />;
+  // Single-item rail: the station is a one-screen console with no natural multi-destination nav,
+  // so the sidebar is intentionally minimal chrome (brand + hamburger + the Station entry). It
+  // starts COLLAPSED to a thin icon-rail (defaultOpen={false}) so it never dominates the console.
+  const navItems: AppShellNavItem[] = [
+    { id: 'station', label: 'Station', href: `/${tenantSlug}/station`, exact: true },
+  ];
+
+  return (
+    <AppShell
+      brandName={tenant.companyName}
+      brandSubtitle="Station"
+      title="Employee Station"
+      subtitle={
+        <>
+          Tenant: <code className="font-mono">{tenantSlug}</code>
+        </>
+      }
+      navLabel="Console"
+      navItems={navItems}
+      collapsible="icon"
+      defaultOpen={false}
+    >
+      <StationClient tenantSlug={tenantSlug} windows={windows} />
+    </AppShell>
+  );
 }

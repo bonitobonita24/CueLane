@@ -27,6 +27,7 @@ import {
   ListChecks,
   type LucideIcon,
   Megaphone,
+  MonitorPlay,
   Palette,
   PanelsTopLeft,
   Printer,
@@ -73,6 +74,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   usage: Gauge,
   tenants: Building2,
   'system-ads': Megaphone,
+  station: MonitorPlay,
 };
 
 export interface AppShellProps {
