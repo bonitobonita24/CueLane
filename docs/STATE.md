@@ -3,7 +3,7 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 (Feature Buildout) IN PROGRESS — Wave 7.7b (Theme runtime CSS wiring + custom picker) DONE + PM-verified**
+PHASE:        **Phase 7 (Feature Buildout) COMPLETE — waves 7.1–7.9 DONE + PM-verified. Now in Phase 8 completeness sweep + regression.**
 CURRENT:      Phase 7 Wave 7.7b — Theme runtime CSS wiring + custom color picker (2026-07-09). Single Sonnet worker,
               TDD real dev stack. Commits bcc4fdc (T1 — @cuelane/shared: real HSL values on all 8 THEME_PRESETS,
               CustomTheme type + themeSettingSchema [preset-id string OR {custom} obj, legacy bare theme:'indigo'
