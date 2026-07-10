@@ -568,3 +568,35 @@ correctly in dev/test today. When the owner is ready to go live, supply real
 Wave 7.8 arrangement) via CREDENTIALS.md — no further code change is required for Turnstile.
 
 **Reversible:** yes — purely a config/key change, no code path needs to be revisited.
+
+---
+
+## 2026-07-10 — Cross-tenant protected-page guard implemented in middleware (previously deferred slug-in-JWT)
+
+**Decision:** The previously-deferred "slug-in-JWT" optimisation is now **implemented**, reversing
+the earlier deferral note (`middleware.ts` step 5 formerly read: *"NOTE: slug-in-JWT optimisation
+tracked in DECISIONS_LOG"* with only a session-exists check). The tenant **slug** is now carried in
+the JWT at sign-in (the `admin-credentials` provider already resolves the tenant by slug; it now
+returns `tenantSlug` on the user object → `jwt` callback → `session.user.tenantSlug`), so the Edge
+middleware can compare the URL `{tenant}` slug against the session user's own tenant **without a DB
+call**. For `PROTECTED_TENANT_PATHS` (`/station`, `/admin`): if the URL slug ≠ the session tenant
+slug AND the user is not a Super Admin, middleware now **redirects to the same sub-path under the
+user's OWN slug** (e.g. a `demo` admin visiting `/clinic/admin/users` → `/demo/admin/users`) instead
+of rendering another tenant's page chrome populated with the visitor's own data. Super Admin is
+exempt (may access any tenant); unauthenticated requests still redirect to `/login` as before.
+
+**Why:** defense-in-depth aligned with attack-informed-hardening (BOLA / cross-tenant object-access
+depth). **Data isolation already held** and is UNCHANGED — the tRPC `requireTenant` / L6 Prisma
+guard / RLS layer remains the authoritative isolation boundary and scopes every read/write to the
+session `tenantId`, ignoring the URL slug (so there was never a data leak). This closes the
+page-render / UX + defense-in-depth gap only: it stops a valid session from ever rendering a
+different tenant's slug in the chrome.
+
+**Affected files:** `apps/web/src/server/auth/tenant-guard.ts` (new, edge-safe pure decision fn +
+`tenant-guard.test.ts`), `apps/web/src/server/auth/config.ts` (authorize returns carry `tenantSlug`),
+`apps/web/src/server/auth/config.edge.ts` (jwt + session callbacks propagate `tenantSlug`),
+`apps/web/src/types/next-auth.d.ts` (`tenantSlug` on Session.user / User / JWT), `apps/web/src/middleware.ts`.
+
+**Reversible:** yes — remove the slug from the JWT return + revert middleware step 5 to the
+session-exists check; the tRPC/L6/RLS DB-layer guard (kept intact) continues to enforce isolation
+regardless.

@@ -87,6 +87,10 @@ export const authConfig: NextAuthConfig = {
           name: user.name,
           email: null,
           tenantId: user.tenantId,
+          // Carry the tenant SLUG (already validated above) onto the session so
+          // Edge middleware can compare the URL {tenant} slug without a DB call
+          // (cross-tenant page guard — see server/auth/tenant-guard.ts).
+          tenantSlug,
           roles: [roleMap[user.role] ?? Role.Employee],
         };
       },
@@ -125,6 +129,7 @@ export const authConfig: NextAuthConfig = {
           name: 'Super Admin',
           email: superAdminEmail,
           tenantId: null,
+          tenantSlug: null, // Super Admin has no home tenant — exempt from the slug guard
           roles: [Role.SuperAdmin],
         };
       },

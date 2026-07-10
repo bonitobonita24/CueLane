@@ -42,6 +42,7 @@ export const authConfigEdge: NextAuthConfig = {
           ...token,
           userId: String(u.id ?? ''),
           tenantId: (u.tenantId as string | null | undefined) ?? null,
+          tenantSlug: (u.tenantSlug as string | null | undefined) ?? null,
           roles: (u.roles as Role[] | undefined) ?? [],
         };
       }
@@ -53,6 +54,7 @@ export const authConfigEdge: NextAuthConfig = {
       const tok = token as any;
       session.user.id = String(tok.userId ?? '');
       session.user.tenantId = (tok.tenantId as string | null | undefined) ?? null;
+      session.user.tenantSlug = (tok.tenantSlug as string | null | undefined) ?? null;
       session.user.roles = (tok.roles as Role[] | undefined) ?? [];
       return session;
     },

@@ -5,6 +5,7 @@ import { auth } from '@/server/auth/edge';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { Role } from '@cuelane/shared';
+import { evaluateProtectedTenantAccess } from '@/server/auth/tenant-guard';
 
 // Paths that do NOT need auth (kiosk + display are public-facing)
 const PUBLIC_TENANT_PATHS = ['/kiosk', '/display'];
@@ -89,27 +90,44 @@ export default auth((req: NextRequest & { auth: unknown }) => {
     return NextResponse.next();
   }
 
-  // 5. Protected tenant routes (station, admin) — require valid session
+  // 5. Protected tenant routes (station, admin) — require a valid session AND
+  //    enforce that the URL {tenant} slug matches the session user's own tenant
+  //    (defense-in-depth page guard; DATA isolation is still owned by the tRPC
+  //    requireTenant / L6 / RLS layer — do NOT rely on this alone). SuperAdmin is
+  //    exempt (may view any tenant). The tenant slug is carried in the JWT
+  //    (server/auth/config.ts authorize → jwt callback), so no DB call is needed
+  //    edge-side. See server/auth/tenant-guard.ts + DECISIONS_LOG 2026-07-10.
   if (isProtectedTenantPath) {
     const session = req.auth as
-      | { user?: { id?: string; tenantId?: string | null; roles?: Role[] } }
+      | { user?: { id?: string; tenantSlug?: string | null; roles?: Role[] } }
       | null
       | undefined;
 
-    const userId = session?.user?.id;
-    if (userId == null || userId === '') {
+    const decision = evaluateProtectedTenantAccess({
+      urlTenantSlug: tenantSlug,
+      session: {
+        userId: session?.user?.id,
+        tenantSlug: session?.user?.tenantSlug,
+        roles: session?.user?.roles,
+      },
+    });
+
+    if (decision.action === 'redirect-login') {
       const loginUrl = req.nextUrl.clone();
       loginUrl.pathname = '/login';
       loginUrl.searchParams.set('callbackUrl', pathname);
       return NextResponse.redirect(loginUrl);
     }
 
-    // L1 anti-enumeration: tenant slug vs session tenantId.
-    // Full enforcement is in tRPC requireTenant middleware (DB-level guard).
-    // NOTE: slug-in-JWT optimisation tracked in DECISIONS_LOG.
-    const roles: Role[] = session?.user?.roles ?? [];
-    const _isSuperAdmin = roles.includes('super_admin' as Role);
-    void _isSuperAdmin; // checked here for future early-exit; enforcement is in tRPC layer
+    if (decision.action === 'redirect-tenant') {
+      // Send the user to the SAME sub-path under their OWN tenant slug, e.g.
+      // /clinic/admin/users (as a demo admin) → /demo/admin/users. Drop the query
+      // string — it may reference the other tenant's resource ids.
+      const ownUrl = req.nextUrl.clone();
+      ownUrl.pathname = `/${decision.slug}${subPath}`;
+      ownUrl.search = '';
+      return NextResponse.redirect(ownUrl);
+    }
 
     return NextResponse.next();
   }
