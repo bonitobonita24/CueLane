@@ -26,7 +26,7 @@ Current build state. Rewritten after every feature update to reflect what exists
 - `src/index.ts` — barrel export
 
 ### @cuelane/api-client ✅ Phase 4 Part 2 complete (swarm/phase4-scaffold, 2026-07-08)
-- `src/index.ts` — createClient() vanilla tRPC v11 client; trpc = createTRPCReact<AppRouter>(); AppRouter=any placeholder (TODO S5 — replace with import type from apps/web); peerDep react >=18.2.0; no transformer on client (tRPC v11 — lives on server initTRPC)
+- `src/index.ts` — createClient() vanilla tRPC v11 client; trpc = createTRPCReact<AppRouter>(); AppRouter=any by deliberate design (avoids a package→app circular dependency; the web app's own `@/lib/trpc` carries the real typed AppRouter — see source comment); peerDep react >=18.2.0; no transformer on client (tRPC v11 — lives on server initTRPC)
 
 ### @cuelane/db ✅ Phase 4 Part 3 complete (swarm/phase4-scaffold, 2026-07-08)
 - `prisma/schema.prisma` — 13 models (Tenant+slug, Service, Window×3 back-relations, User, UserService explicit join table, Ticket, PlaylistEntry, SystemAd, TenantAd, Subscription, PasswordResetToken, AuditLog); 7 enums; all tables @@map("snake_case")
@@ -56,7 +56,7 @@ Current build state. Rewritten after every feature update to reflect what exists
 - `src/queues/webhooks.ts` — webhooksQueue + webhooksDlq; same pattern
 
 ### @cuelane/storage ✅ Phase 4 Part 4 complete (swarm/phase4-scaffold, 2026-07-08)
-- `src/types.ts` — ALLOWED_MIME_TYPES (jpeg/png/gif/webp/mp4/pdf), BLOCKED_MIME_TYPES (svg+xml/html/js), MAX_FILE_SIZE_BYTES (10MB), MIME_TO_EXT map, SEGMENT_RE (/^[a-z0-9][a-z0-9_-]{0,63}$/), UploadInput/Result/GetSignedUrlInput, StorageValidationError, StorageAuthorizationError
+- `src/types.ts` — MIME allow-list (jpeg/png/gif/webp/mp4/pdf) + deny-list (svg+xml/html/js) constants, MAX_FILE_SIZE_BYTES (10MB), MIME_TO_EXT map, SEGMENT_RE (/^[a-z0-9][a-z0-9_-]{0,63}$/), UploadInput/Result/GetSignedUrlInput, StorageValidationError, StorageAuthorizationError
 - `src/config.ts` — S3Client singleton from env (MINIO_ENDPOINT:41709 dev); requireEnv() fails-fast in production; getDefaultBucket()
 - `src/storage.ts` — validatePathSegment() (tenantId+entityType against SEGMENT_RE, prevents traversal); validateUpload() (blocklist→allowlist→path→size via body.byteLength); buildStorageKey (MIME_TO_EXT not originalFilename extension); assertTenantKey() (cross-tenant guard on read/delete/sign); putObject/getObject(tenantId)/deleteObject(tenantId)/getSignedDownloadUrl
 
@@ -71,8 +71,8 @@ Current build state. Rewritten after every feature update to reflect what exists
 - `src/env.ts` — Zod-validated env: VALKEY_URL (dev:41708), DATABASE_URL, SMTP_HOST/PORT/SECURE/USER/PASS/FROM/FROM_NAME, MINIO_* vars; process.exit(1) on invalid
 - `src/index.ts` — BullMQ Worker per queue (email:concurrency=5, reports:2, webhooks:10); shared connection options; completed/failed event logging; graceful shutdown (SIGTERM/SIGINT, double-shutdown guard, error-tolerant Promise.all)
 - `src/processors/email.processor.ts` — nodemailer SMTP send; renderTemplate() switch (email_verification, password_reset, subscription_confirmation, subscription_cancellation, subscription_renewal_reminder, default); escapeHtml() prevents HTML injection; SMTP_SECURE env-driven; no unnecessary withTenant DB coupling
-- `src/processors/reports.processor.ts` — skeleton; withTenant(tenantId) scoped; TODO Phase 8
-- `src/processors/webhooks.processor.ts` — skeleton; withTenant(tenantId) scoped; TODO Phase 8 (Xendit validation)
+- `src/processors/reports.processor.ts` — tenant-scoped skeleton (withTenant(tenantId)); background report-generation IO is deferred future scope (report export not yet in active PRODUCT.md scope — see Background Jobs / Reporting & Dashboards). Wired end-to-end (queue → worker → tenant tx), body is a logging placeholder.
+- `src/processors/webhooks.processor.ts` — tenant-scoped skeleton (withTenant(tenantId)); Xendit webhook signature-validation + dispatch is deferred future scope (payments/subscription billing not yet active — see Integrations). Wired end-to-end, body is a logging placeholder.
 
 ## Infrastructure ✅ Phase 4 Part 7 complete (swarm/phase4-scaffold, 2026-07-08)
 - `apps/web/Dockerfile` — multi-stage (deps→builder→runner); Next.js standalone output; non-root user nextjs:nodejs
@@ -120,3 +120,50 @@ Current build state. Rewritten after every feature update to reflect what exists
 - CREDENTIALS.md — AI secrets filled; human ⏳ sections: Docker Hub token, SMTP (Host/Port/Username/Password/From address/From name), Xendit keys, Turnstile LIVE keys, Komodo UI URL
 - scripts/sync-credentials-to-env.sh — propagates CREDENTIALS.md → env files; chmod +x
 - .cline/handoffs/2026-05-03-phase3-complete-pause.md — pause handoff with resume instructions
+
+---
+
+## PRODUCT.md Feature-Section → Built Implementation (Phase 7 COMPLETE — waves 7.1–7.9, 2026-07-09)
+
+Each PRODUCT.md section (§) mapped to the real routes/files that implement it. ✅ = built + PM-verified;
+⏭ = deliberately deferred future scope (documented, not a Phase-7 gap). No invented mappings — every path
+below exists in the tree.
+
+| PRODUCT.md section | Status | Implemented by (real routes/files) |
+|---|---|---|
+| **App Identity** | ✅ | `docs/PRODUCT.md`, branding surfaced across landing + per-tenant screens (companyName/tagline/logoUrl on Tenant model) |
+| **Problem Statement** | ✅ | Queue-management product; realized across kiosk/station/display/admin surfaces below |
+| **Core User Flows** | ✅ | Kiosk issue → Station call/serve → Display show → Admin manage; wired via tRPC routers `ticket.ts`/`queue.ts`/`station.ts` |
+| **Modules + Features** | ✅ | See per-module rows below (kiosk, station, display, admin, super-admin) |
+| **Big Display Screen (🖥)** | ✅ | route `apps/web/src/app/[tenant]/display/`; router `display.ts`; live via SSE `api/tenants/[slug]/queue/stream/route.ts` (Wave 7.5) |
+| **Customer Kiosk (🎫)** | ✅ | route `apps/web/src/app/[tenant]/kiosk/`; ticket issuance via `ticket.ts` (kioskProcedure) |
+| **Employee Station (👤 — Desktop)** | ✅ | route `apps/web/src/app/[tenant]/station/` (auth-guarded); router `station.ts` + `src/server/station/session.ts` (Valkey session map); Call-Next/serve/transfer |
+| **Mobile Employee (📱 — Premium only)** | ⏭ | Native Expo mobile app deferred future scope (WatermelonDB/Expo Push not yet built — see Mobile Needs / Out of Scope) |
+| **Admin Panel (⚙️)** | ✅ | routes `apps/web/src/app/[tenant]/admin/{services,windows,users,media,theme,settings,usage}/`; routers `tenantAdmin.ts`/`service.ts`/`window.ts`/`user.ts`/`media.ts`/`tenantAd.ts`; access control `admin/_lib/access.ts` |
+| **Platform Super Admin (CueLane internal — /superadmin)** | ✅ | routes `apps/web/src/app/super-admin/{dashboard,tenants,system-ads}/`; router `superAdmin.ts`; super-admin auth (env cred) |
+| **Platform Landing Page (/)** | ✅ | route `apps/web/src/app/page.tsx` + `_components/landing/` |
+| **Subscription Tiers** | ✅ | Tenant.tier (free/premium) enum; tier-gating across admin/display/dashboard; `subscriptions` table |
+| **Free Tier** | ✅ | tier=free gating (Powerbyte attribution shown, advanced blocks hidden) — enforced in admin/dashboard/display |
+| **Premium Tier** | ✅ | tier=premium unlocks custom theme picker, advanced dashboard blocks, media manager, attribution hidden |
+| **Roles + Permissions** | ✅ | Role enum (employee/admin/super_admin); `admin/_lib/access.ts`; Auth.js v5 config `src/server/auth/config.ts`; L3 RBAC |
+| **Data Entities** | ✅ | `packages/db/prisma/schema.prisma` (13 models); see Packages → @cuelane/db above |
+| **Integrations** | ⏭ (Xendit deferred) | tRPC/Auth.js/MinIO/Valkey/BullMQ all live; Xendit payment webhook is deferred future scope (`webhooks.processor.ts` skeleton) |
+| **File Uploads** | ✅ | `packages/storage/` (S3/MinIO); routes `api/tenants/[slug]/media/upload/route.ts` + `api/system-ads/upload/route.ts`; validation in `storage.ts` |
+| **Background Jobs** | ✅ (email) / ⏭ (reports) | `packages/jobs/` queues + `apps/worker/` processors; email processor live; reports processor is deferred future scope |
+| **Realtime Features** | ✅ | SSE `api/tenants/[slug]/queue/stream/route.ts`; `src/server/realtime/publisher.ts`; live Display/Station updates (Wave 7.2/7.5) |
+| **Reporting & Dashboards** | ✅ | route `apps/web/src/app/[tenant]/admin/` dashboard + `admin/usage/`; router `dashboard.ts` (8 KPIs, tier-gated); async report export deferred |
+| **Deployment Config** | ✅ | `deploy/compose/{dev,stage,prod}/`; `start.sh`/`push.sh`; `.github/workflows/` |
+| **Mobile Needs** | ⏭ | Native mobile (Expo) deferred future scope; web surfaces are responsive |
+| **Non-functional Requirements** | ✅ | security (L1-L6), rate-limit, CSP, SSE realtime, multi-tenant isolation (RLS + L6 guard) |
+| **Tenancy Model** | ✅ | shared-schema + tenant_id; subdirectory `/[tenant]/` middleware; RLS `packages/db/src/rls.ts` + L6 tenant-guard middleware |
+| **User-Facing URLs** | ✅ | `/`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/[tenant]/{kiosk,display,station,admin/*}`, `/super-admin/*` |
+| **Access Control** | ✅ | `admin/_lib/access.ts`; Auth.js middleware; L1 routing guard; super-admin gate |
+| **Data Sensitivity** | ✅ | PIN auth (bcrypt/SHA-256 dev), tenant isolation, audit_logs (L5), no cross-tenant leakage (assertTenantKey) |
+| **Security Requirements** | ✅ | L1-L6 stack; CSP headers, DOMPurify sanitize, rate-limit, RLS; `packages/db/src/middleware/tenant-guard.ts` |
+| **Environments Needed** | ✅ | dev/stage/prod compose stacks + `.env.{dev,staging,prod}` |
+| **Domain / Base URL Expectations** | ✅ | cuelane.powerbyte.app (prod), cuelane-staging.powerbyte.app (stage) — Traefik labels in stage/prod compose |
+| **Infrastructure Notes** | ✅ | Postgres/PgBouncer/Valkey/MinIO/MailHog/pgAdmin compose (dev base port 41706); Docker + Komodo + Traefik |
+| **Tech Stack Preferences** | ✅ | Next.js 15 · tRPC v11 · Prisma · Auth.js v5 · PostgreSQL · Valkey · BullMQ · MinIO · shadcn/ui · Tailwind (locked stack) |
+| **Design Identity** | ✅ | `docs/DESIGN.md` (HashiCorp aesthetic); `packages/ui/` tokens; per-tenant theme presets + premium custom picker (Wave 7.7) |
+| **Out of Scope** | ✅ | Native mobile, Xendit payments, async report export explicitly out of current scope (deferred future work) |
+
