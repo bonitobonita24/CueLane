@@ -2335,6 +2335,87 @@ VERIFICATION:
 
 ---
 
+### SCENARIO 42 — Retrofit the Tenant-RBAC 3-tier backbone onto an existing tenant-based app (NEW V32.25)
+```
+CONTEXT:
+  An existing tenant-based app has ad-hoc admin roles (e.g. super_admin / site_admin /
+  administrator) and needs to adopt the fleet-standard 3-tier backbone
+  (tenant_manager / tenant_superadmin / tenant_admin) WITHOUT losing any user's role
+  and WITHOUT downtime. Proven on Marine-Guardian branch feat/tenant-rbac-3tier (2026-07-10).
+  Authority: Rule 34 + .ai_prompt/rbac.md. DESIGN reference for the enforcement mechanics.
+
+WHEN TO USE:
+  - "retrofit the 3-tier RBAC into <app>" / "adopt the tenant RBAC standard" / "set up
+    tenant_manager/superadmin/admin" on any app that already has a UserRole enum + users.
+  - The custom-role MATRIX layer (rbac.md Part B) is a SEPARATE, later, gated pass — this
+    scenario delivers the BACKBONE only (what MG shipped).
+
+⚠ HARD HOLD: every step below lands as LOCAL commits + a DEV-DB apply only. Staging / prod /
+   demo promotion are separate, explicit, owner-gated words (see step 8).
+
+STEPS (dev-first):
+  1. Branch feat/tenant-rbac-3tier.
+  2. Normalize FIRST — before the unique index exists, demote any extra owners so there is
+     ≤ 1 tenant_superadmin-elect per tenant (extras → tenant_admin). Retire/deactivate stale
+     placeholder accounts. (If two rows would both become tenant_superadmin, the index in step 3
+     rejects the migration.)
+  3. Migration (data-preserving — NEVER DROP/CREATE the enum):
+       ALTER TYPE "UserRole" RENAME VALUE '<old_top>'    TO 'tenant_manager';
+       ALTER TYPE "UserRole" RENAME VALUE '<old_owner>'  TO 'tenant_superadmin';
+       ALTER TYPE "UserRole" RENAME VALUE '<old_admin>'  TO 'tenant_admin';
+       CREATE UNIQUE INDEX "one_tenant_superadmin_per_tenant"
+         ON users (tenant_id) WHERE role = 'tenant_superadmin' AND tenant_id IS NOT NULL;
+     RENAME VALUE preserves every existing row's (renamed) role automatically — no data
+     migration. Domain roles (coordinator/operator/viewer) are UNCHANGED. The partial-unique
+     index enforces one owner per tenant; the platform tenant_manager (tenant_id NULL) is exempt.
+  4. Rename code literals across rbac.ts / middleware.ts / sidebar.tsx / seed / tests. Widen
+     user-management: userManagementProcedure = tenant_manager + tenant_superadmin ONLY
+     (tenant_admin deliberately excluded); /users + /settings route + nav gate to those two.
+  5. Add succession procedures + tests: platform break-glass reassign (platformUser.updateRole —
+     reassigns a tenant's owner, audited L5, NOT_FOUND on a bad tenant) AND owner transfer
+     (promote another + demote self, mediated promote-then-demote inside ONE transaction so the
+     one-owner index is never violated mid-swap). Both directions covered by unit tests.
+  6. Seed the 3 canonical accounts per env — passwords ALWAYS from env (.env.{env}), never
+     hardcoded; values from the vault (Server-Setups/secrets/universal-login-credentials.enc.yaml).
+     tenant_manager = universal platform account (tenant_id null); tenant_superadmin + tenant_admin
+     attached to the primary tenant. Seed comment forbids a 2nd tenant_superadmin anywhere
+     (including the SEED_DEV_ACCOUNTS block). Apply to the DEV DB.
+  7. Full gate + Visual QA on DEV. Back-port the decision to docs/PRODUCT.md (Roles & Permissions)
+     + docs/DECISIONS_LOG.md. LOCAL only.
+  8. Promotion (each a separate owner word, never auto):
+     - STAGING: ship image → migration runs (renames enum on staging) → apply creds → validate via
+       the staging data-first gate (~/.claude/rules/staging-refresh-gate.md).
+     - PROD: promote the verified image → migration → apply creds → health-verify. Back up first.
+     - DEMO: promote → migration → apply creds (owner account; no tenant_admin) → NEVER reseed.
+
+VERIFICATION:
+  - Every pre-existing user kept its (renamed) role (spot-check counts before/after).
+  - `\d+ users` shows the partial-unique index; a 2nd tenant_superadmin insert on a tenant is rejected.
+  - userManagementProcedure rejects tenant_admin; accepts tenant_manager + tenant_superadmin.
+  - Succession tests green (reassign + owner-transfer, both directions).
+  - PRODUCT.md Roles & Permissions + DECISIONS_LOG.md updated.
+  - No staging/prod/demo change without an explicit owner word.
+```
+
+---
+
+### Scenario 43 — Add Multi-Channel Event Delivery / Notifications
+
+**Trigger:** `docs/PRODUCT.md` declares a multi-channel notification / event-delivery need (email + push + SMS + webhook + in-app, event-driven side-effects across services, a notification center).
+
+**Read first:** `.ai_prompt/notifications.md` (deliverable #30 — the full pattern + FOSS tier ladder).
+
+**Procedure (dev-first, LOCAL-only, HARD HOLD):**
+1. Confirm the need + channels in PRODUCT.md; record the channel list + any provider/SLA decision in `docs/DECISIONS_LOG.md` (SMS provider + real-time-in-app are owner `[WHAT]` calls).
+2. **Tier 1 by default** — Valkey Streams (durable log) + BullMQ (processing/routing/retry/DLQ/rate-limit). Do NOT stand up Kafka/NATS unless the documented graduation threshold is met.
+3. Define events as **Zod contracts** (schema registry) with `schema_version`; stamp `{event_id, tenant_id, type, schema_version, actor, ts, correlation_id}` at emit; idempotency at ingestion.
+4. Build the pipeline: ingestion (`emitEvent()` + tenant-scoped auth + validate) → Valkey Stream → BullMQ processor (route by event × tenant × preferences, dedup, retry, DLQ) → per-channel delivery queues (adapter + per-provider rate-limit) → L5 AuditLog + Telegram alert on DLQ growth.
+5. **Enforce the 6 additions** — schema/versioning, tenant isolation (never cross-tenant), preference center, idempotency-at-ingestion, per-provider rate limits, PII routing (`privacy.md`).
+6. **Phased:** MVP (email + in-app + DLQ + audit) → expand channels + preferences → (only if needed) graduate Valkey → NATS JetStream at the documented threshold.
+7. DEV gate: schema-validated, tenant-isolated, idempotent, DLQ + replay verified on real data. Staging/prod/demo promotion each require the owner's explicit word (deploy discipline).
+
+---
+
 ### File Ownership Reference
 
 ```

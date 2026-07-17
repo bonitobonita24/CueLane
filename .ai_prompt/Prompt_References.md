@@ -1970,7 +1970,7 @@ and line numbers.
 ```
 Attach `Security_Checklist.md` + relevant code files.
 
-**What happens:** Agent runs all 135 items across 20 sections (Authentication, RBAC, Multi-tenant isolation L1–L6, Input validation, Database safety, File uploads, Queue/cache, Production errors, Security headers, Webhooks, Secrets, Production defaults, Phase 5 baseline, Compliance & Data Privacy, AI/LLM/MCP Security, API Authorization & Injection Family, Auth-Token/OAuth, Command/Code-Execution, Cloud-Credential, Mobile-conditional). Fix all FAILs before merging or deploying.
+**What happens:** Agent runs all 147 items across 21 sections (Authentication, RBAC, Multi-tenant isolation L1–L6, Input validation, Database safety, File uploads, Queue/cache, Production errors, Security headers, Webhooks, Secrets, Production defaults, Phase 5 baseline, Compliance & Data Privacy, AI/LLM/MCP Security, API Authorization & Injection Family, Auth-Token/OAuth, Command/Code-Execution, Cloud-Credential, Mobile-conditional, Tenant RBAC & Custom Roles). Fix all FAILs before merging or deploying.
 
 ---
 

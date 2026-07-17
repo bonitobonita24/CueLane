@@ -11,7 +11,7 @@
 > **How to use:** Copy this file into your project root. After code generation, `grep` or
 > manually inspect each item. Mark PASS / FAIL / N/A. Fix all FAILs before squash-merge.
 >
-> **Total: 135 verification items across 20 sections.**
+> **Total: 147 verification items across 21 sections.**
 
 ---
 
@@ -490,6 +490,9 @@ Skip only when the app has no AI/LLM/agent/MCP surface. Maps to OWASP LLM Top 10
         VERIFY: tool definitions pinned + rug-pull detection; raw tool/prompt/resource descriptions
                 inspected for hidden instructions (tool poisoning)
         VERIFY: URL-fetching MCP tools pass the SSRF block (allowlist + blocked private ranges)
+        VERIFY: the SSRF block explicitly denies the cloud-metadata endpoints (169.254.169.254,
+                metadata.google.internal, fd00:ec2::254) — an agent/tool fetch that reaches them is
+                cloud-credential theft (harvest 2026-07-16: PentesterFlow/agent AUDIT.md)
 
 □ 15.5  RAG corpus provenance + tenant-scoped retrieval
         → security.md § AI/LLM/MCP item 5, 7  (OWASP LLM01/LLM03)
@@ -507,6 +510,10 @@ Skip only when the app has no AI/LLM/agent/MCP surface. Maps to OWASP LLM Top 10
         VERIFY: no API keys, tenant secrets, other users' data, or full system prompt placed where the
                 model can echo them; PII redacted from inputs that don't need it
         VERIFY: LLM endpoints rate-limited + cost-capped (treated as public endpoint per L4 tiers)
+        VERIFY: agent persistence paths — logs, checkpoints, session memory, learning/compaction
+                snapshots — redact secrets/bearer tokens BEFORE write, not only before user display
+                (a secret written to a log or snapshot is already leaked; harvest 2026-07-16:
+                PentesterFlow/agent src/redact credential-redaction layer)
 ```
 
 ---
@@ -685,10 +692,84 @@ Run only when PRODUCT.md §9 declares native mobile (Expo). Skip entirely for we
 
 ---
 
+## SECTION 21 — TENANT RBAC & CUSTOM ROLES (V32.25 — Rule 34)
+
+Run for every multi-tenant app (the default multi-tenancy strategy). Verifies the 3-tier backbone,
+one-owner-per-tenant enforcement, matrix-driven custom roles, and the guardrails.
+→ security.md § L3 — TENANT RBAC STANDARD + `.ai_prompt/rbac.md`.
+
+```
+□ 21.1  One-owner-per-tenant enforced at the DB layer by a PARTIAL unique index
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: `one_tenant_superadmin_per_tenant` exists as
+                unique(tenant_id) WHERE role='tenant_superadmin' AND tenant_id IS NOT NULL —
+                inserting a 2nd tenant_superadmin for the same tenant is rejected; platform
+                tenant_manager rows (tenant_id=NULL) are unaffected
+
+□ 21.2  Role-enum renames are data-preserving (ALTER TYPE … RENAME VALUE), never DROP/CREATE
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: the RBAC migration renames enum values in place; no existing user lost their
+                (renamed) role; there is no DROP TYPE / CREATE TYPE on the role enum
+
+□ 21.3  The 3 fixed system tiers exist with correct semantics
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: tenant_manager (platform, tenant_id=NULL), tenant_superadmin (tenant owner),
+                tenant_admin (below owner) are present; app domain roles sit below tenant_admin
+
+□ 21.4  Deny-by-default matrix enforcement at tRPC procedures
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: privileged procedures resolve permission via hasPermission(role, feature, action)
+                (matrixProcedure factory) and DENY when no matching grant exists — not allow-by-default
+
+□ 21.5  Deny-by-default matrix enforcement at route middleware
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: protected route prefixes (e.g. /users, /settings, feature routes) deny by default
+                and admit only roles the matrix grants; an unlisted role is blocked
+
+□ 21.6  Sidebar / nav visibility is filtered by the matrix `view` permission
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: menu items render only when the current role has `view` on that feature; hiding a nav
+                item is UX only — the tRPC + middleware checks (21.4/21.5) are the real gate
+
+□ 21.7  A custom role can NEVER escalate past the tenant_admin ceiling
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: the role-builder rejects (or the resolver ignores) any custom-role grant that would
+                exceed tenant_admin capabilities; custom roles are strictly ≤ tenant_admin
+
+□ 21.8  Billing + User-Management are exclusive to tenant_superadmin
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: neither tenant_admin nor any custom role can be granted Billing or User-Management;
+                these capabilities resolve TRUE only for tenant_superadmin (and platform tenant_manager)
+
+□ 21.9  Only tenant_superadmin (+ platform tenant_manager) can create/edit/assign custom roles
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: the role-builder + role-assignment endpoints authorize to tenant_superadmin /
+                tenant_manager only; tenant_admin and below cannot mint or assign roles
+
+□ 21.10 Succession is authorized AND audited, both directions
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: break-glass reassign (platform tenant_manager) + owner-transfer (promote-then-demote)
+                are authz-gated, write an L5 AuditLog entry, and never violate the one-owner index
+                mid-transfer; reassigning to a non-existent tenant is rejected
+
+□ 21.11 Roles are ALWAYS server-derived, never trusted from the client
+        → security.md § L3 — TENANT RBAC STANDARD (inherits AGENT PROHIBITION #1)
+        VERIFY: role/permission is read from the server session, never from a client-sent field,
+                header, or form value
+
+□ 21.12 Per-env seeded credentials come from the vault; no secrets committed
+        → security.md § L3 — TENANT RBAC STANDARD
+        VERIFY: the 3-tier seed accounts read passwords from env (bcryptjs, never hardcoded/argv);
+                dev weak creds gate on SEED_DEV_ACCOUNTS=true; values live only in the Server-Setups
+                vault (universal-login-credentials.enc.yaml), never pasted into the repo
+```
+
+---
+
 ## HOW TO USE THIS CHECKLIST
 
 **After Phase 4 (initial scaffold):**
-Run ALL 20 sections. Every item applies. This is the most critical audit — the scaffold
+Run ALL 21 sections. Every item applies. This is the most critical audit — the scaffold
 defines the security posture for the entire project lifecycle.
 
 **After Phase 7 (Feature Update):**
@@ -704,6 +785,7 @@ Run only the sections relevant to the feature:
 - Added a shell-out, eval, or dynamic-code path? → Section 18
 - Added or changed AWS/R2/MinIO cloud storage credentials? → Section 19
 - Added native mobile (Expo) features? → Section 20
+- Added/changed roles, RBAC, user-management, custom-role builder, or role succession? → Sections 2, 21
 - Always run Section 13 (Phase 5 commands) regardless
 
 **Cross-AI audit loop:**

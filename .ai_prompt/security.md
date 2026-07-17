@@ -506,6 +506,52 @@ ISO/IEC 27701 organizing model. It maps L1–L6 ↔ ISO 27701 / ASVS and points 
 technical controls. Read privacy.md whenever a phase touches personal data or for any gov/LGU client.
 ```
 
+**L3 — TENANT RBAC STANDARD (Rule 34, V32.25) — the fleet-wide role backbone the L3 layer builds on:**
+```
+Full authority: `.ai_prompt/rbac.md` (Rule 34). Read it for ANY auth/RBAC/user-management/role-builder
+work, or when PRODUCT.md's Roles & Permissions section is populated. This EXTENDS L3 — it does not
+replace L1 tenant scoping, L5 AuditLog, or L6 Prisma guardrails, which stay always-active underneath.
+
+3 FIXED SYSTEM TIERS (same three top roles in every multi-tenant app):
+  tenant_manager     — PLATFORM operator, tenant_id = NULL (not bound to one tenant), break-glass
+                       cross-tenant owner reassignment (audited). Multiple allowed.
+  tenant_superadmin  — the TENANT OWNER. EXACTLY ONE per tenant (DB-enforced). SOLE holder of
+                       Billing + User-Management for its tenant.
+  tenant_admin       — top in-tenant admin BELOW the owner; broad admin but NEVER Billing/User-Mgmt.
+                       This is the CEILING every custom role must stay at or below.
+  App domain roles keep their own names BELOW tenant_admin (never force-renamed) and map onto the
+  Supervisor / Operator / Contributor / Viewer capability presets.
+
+PROVEN MECHANICS — prescribed, do NOT invent divergent DDL:
+  • Rename role enums with `ALTER TYPE … RENAME VALUE` (data-preserving) — NEVER DROP/CREATE
+    (DROP/CREATE wipes every existing user's role).
+  • Enforce one owner per tenant with a PARTIAL unique index (not a plain unique constraint):
+      CREATE UNIQUE INDEX one_tenant_superadmin_per_tenant ON users (tenant_id)
+        WHERE role = 'tenant_superadmin' AND tenant_id IS NOT NULL;
+    The WHERE clause is load-bearing — it leaves platform tenant_manager rows (tenant_id=NULL)
+    unconstrained so multiple platform managers remain allowed.
+  • Succession is MANDATORY, both directions, and ships with tests: (1) platform break-glass reassign
+    (audited); (2) mediated owner-transfer (promote-then-demote / transactional swap so the
+    partial-unique index is never violated mid-transfer).
+
+MATRIX-DRIVEN ENFORCEMENT for tenant_admin-and-below (the 3 top tiers stay fixed system roles):
+  Custom roles are tenant-scoped and built from a feature registry × a `role_permissions` STRICT-CRUD
+  matrix (view / write=create-only / update=edit-only / delete as SEPARATE columns). A single
+  `hasPermission(role, feature, action)` resolver enforces the matrix IDENTICALLY at THREE surfaces —
+  tRPC procedures (a matrixProcedure factory), route middleware (deny-by-default), and sidebar nav
+  (menu filtered by `view`). Roles are ALWAYS server-derived, NEVER client-trusted (AGENT PROHIBITION #1).
+
+GUARDRAILS (never violated):
+  • Custom roles are tenant-scoped and capped at ≤ tenant_admin — a custom role can NEVER exceed the
+    in-tenant admin ceiling.
+  • Custom roles are NEVER granted Billing or User-Management (exclusive to tenant_superadmin).
+  • Only tenant_superadmin (and platform tenant_manager) may create, edit, or assign custom roles.
+  • Per-env seeded default accounts come from the Server-Setups vault
+    (universal-login-credentials.enc.yaml — nested role×env; values vault-only; passwords from env via
+    bcryptjs, never hardcoded/argv; dev creds gated on SEED_DEV_ACCOUNTS). Reference the vault; never
+    paste values into a repo.
+```
+
 **AI / LLM / MCP SECURITY — enforce on any feature that calls an LLM, exposes a tool, or runs an agent (NEW V32.18):**
 ```
 Source: harvested from the curated Anthropic-Cybersecurity-Skills bundle
@@ -645,7 +691,7 @@ PRIORITY  SOURCE                  ENFORCED BY
 ────────  ──────────────────────  ───────────────────────────────────
 1         Safety constraints      All agents — never expose credentials,
                                   never delete without confirm, never harm data
-2         CLAUDE.md rules         This file — all 33 rules
+2         CLAUDE.md rules         This file — all 34 rules
 3         Active phase rules      Numbered steps of the current phase
 4         docs/PRODUCT.md         Feature intent — what to build
 5         docs/DECISIONS_LOG.md   Locked decisions — never re-decide
