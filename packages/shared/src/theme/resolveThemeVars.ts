@@ -27,7 +27,7 @@ export function resolveThemeVars(setting: unknown): ThemeVars {
   //    because it has a `custom` key) — a hand-edited or pre-schema DB row could carry a
   //    malformed/incomplete custom object, which must fall back rather than inject bad CSS.
   if (setting != null && typeof setting === 'object' && 'custom' in setting) {
-    const parsed = customThemeSchema.safeParse((setting as { custom: unknown }).custom);
+    const parsed = customThemeSchema.safeParse(setting.custom);
     if (parsed.success) return parsed.data;
   }
 

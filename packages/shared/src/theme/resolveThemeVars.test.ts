@@ -41,8 +41,8 @@ describe('resolveThemeVars', () => {
   });
 
   it('falls back to the default preset for an unknown/garbage string', () => {
-    // @ts-expect-error — deliberately passing a value outside ThemeSetting to prove the runtime
-    // guard holds even when Prisma's untyped Json column hands back something unexpected.
+    // NOTE: the signature is `unknown` by design (defensive parse of Prisma's untyped Json
+    // column) — this asserts the runtime guard falls back for an unknown/retired preset id.
     const vars = resolveThemeVars('some-old-value-that-no-longer-exists');
     const fallback = THEME_PRESETS[0];
     expect(vars.primary).toBe(fallback.vars.primary);
@@ -52,10 +52,10 @@ describe('resolveThemeVars', () => {
     const fallback = THEME_PRESETS[0];
     expect(resolveThemeVars(undefined).primary).toBe(fallback.vars.primary);
     expect(resolveThemeVars(null).primary).toBe(fallback.vars.primary);
-    // @ts-expect-error — old `{ preset: 'indigo' }` shape (pre-decision-2, docs/DECISIONS_LOG.md
-    // 2026-07-08) is neither a string nor `{ custom }` — must not throw, must fall back.
+    // NOTE: old `{ preset: 'indigo' }` shape (pre-decision-2, docs/DECISIONS_LOG.md 2026-07-08)
+    // is neither a string nor `{ custom }` — must not throw, must fall back.
     expect(resolveThemeVars({ preset: 'indigo' }).primary).toBe(fallback.vars.primary);
-    // @ts-expect-error — a `{ custom }` object missing/garbage keys must not throw.
+    // NOTE: a `{ custom }` object with missing/garbage keys must not throw.
     expect(resolveThemeVars({ custom: { primary: 123 } }).primary).toBe(fallback.vars.primary);
   });
 });
