@@ -4,7 +4,28 @@ _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
 PHASE:        **Phase 7 COMPLETE + Phase 8 sweep DONE. v0.1.0 tagged. Build genuinely complete; hardening scan clean; only deferred future-scope + 1 owner [WHAT] (D2) remain.**
-CURRENT:      Resume session 2026-07-19b (Full Auto). ✅ DONE THIS SESSION (2026-07-19b):
+CURRENT:      Resume session 2026-07-19c (Full Auto). ✅ DONE THIS SESSION (2026-07-19c):
+              **Lint gate made GENUINELY green (STATE's "lint 7/8" was a turbo-cache false read).**
+              A `pnpm -w lint --force` (cache OFF) surfaced the true state: `@cuelane/shared` had 4
+              errors AND `@cuelane/ui` had 42 (ALL in CLI-vendored shadcn primitives) that turbo's warm
+              cache was masking — the DEFERRED #1 "shared lint parse error" was only the tip. Fixed at
+              root, matching the repo's own passing conventions: (1) `packages/shared/tsconfig.json`
+              stopped excluding `src/**/*.test.ts` (ESLint projectService couldn't find test files;
+              storage/db never exclude them) → 3 parse errors gone + test files now type-checked;
+              (2) removed an unnecessary type-assertion in `resolveThemeVars.ts`; (3) converted 3 dead
+              `@ts-expect-error` (signature is `unknown` by design) to NOTE comments in
+              `resolveThemeVars.test.ts`; (4) scoped `eslint.config.mjs` override for vendored shadcn
+              globs (`components/ui/**` + `hooks/use-mobile.tsx`) turning OFF only the shadcn/recharts-
+              clashing rules (strict-boolean-expressions, no-unnecessary-type-assertion, no-unsafe-*,
+              restrict-template-expressions) — vendored code not hand-edited, no global relaxation.
+              **Verified cache-OFF against the real dev stack: lint 8/8 · typecheck 8/8 · build 8/8 ·
+              test 258/258 (shared 32 · storage 15 · db 5 · web 206). Zero regression.** Commit b8fb256.
+              DEFERRED #1 now RESOLVED (superseded by this fix). 2 global LESSONS logged:
+              `turbo.cache.masks-failing-lint-gate-false-green` (verify gates with cache OFF for any
+              go/no-go claim) + `eslint.shadcn.vendored-primitives-strict-rule-friction`. **125 commits
+              ahead of origin, 0 pushed (HARD HOLD).**
+              ── prior this-day session (2026-07-19b) ──
+              ✅ DONE THIS SESSION (2026-07-19b):
               **Attack-informed hardening scan (STATE NEXT item (a)) — DONE, CLEAN.** Ran semgrep
               (via uvx, `--metrics=off` so code never left the machine) with 6 security packs
               (security-audit · owasp-top-ten · nextjs · typescript · javascript · secrets) over
@@ -131,10 +152,10 @@ NEXT:         Phase 7 Wave 7.6 — Admin Core CRUD. services / windows / users (
               gap hid the L6 auth bug + the employee-login-filter bug). For any Prisma access in a server
               component / non-staff resolver, wrap tenant-scoped reads in withTenantContext with an ASYNC callback.
 DEFERRED (task-boundary fast-follows, non-blocking):
-              1. Pre-existing @cuelane/shared lint failure (packages/shared schemas.smoke.test.ts, ESLint
-                 TS-project-service parse error, from commit 7910825 BEFORE Wave 7.2). `pnpm -w lint` = 7/8.
-                 Does not block dev/typecheck/tests (the smoke suite itself PASSES as a test — this is the
-                 LINT parse step only). Fix at a task boundary.
+              1. [RESOLVED 2026-07-19c, commit b8fb256] @cuelane/shared lint parse error (+ 42 cache-masked
+                 @cuelane/ui errors) fixed at root; `pnpm -w lint --force` now 8/8 green. See CURRENT block.
+                 (Original note: ESLint TS-project-service parse error on the shared test files, "7/8" — that
+                 count was itself a turbo-cache false read; the real gate had more failures.)
               2. [RESOLVED in 7.4-T0 commit ec1575e] queue.integration.test.ts demo-tenant pollution — now
                  has afterAll teardown; demo re-verified clean (4 svc/3 tickets/3 windows).
               3. Ops note for Phase 6+: true zero-touch kiosk auto-print needs the kiosk browser launched
