@@ -5,6 +5,34 @@ Format: Rule 15 — Agent attribution required on every entry.
 
 ---
 
+## 2026-07-19 — Versioning baseline + sidebar-footer white-label (design-defaults Entry 3)
+
+- Agent:               CLAUDE_CODE (PM, resume session — Full Auto)
+- Branch:              main (local only — HARD HOLD, never pushed)
+- Session:             Post-Phase-8 polish — queued 2026-07-10 NEXT-SESSION TODO
+
+### apps/web/src/lib/app-version.ts (new)
+- Single source of the user-facing version string `APP_VERSION = '0.1.0'`; mirrors root
+  package.json "version" + the annotated git tag `v0.1.0` (git tags = fleet source of truth,
+  versioning-standard.md). Pre-1.0 = still in development / never shipped to prod.
+
+### apps/web/src/components/AppShell.tsx (edit)
+- Added a `SidebarFooter` block (design-defaults Entry 3): muted `v{APP_VERSION}` + a single
+  "Developed by Powerbyte IT Solutions" link → new tab to https://www.powerbyteitsolutions.com/
+  (`target="_blank" rel="noopener noreferrer"`). Whole label is the link. Hidden in the collapsed
+  icon-rail (`group-data-[collapsible=icon]:hidden`) so the Station console keeps max working area.
+- Imported `SidebarFooter` from the `@cuelane/ui/sidebar` subpath (never the barrel — RSC-safe).
+- Applies to all three app-shell surfaces (Tenant Admin, Super Admin, Employee Station rail).
+
+### Versioning
+- Cut the first annotated git tag `v0.1.0` on this commit (SemVer baseline; pre-1.0 dev build).
+
+### Verification
+- pnpm --filter @cuelane/web typecheck ✓ ; pnpm --filter @cuelane/web build ✓ (all RSC layouts
+  rendering AppShell compiled clean). Live screenshot verification follows on dev-stack rebuild.
+
+---
+
 ## 2026-07-08 — Phase 4 Part 7: infra + CI (Docker images, Compose stage/prod, GitHub Actions)
 
 - Agent:               CLAUDE_CODE (swarm S7, headless worker session)

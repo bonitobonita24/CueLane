@@ -37,6 +37,7 @@ import { cn } from '@cuelane/ui';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -49,6 +50,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@cuelane/ui/sidebar';
+import { APP_VERSION } from '../lib/app-version';
 
 export interface AppShellNavItem {
   /** Stable id — also the icon-map key. */
@@ -155,6 +157,22 @@ export function AppShell({
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+        {/* Sidebar-footer white-label (design-defaults Entry 3): muted app version + a single
+            "Developed by Powerbyte IT Solutions" link opening a new tab. Hidden in the collapsed
+            icon-rail (Station) so the focused console keeps max working area. */}
+        <SidebarFooter>
+          <div className="px-2 pb-1 text-xs text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
+            <p className="leading-tight">v{APP_VERSION}</p>
+            <a
+              href="https://www.powerbyteitsolutions.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="leading-tight transition-colors hover:text-sidebar-foreground hover:underline"
+            >
+              Developed by Powerbyte IT Solutions
+            </a>
+          </div>
+        </SidebarFooter>
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
