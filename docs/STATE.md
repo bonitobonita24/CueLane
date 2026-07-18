@@ -3,8 +3,34 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 (Feature Buildout) COMPLETE — waves 7.1–7.9 DONE + PM-verified. Now in Phase 8 completeness sweep + regression.**
-CURRENT:      Post-Phase-7 polish + Phase-8 sweep (2026-07-10). Phase 7 (waves 7.1–7.9) is COMPLETE; this session
+PHASE:        **Phase 7 COMPLETE + Phase 8 sweep DONE. v0.1.0 tagged. Build genuinely complete; only deferred future-scope + 2 owner [WHAT]s remain.**
+CURRENT:      Resume session 2026-07-19 (Full Auto). ✅ DONE THIS SESSION:
+              (1) **Versioning baseline** — cut first annotated git tag **v0.1.0** (SemVer, pre-1.0 dev build;
+                  package.json already mirrored 0.1.0). Git tags = fleet source of truth.
+              (2) **Sidebar-footer white-label** (design-defaults Entry 3) — new `apps/web/src/lib/app-version.ts`
+                  (`APP_VERSION='0.1.0'`) + `SidebarFooter` block in the shared `AppShell` (Tenant Admin / Super
+                  Admin / Employee Station): muted `v0.1.0` + single "Developed by Powerbyte IT Solutions" link
+                  (new tab, noopener noreferrer), hidden in the collapsed icon-rail so Station keeps max working
+                  area. RSC-safe (SidebarFooter from the `@cuelane/ui/sidebar` subpath, never the barrel).
+                  Verified: web typecheck 8/8 + full production build 8/8 (all RSC layouts compiled clean).
+                  Commit cb49b4f. Live footer screenshot PENDING next dev-stack-up (owner left the stack down).
+              (3) **Governance** — created `docs/PENDING_DECISIONS.md` (was missing) with 2 tracked owner [WHAT]s;
+                  corrected the stale "polling" memory (Employee Station is SSE, not polling — since Wave 7.2).
+              **OPEN [WHAT]s (owner decides — see docs/PENDING_DECISIONS.md):**
+                • **D1 — real-time transport:** PRODUCT.md says "WebSocket per tenant via Valkey pub/sub"; the build
+                  ships **SSE over that same Valkey pub/sub** (per-tenant channel isolation). Spec substance fully
+                  met; only the browser transport word differs. **PM rec: Option A — accept SSE + back-port the 4
+                  PRODUCT.md lines** (SSE is the better fit for unidirectional queue broadcast, already live+tested).
+                • **D2 — login identifier:** tenant login matches by `name`-as-username; no `User.email` column.
+                  Add email login only if the owner confirms it's a real requirement. PM rec: defer (low priority).
+              **Un-gated BUILD queue is EMPTY** — IMPLEMENTATION_MAP is complete; remaining ⏭ items (native mobile,
+              Xendit payments, async report export) are deliberately deferred future-scope, not gaps.
+              **116 commits ahead of origin, 0 pushed (HARD HOLD — local dev only).**
+              NEXT: owner answers D1/D2 → back-port to PRODUCT.md + DECISIONS_LOG, then execute if D1=B. Otherwise
+              the build is genuinely complete; any further work is new PRODUCT.md scope. Phase-6 deploy prep stays
+              OWNER-GATED (Docker Hub / SMTP / Xendit / Turnstile creds).
+              ── prior session ──
+PREV_SESSION: Post-Phase-7 polish + Phase-8 sweep (2026-07-10). Phase 7 (waves 7.1–7.9) is COMPLETE; that session
               added four things on top:
               (1) **Phase-8 completeness sweep DONE** — 031f0af docs(state) + 1516d78 docs(impl-map). Gates green
                   (typecheck 8/8, test 252/252, build 8/8); data canonical (demo 9 / clinic 6, 2 tenants, system_ads 1);
