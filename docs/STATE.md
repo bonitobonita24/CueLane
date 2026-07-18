@@ -13,7 +13,9 @@ CURRENT:      Resume session 2026-07-19 (Full Auto). ✅ DONE THIS SESSION:
                   (new tab, noopener noreferrer), hidden in the collapsed icon-rail so Station keeps max working
                   area. RSC-safe (SidebarFooter from the `@cuelane/ui/sidebar` subpath, never the barrel).
                   Verified: web typecheck 8/8 + full production build 8/8 (all RSC layouts compiled clean).
-                  Commit cb49b4f. Live footer screenshot PENDING next dev-stack-up (owner left the stack down).
+                  Commit cb49b4f. ✅ Footer LIVE-VERIFIED (Milestone 2) — demo admin shell renders v0.1.0 +
+                  the Powerbyte link (target=_blank rel=noopener noreferrer, correct href, icon-rail hide class);
+                  screenshot screenshots/v0.1.0-footer-admin.png.
               (3) **Governance** — created `docs/PENDING_DECISIONS.md` (was missing) with 2 tracked owner [WHAT]s;
                   corrected the stale "polling" memory (Employee Station is SSE, not polling — since Wave 7.2).
               **[WHAT] decisions:**
@@ -26,9 +28,16 @@ CURRENT:      Resume session 2026-07-19 (Full Auto). ✅ DONE THIS SESSION:
               **Un-gated BUILD queue is EMPTY** — IMPLEMENTATION_MAP is complete; remaining ⏭ items (native mobile,
               Xendit payments, async report export) are deliberately deferred future-scope, not gaps.
               **116 commits ahead of origin, 0 pushed (HARD HOLD — local dev only).**
-              NEXT: owner answers D1/D2 → back-port to PRODUCT.md + DECISIONS_LOG, then execute if D1=B. Otherwise
-              the build is genuinely complete; any further work is new PRODUCT.md scope. Phase-6 deploy prep stays
-              OWNER-GATED (Docker Hub / SMTP / Xendit / Turnstile creds).
+              **Milestone 2 (verification sweep, 2026-07-19) DONE:** dev stack UP + healthy (app :41716);
+              **full 258-test regression GREEN vs real DB/Valkey** (storage 15 · shared 32 · db 5 · web 206 — footer
+              change = zero regression); footer live-verified; `lint-design.sh` PASS (no slop); `spec-gap-check.sh`
+              output is known false-positive noise (prose words mis-read as entities). New global LESSON logged:
+              `monorepo.test-env.compose-var-rename-not-in-host-test-env` (host tests need MINIO_*←STORAGE_* export;
+              app compose maps it but host `pnpm -w test` doesn't — plus naive `source .env.dev` breaks on the
+              `SMTP_FROM_NAME=CueLane Dev` space value). Dev stack LEFT UP for the next session.
+              NEXT: (a) optional attack-informed hardening scan (semgrep) — standing discipline, un-gated; (b) owner
+              may pick up D2 (email login, deferred). D1 resolved. Build is otherwise complete; further features =
+              new PRODUCT.md scope. Phase-6 deploy prep stays OWNER-GATED (Docker Hub / SMTP / Xendit / Turnstile creds).
               ── prior session ──
 PREV_SESSION: Post-Phase-7 polish + Phase-8 sweep (2026-07-10). Phase 7 (waves 7.1–7.9) is COMPLETE; that session
               added four things on top:
