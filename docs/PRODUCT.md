@@ -55,7 +55,7 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 - Scrolling ticker: Custom text from Admin, infinite loop. Free tier appends "Powered by Powerbyte IT Solutions"
 - 16:9 aspect ratio lock: `aspect-ratio: 16/9` with `max-height: 100vh; max-width: 100vw`, black letterbox centering
 - Fluid sizing: all text uses clamp(), spacing uses vmin/vw/%, readable from 3+ meters
-- Real-time sync: WebSocket connection per tenant via Valkey pub/sub — display updates immediately on ticket call, complete, skip, transfer
+- Real-time sync: SSE (Server-Sent Events) per tenant over Valkey pub/sub — display updates immediately on ticket call, complete, skip, transfer
 - Branding: Free = "CueLane — Powered by Powerbyte IT Solutions"; Premium = company name + custom tagline
 
 ### Customer Kiosk (🎫)
@@ -65,7 +65,7 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 - Ticket issuance: Regular tickets: {serviceNumber}-{3digitSeq} (e.g. 1-003). Priority: P-{3digitSeq} (e.g. P-001). Separate numbering sequences.
 - Auto-print: Thermal receipt prints on confirmation via hidden iframe with @page sizing
 - Auto-reset: Returns to regular transaction grid after 5 seconds
-- Real-time sync: WebSocket connection per tenant — waiting counts and avg wait times update live
+- Real-time sync: SSE (Server-Sent Events) per tenant over Valkey pub/sub — waiting counts and avg wait times update live
 - Branding: Free shows CueLane + Powerbyte subtitle; Premium shows company name
 
 ### Employee Station (👤 — Desktop)
@@ -77,7 +77,7 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 - Stats sidebar: Done / Skip / No Show / Transfer counters
 - Recent Activity log: Timestamped entries with status icons
 - Voice: Web Audio API 3-tone chime + SpeechSynthesis male voice (rate 0.78, pitch 0.85), reads ticket number as words
-- Real-time sync: WebSocket connection per tenant — queue state reflects all employee actions instantly across all devices
+- Real-time sync: SSE (Server-Sent Events) per tenant over Valkey pub/sub — queue state reflects all employee actions instantly across all devices
 
 ### Mobile Employee (📱 — Premium only)
 - Number pad PIN login: 3×4 grid with large tap targets, bullet-dot masking, backspace key
@@ -87,7 +87,7 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 - Fixed bottom action bar: Call Next / ✅ Done / ⏭ Skip / 🔁 Recall / ↗ Transfer
 - Full-screen views: Complete (3-button stack), Transfer (with Return After Done toggle + transaction matching), Skipped Tickets (tap to recall)
 - Mobile optimizations: WebkitTapHighlightColor transparent, 48px+ touch targets, backdrop-blur bottom bar, 100px bottom padding
-- Real-time sync: WebSocket connection — same state as desktop Employee Station
+- Real-time sync: SSE (Server-Sent Events) over Valkey pub/sub — same state as desktop Employee Station
 
 ### Admin Panel (⚙️)
 - PIN-protected access (default: 0000) + Cloudflare Turnstile
@@ -185,7 +185,7 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 - **Web Audio API**: Browser-native — generates notification bell chimes (3-tone sine wave, no external files)
 - **SpeechSynthesis API**: Browser-native — male English voice announcements at rate 0.78, pitch 0.85
 - **YouTube Embed API**: iframe embed for Big Display entertainment (no API key required)
-- **Valkey pub/sub**: Real-time WebSocket state sync across all connected devices per tenant (Big Display, Kiosk, Employee Stations, Mobile). All ticket state changes propagate instantly via tenant-scoped channels.
+- **Valkey pub/sub**: Real-time state sync (SSE / Server-Sent Events) across all connected devices per tenant (Big Display, Kiosk, Employee Stations, Mobile). All ticket state changes propagate instantly via tenant-scoped channels.
 - **Xendit** (production): Payment gateway for Premium tier subscription billing. BSP-regulated, Philippines-first. Supports cards (Visa/Mastercard/JCB), e-wallets (GCash, Maya, GrabPay), online banking (BDO, BPI, Metrobank, UnionBank), over-the-counter (7-Eleven, Cebuana), QR Ph. Subscription billing uses Xendit Subscriptions API: create recurring plan → redirect customer to Xendit-hosted payment method linking page → receive `recurring.plan.activated` webhook → Xendit auto-deducts monthly → receive `recurring.cycle.succeeded` / `recurring.cycle.failed` / `recurring.plan.inactivated` webhooks. No card data stored in CueLane — PCI compliance handled entirely by Xendit. Auth: Basic Auth with secret API key. Node.js SDK: `xendit-node`. Docs: https://docs.xendit.co/apidocs
 - **SMTP** (production): transactional emails — welcome, tier change confirmation, payment failure warning, password reset link, DLQ failure alert. Generic SMTP relay (e.g. SendGrid, AWS SES, Postmark, or self-hosted MTA). Staging and production share one SMTP account. Dev uses local MailHog — no real SMTP credentials required.
 - **Cloudflare Turnstile**: Human verification on all authentication forms. Free tier from Cloudflare. Widget type: Managed. Applied to: tenant signup, tenant admin login, employee PIN login (desktop + mobile), admin PIN login, super-admin login. NOT applied to: Customer Kiosk (shared touchscreen), Big Display (view-only). Docs: https://developers.cloudflare.com/turnstile/
@@ -209,12 +209,12 @@ Retry strategy:      Exponential backoff, 3 retries max
 DLQ:                 After 3 failures, move to dead-letter queue. Log-only — no auto-retry from DLQ. Admin notified via email.
 
 ## Realtime Features
-Protocol:            WebSocket via Valkey pub/sub (BullMQ not used for real-time — Valkey pub/sub handles it directly)
+Protocol:            SSE (Server-Sent Events) over Valkey pub/sub (BullMQ not used for real-time — Valkey pub/sub handles it directly). Server→client push via SSE; clients trigger events through tRPC mutations that publish to the tenant Valkey channel.
 Channel scope:       Per-tenant channels — tenant:{tenantId}:queue. No cross-tenant data on any channel.
 Subscribers:         Big Display, Customer Kiosk, Employee Station (desktop), Mobile Employee — all subscribe on connect
 Publishers:          Employee Station and Mobile Employee publish on: Call Next, Complete, Skip, Recall, Transfer, No Show
 Events propagated:   ticket.called, ticket.completed, ticket.skipped, ticket.noshow, ticket.transferred, ticket.recalled
-Fallback:            No polling fallback — WebSocket required. If connection drops, client reconnects automatically with exponential backoff.
+Fallback:            No polling — SSE (EventSource) required. If the connection drops, the browser's EventSource reconnects automatically.
 
 ## Reporting & Dashboards
 KPIs:             Tickets Issued, Completed, Waiting Now, Serving Now, No Shows, Skipped, Transferred, Avg Wait Time
@@ -236,7 +236,7 @@ Docker tags:  GitHub Actions pushes :latest, :staging-latest, and :sha-{hash} on
 
 **Native mobile app:** None — web only. Mobile Employee module is a responsive web app accessed via phone browser on same domain.
 Platform:           Web (responsive) — no native iOS/Android app. No app store distribution.
-Offline-first:      No (requires real-time WebSocket connection to server for queue state sync)
+Offline-first:      No (requires a real-time SSE connection to the server for queue state sync)
 Push notifications: No (not in v1)
 Native features:    None — no camera, GPS, biometrics, or device APIs used. Pure browser-based.
 Deep linking:       No — accessed via standard URL (/{tenant}/mobile). No custom URL schemes or universal links.
@@ -271,7 +271,7 @@ Deep linking:       No — accessed via standard URL (/{tenant}/mobile). No cust
 - **Tailwind breakpoint convention:** `sm:` (640px), `md:` (768px), `lg:` (1024px), `xl:` (1280px). Mobile First pages use base + `md:` enhancements. Mobile Ready pages use base + `max-md:` fallbacks or conditional rendering.
 
 ## Non-functional Requirements
-Performance:    <200ms API response at 100 concurrent users per tenant. Voice/audio within 100ms of user gesture. WebSocket event propagation <500ms end-to-end.
+Performance:    <200ms API response at 100 concurrent users per tenant. Voice/audio within 100ms of user gesture. SSE event propagation <500ms end-to-end.
 Uptime:         99.5% SLA for production.
 Data retention: Ticket records kept 1 year. Configurable archival per tenant.
 Compliance:     Privacy by design — no customer PII collected at kiosk. Employee data (name + PIN) scoped to tenant. DICT RA 10175 awareness (Philippines). No GDPR personal data from customers.
@@ -348,7 +348,7 @@ CREDENTIALS.md: generated by Phase 3 — master credentials list for all envs, s
 Security: HTTP headers + rate limiter + DOMPurify sanitizer scaffolded by Phase 4 — always-on defaults
 Spec stress-test: Phase 2.7 runs automatically before Phase 3 — catches PRODUCT.md gaps early
 Production services: Next.js app + PostgreSQL + Valkey (pub/sub + BullMQ) + MinIO (dev) / S3 (prod) for tenant media
-Real-time sync: WebSocket connections per tenant via Valkey pub/sub for multi-device state sync (Big Display, Kiosks, Employee Stations, Mobile reflect same queue instantly)
+Real-time sync: SSE (Server-Sent Events) per tenant over Valkey pub/sub for multi-device state sync (Big Display, Kiosks, Employee Stations, Mobile reflect same queue instantly)
 Komodo deployment:
   Staging: auto_update: true — Komodo polls Docker Hub for new :staging-latest digests. Auto-redeploys on change.
   Production: auto_update: false — human clicks Deploy in Komodo UI after verifying staging.
@@ -370,7 +370,7 @@ ORM / DB layer:            Prisma
 Auth provider:             Auth.js v5 (tenant admin: email/password; employee: PIN-based custom credentials within tenant scope; super-admin: email/password separate)
 Auth strategy:             authjs
 Primary database:          PostgreSQL
-Cache / queue:             Valkey + BullMQ (real-time pub/sub for multi-device WebSocket sync + background jobs: email sending, subscription webhooks, report generation)
+Cache / queue:             Valkey + BullMQ (real-time pub/sub for multi-device SSE sync + background jobs: email sending, subscription webhooks, report generation)
 File storage:              MinIO (dev) / S3 or R2 (prod) — tenant media uploads (logos, local videos, tenant ads) + system ads (global prefix)
 UI component library:      shadcn/ui + Tailwind CSS (locked — no alternatives)
 Chart library:             shadcn/ui Chart (Recharts) — Admin Dashboard: hourly traffic bar chart, completion/no-show rate progress bars, per-transaction breakdown progress bars
@@ -401,7 +401,7 @@ Theming approach:   shadcn/ui CSS variables (--primary, --secondary, etc.) — c
 - No annual billing plan (monthly only for v1)
 - No dark mode for admin/employee/kiosk interfaces (dark theme is Big Display only)
 - No queue priority rules beyond PWD/Senior/Pregnant (no VIP tiers, no paid priority)
-- No polling fallback for real-time — WebSocket required
+- No polling fallback for real-time — SSE (EventSource) with automatic reconnect
 - No PDF/CSV dashboard export in v1
 - No per-user data export or granular data download (v2 scope)
 - No self-service tenant data export (v2 scope — v1 supports tenant-level deletion only)

@@ -27,6 +27,11 @@ Format: Rule 15 — Agent attribution required on every entry.
 ### Versioning
 - Cut the first annotated git tag `v0.1.0` on this commit (SemVer baseline; pre-1.0 dev build).
 
+### docs/PRODUCT.md (edit — owner-authorized back-port, D1)
+- Reconciled 12 real-time "WebSocket" mentions → "SSE (Server-Sent Events) over Valkey pub/sub" to
+  match the shipped Wave-7.2 transport. Owner decision D1 = accept SSE. `spec-divergent: transport`
+  logged in DECISIONS_LOG (2026-07-19). No code change — SSE was already the built behavior.
+
 ### Verification
 - pnpm --filter @cuelane/web typecheck ✓ ; pnpm --filter @cuelane/web build ✓ (all RSC layouts
   rendering AppShell compiled clean). Live screenshot verification follows on dev-stack rebuild.

@@ -600,3 +600,32 @@ different tenant's slug in the chrome.
 **Reversible:** yes — remove the slug from the JWT return + revert middleware step 5 to the
 session-exists check; the tRPC/L6/RLS DB-layer guard (kept intact) continues to enforce isolation
 regardless.
+
+---
+
+## 2026-07-19 — Real-time transport is SSE (spec-divergent: transport) — accept, back-port PRODUCT.md
+
+**Decision:** The real-time queue-sync transport is **SSE (Server-Sent Events)**, not WebSocket.
+PRODUCT.md previously specified *"WebSocket connection per tenant via Valkey pub/sub"*; the built
+system (Wave 7.2) ships SSE over that **same Valkey pub/sub backbone** with strict per-tenant channel
+isolation. Owner decision (2026-07-19): **accept SSE and back-port the spec** — the 12 "WebSocket"
+mentions in PRODUCT.md were reconciled to "SSE (Server-Sent Events) over Valkey pub/sub" this session.
+Resolves `docs/PENDING_DECISIONS.md` D1.
+
+**Tag:** `spec-divergent: transport` — the implementation drove the spec (LIVING-SPEC / Flow-Back,
+Rule 1). The spec's substance (live per-tenant updates on call/complete/skip/transfer via Valkey
+pub/sub) was always met; only the browser-facing transport word changed.
+
+**Rationale:** Queue updates are unidirectional (server → client); clients trigger events via tRPC
+mutations that publish to the tenant Valkey channel, never over the socket. SSE fits this exactly —
+native `EventSource` auto-reconnect, no bidirectional/WS-upgrade overhead — and is already live and
+tested across Kiosk, Big Display, and Employee Station. Implementing true WebSocket would be real work
+with no functional gain for this use case.
+
+**Affected files:** `docs/PRODUCT.md` (12 transport lines reconciled WebSocket → SSE). No code change
+— the SSE implementation (`apps/web/src/app/api/tenants/[slug]/queue/stream/route.ts` +
+`apps/web/src/server/realtime/publisher.ts`) was already the shipped behavior.
+
+**Reversible:** yes (as a product decision) — if true WebSocket is later required, reopen D1 as a
+Feature Update and swap the browser transport (keep the Valkey pub/sub backbone). The Valkey channel
+layer is transport-agnostic.

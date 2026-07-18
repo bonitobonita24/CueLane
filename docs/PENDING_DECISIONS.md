@@ -7,7 +7,11 @@ un-gated work and re-surfaces these until answered. When answered, back-port to 
 
 ---
 
-## [ ] D1 — Real-time transport: PRODUCT.md says "WebSocket", the build ships "SSE" (over Valkey pub/sub)
+## [x] D1 — Real-time transport: PRODUCT.md said "WebSocket", the build ships "SSE" (over Valkey pub/sub) — RESOLVED 2026-07-19
+
+**RESOLVED (2026-07-19): Option A — accept SSE + back-port PRODUCT.md.** Owner decision. The 12
+"WebSocket" mentions in PRODUCT.md were reconciled to "SSE (Server-Sent Events) over Valkey pub/sub";
+logged in DECISIONS_LOG (`spec-divergent: transport`). No code change (SSE was already shipped).
 
 **Type:** `[WHAT]` — spec ↔ implementation divergence (Back-Port Candidate; Rule 1 LIVING-SPEC / Flow-Back).
 **Surfaced:** 2026-07-19 (corrects the stale "polling" note — the Employee Station/Display do NOT poll).

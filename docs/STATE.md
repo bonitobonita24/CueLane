@@ -16,13 +16,13 @@ CURRENT:      Resume session 2026-07-19 (Full Auto). ✅ DONE THIS SESSION:
                   Commit cb49b4f. Live footer screenshot PENDING next dev-stack-up (owner left the stack down).
               (3) **Governance** — created `docs/PENDING_DECISIONS.md` (was missing) with 2 tracked owner [WHAT]s;
                   corrected the stale "polling" memory (Employee Station is SSE, not polling — since Wave 7.2).
-              **OPEN [WHAT]s (owner decides — see docs/PENDING_DECISIONS.md):**
-                • **D1 — real-time transport:** PRODUCT.md says "WebSocket per tenant via Valkey pub/sub"; the build
-                  ships **SSE over that same Valkey pub/sub** (per-tenant channel isolation). Spec substance fully
-                  met; only the browser transport word differs. **PM rec: Option A — accept SSE + back-port the 4
-                  PRODUCT.md lines** (SSE is the better fit for unidirectional queue broadcast, already live+tested).
-                • **D2 — login identifier:** tenant login matches by `name`-as-username; no `User.email` column.
-                  Add email login only if the owner confirms it's a real requirement. PM rec: defer (low priority).
+              **[WHAT] decisions:**
+                • **D1 — real-time transport: RESOLVED 2026-07-19 (owner) = accept SSE + back-port.** PRODUCT.md's
+                  12 "WebSocket" mentions reconciled to "SSE over Valkey pub/sub"; DECISIONS_LOG logged
+                  `spec-divergent: transport`. No code change (SSE was already shipped in Wave 7.2).
+                • **D2 — login identifier: DEFERRED 2026-07-19 (owner) = keep `name`-as-username login** (no
+                  `User.email` column). Revisit only if email login becomes a confirmed requirement. Stays open in
+                  PENDING_DECISIONS as low-priority.
               **Un-gated BUILD queue is EMPTY** — IMPLEMENTATION_MAP is complete; remaining ⏭ items (native mobile,
               Xendit payments, async report export) are deliberately deferred future-scope, not gaps.
               **116 commits ahead of origin, 0 pushed (HARD HOLD — local dev only).**
