@@ -3,8 +3,21 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 COMPLETE + Phase 8 sweep DONE. v0.1.0 tagged. Build genuinely complete; only deferred future-scope + 2 owner [WHAT]s remain.**
-CURRENT:      Resume session 2026-07-19 (Full Auto). ✅ DONE THIS SESSION:
+PHASE:        **Phase 7 COMPLETE + Phase 8 sweep DONE. v0.1.0 tagged. Build genuinely complete; hardening scan clean; only deferred future-scope + 1 owner [WHAT] (D2) remain.**
+CURRENT:      Resume session 2026-07-19b (Full Auto). ✅ DONE THIS SESSION (2026-07-19b):
+              **Attack-informed hardening scan (STATE NEXT item (a)) — DONE, CLEAN.** Ran semgrep
+              (via uvx, `--metrics=off` so code never left the machine) with 6 security packs
+              (security-audit · owasp-top-ten · nextjs · typescript · javascript · secrets) over
+              apps/+packages/: **246 targets · 136 rules · 0 findings · 0 scan errors.** PM also
+              manually attack-reviewed the crown-jewel media upload route (session-authoritative
+              tenantId, Admin gate, rate-limit, tier caps, async withTenantContext) — no BOLA/BFLA
+              gap; corroborates prior hardening (cross-tenant page-guard, L6 tenant-guard,
+              suspension enforcement, anti-enumeration reset). No code change needed; nothing
+              generalizable to back-port to framework Security_Checklist. Evidence:
+              `test-artifacts/hardening-20260719/REPORT.md` + `semgrep-raw.json`. Standing discipline
+              `~/.claude/rules/attack-informed-hardening.md`. Item (a) now CLOSED.
+              ── prior this-day session (2026-07-19a) ──
+              ✅ DONE (2026-07-19a):
               (1) **Versioning baseline** — cut first annotated git tag **v0.1.0** (SemVer, pre-1.0 dev build;
                   package.json already mirrored 0.1.0). Git tags = fleet source of truth.
               (2) **Sidebar-footer white-label** (design-defaults Entry 3) — new `apps/web/src/lib/app-version.ts`
@@ -35,9 +48,11 @@ CURRENT:      Resume session 2026-07-19 (Full Auto). ✅ DONE THIS SESSION:
               `monorepo.test-env.compose-var-rename-not-in-host-test-env` (host tests need MINIO_*←STORAGE_* export;
               app compose maps it but host `pnpm -w test` doesn't — plus naive `source .env.dev` breaks on the
               `SMTP_FROM_NAME=CueLane Dev` space value). Dev stack LEFT UP for the next session.
-              NEXT: (a) optional attack-informed hardening scan (semgrep) — standing discipline, un-gated; (b) owner
-              may pick up D2 (email login, deferred). D1 resolved. Build is otherwise complete; further features =
-              new PRODUCT.md scope. Phase-6 deploy prep stays OWNER-GATED (Docker Hub / SMTP / Xendit / Turnstile creds).
+              NEXT: Un-gated queue is now EMPTY — item (a) hardening scan is CLOSED (clean). Only remaining
+              open item is **D2** (email-login schema decision) — an owner [WHAT], deferred/low-priority; the
+              loop re-surfaces it and holds (does NOT stop while a `[ ]` decision is open). D1 resolved. Build
+              is complete; further features = new PRODUCT.md scope. Phase-6 deploy prep stays OWNER-GATED
+              (Docker Hub / SMTP / Xendit / Turnstile creds) — HARD HOLD, local dev only.
               ── prior session ──
 PREV_SESSION: Post-Phase-7 polish + Phase-8 sweep (2026-07-10). Phase 7 (waves 7.1–7.9) is COMPLETE; that session
               added four things on top:
