@@ -4,7 +4,20 @@ _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
 PHASE:        **Phase 7 COMPLETE + Phase 8 sweep DONE. v0.1.0 tagged. Build genuinely complete; hardening scan clean; only deferred future-scope + 1 owner [WHAT] (D2) remain.**
-CURRENT:      Resume session 2026-07-19c (Full Auto). ✅ DONE THIS SESSION (2026-07-19c):
+CURRENT:      Resume session 2026-07-19d (Full Auto) — SHORT SESSION, owner requested save+handoff to rest the PC.
+              ✅ DONE THIS SESSION (2026-07-19d):
+              (1) **Resume verification** — read STATE + PENDING_DECISIONS; git ground-truth confirmed matches
+                  STATE exactly: branch `main`, **126 commits ahead of origin / 0 pushed** (HARD HOLD holding),
+                  working tree CLEAN, tag `v0.1.0` present, HEAD `68a7b3a`. No regression; gates were already
+                  cache-OFF-verified green last session (lint/typecheck/build 8/8, test 258/258) — not re-run
+                  (tree unchanged since b8fb256 + the STATE commit).
+              (2) **OWNER DECISION CAPTURED — RBAC 3-tier retrofit APPROVED.** Surfaced the two open owner
+                  [WHAT]s (D2 email-login + the offered Scenario-42 RBAC retrofit). Owner chose: **RUN the RBAC
+                  3-tier retrofit.** It becomes the NEXT session's PRIMARY BUILD TASK (see NEXT). Not started this
+                  session (owner asked to save+shut down before any code was written). D2 stays deferred/low-prio.
+              **➡ NEXT SESSION STARTS HERE: execute the Scenario-42 RBAC 3-tier retrofit, dev-first, HARD HOLD.**
+              ── prior this-day session (2026-07-19c) ──
+              Resume session 2026-07-19c (Full Auto). ✅ DONE THIS SESSION (2026-07-19c):
               **Lint gate made GENUINELY green (STATE's "lint 7/8" was a turbo-cache false read).**
               A `pnpm -w lint --force` (cache OFF) surfaced the true state: `@cuelane/shared` had 4
               errors AND `@cuelane/ui` had 42 (ALL in CLI-vendored shadcn primitives) that turbo's warm
@@ -142,12 +155,32 @@ LAST_DONE:    Phase 7 Wave 7.5 — Big Display (2026-07-08). Sonnet worker (died
               flow + transfer+Return-After-Done DB-verified per test-artifacts/phase7-station/NOTES.md +3 png.
               Prior waves: 7.3 Kiosk (b8797d9/0aaf118/cc2fca2), 7.2 SSE (07b792b/83c38a7/cc2dc13/d1ca600),
               7.1 Queue Engine (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a). 55 commits ahead, 0 pushed (HARD HOLD).
-NEXT:         Phase 7 Wave 7.6 — Admin Core CRUD. services / windows / users (+userServices) / tenant settings
-              (printer, theme) routers + UI; tier usage meters + limit enforcement (API + UI). Deps: 7.1 (done).
-              Verify: CRUD each entity; free-tier caps (10 users / 6 svc / 4 win) block AT limit; Service.number
-              auto-assigned. Bigger multi-file wave (≤~12 files / a few Sonnet tasks) — plan-first: PM+Architect
-              co-plan the router+UI+tier-gating decomposition before dispatch. Then 7.7 Dashboard/Media/Ads →
-              7.9 Landing/Signup. Phase 6 (deploy) gated on owner CREDENTIALS.md + explicit word (HARD HOLD).
+NEXT:         ⭐ PRIMARY (owner-approved 2026-07-19d): **RBAC 3-tier retrofit — Scenario 42, dev-first, HARD HOLD.**
+              CueLane is tenant-based but NOT yet on the fleet standard (current role enum is `Role` with
+              super_admin/admin/employee — NOT tenant_manager/tenant_superadmin/tenant_admin; verify exact
+              literals at packages/db/prisma/schema.prisma before touching). Follow the PROVEN reference:
+              MG `feat/tenant-rbac-3tier` + `.ai_prompt/scenarios.md` Scenario 42 + `.ai_prompt/rbac.md` (265 ln)
+              + global `~/.claude/rules/tenant-rbac-standard.md`. Target shape:
+                • 3 FIXED system tiers: `tenant_manager` (platform, tenant_id=NULL — already effectively the
+                  re-seeded super-admin `tenantadmin@powerbyteitsolutions.com`) / `tenant_superadmin` (tenant
+                  owner, EXACTLY ONE per tenant) / `tenant_admin` (below owner, custom-role ceiling, NEVER
+                  Billing/User-Mgmt). App domain roles (employee etc.) sit below.
+                • Enum migration MUST be data-preserving: `ALTER TYPE "Role" RENAME VALUE 'old' TO 'new'` — NEVER
+                  DROP/CREATE (loses every user's role). Normalize each tenant to ≤1 owner BEFORE adding the index.
+                • One-owner-per-tenant partial-unique index:
+                  `CREATE UNIQUE INDEX ... ON users (tenant_id) WHERE role='tenant_superadmin' AND tenant_id IS NOT NULL;`
+                • Two-way succession (platform break-glass reassign + in-tenant owner transfer) + tests.
+                • Tenant-scoped custom-role permission matrix (feature registry + role_permissions CRUD split +
+                  hasPermission resolver wired at tRPC + route middleware + sidebar nav + role-builder UI, shadcn only).
+              PLAN-FIRST: PM+Architect co-plan the enum-rename + index + succession + matrix decomposition into
+              tightly-scoped Sonnet tasks BEFORE dispatch (multi-file, security-critical — arm workers with
+              secure-code-guardian + context7 for Prisma migration syntax + LESSONS_GLOBAL grep). Constitution-Check
+              (Rule 34) + Analyze-Confirm gate apply. DEV-FIRST, LOCAL only — staging/prod/demo promotion each need
+              explicit owner word (staging=data-first gate; demo=migrate-never-reseed). Back-port to PRODUCT.md +
+              DECISIONS_LOG when done. Verify against the REAL dev stack (both tenants), never a self-report.
+              SECONDARY (deferred): D2 email-login schema decision (owner [WHAT], low-prio — see PENDING_DECISIONS).
+              Phase 6 deploy prep stays owner-gated (CREDENTIALS.md: Docker Hub / SMTP / Xendit / Turnstile).
+              ── superseded (historical) NEXT — Phase 7 Wave 7.6, long done ──
               REMINDER: every new feature's validation MUST exercise a TENANT path, not just super-admin (that
               gap hid the L6 auth bug + the employee-login-filter bug). For any Prisma access in a server
               component / non-staff resolver, wrap tenant-scoped reads in withTenantContext with an ASYNC callback.

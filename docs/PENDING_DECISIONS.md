@@ -52,3 +52,17 @@ credentials `authorize()` to match by email. If no → keep name-as-username and
 
 **PM recommendation:** low priority — the current name-as-username login works and is tested. Defer
 until the owner confirms email login is an actual product requirement for tenant users.
+
+---
+
+## [x] RBAC 3-tier retrofit — APPROVED 2026-07-19d (owner), now a QUEUED BUILD TASK (no longer a pending decision)
+
+**RESOLVED (2026-07-19d): owner said RUN it.** The offered Scenario-42 fleet-standard RBAC retrofit is
+**approved** and moves out of "pending decision" into the active build queue — it is now the **PRIMARY
+NEXT task** in `docs/STATE.md` NEXT (execute next session). Scope: `tenant_manager`/`tenant_superadmin`/
+`tenant_admin` 3-tier backbone + data-preserving `ALTER TYPE…RENAME VALUE` enum migration +
+one-owner-per-tenant partial-unique index + two-way succession + tenant-scoped custom-role permission
+matrix. **DEV-FIRST, HARD HOLD** — LOCAL commits only; staging/prod/demo promotion each need explicit
+owner word. Reference: MG `feat/tenant-rbac-3tier` · `.ai_prompt/scenarios.md` Scenario 42 ·
+`.ai_prompt/rbac.md` · `~/.claude/rules/tenant-rbac-standard.md`. Not started 2026-07-19d — owner
+requested session save + PC shutdown before any code was written.
