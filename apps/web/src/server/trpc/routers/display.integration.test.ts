@@ -25,7 +25,7 @@ function kioskCaller() {
 }
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 
@@ -46,7 +46,7 @@ describe('displayRouter.media integration (Wave 7.7d-T4, against seeded demo+cli
     demoTenantId = demoTenant.id;
     demoOriginalSettings = demoTenant.settings;
     const demoAdmin = await prismaRaw.user.findFirstOrThrow({
-      where: { tenantId: demoTenantId, name: 'Branch Admin', role: 'admin' },
+      where: { tenantId: demoTenantId, name: 'Branch Admin', role: 'tenant_superadmin' },
       select: { id: true },
     });
     demoAdminId = demoAdmin.id;

@@ -41,7 +41,7 @@ describe('media upload route — large real-file round trip (Wave 7.7d-T3)', () 
     expect(demoTenant.tier).toBe('premium'); // 800MB cap tenant — proves the wider cap accepts 60MB comfortably
     demoTenantId = demoTenant.id;
     const demoAdmin = await prismaRaw.user.findFirstOrThrow({
-      where: { tenantId: demoTenantId, name: 'Branch Admin', role: 'admin' },
+      where: { tenantId: demoTenantId, name: 'Branch Admin', role: 'tenant_superadmin' },
       select: { id: true },
     });
     demoAdminId = demoAdmin.id;
@@ -65,7 +65,7 @@ describe('media upload route — large real-file round trip (Wave 7.7d-T3)', () 
     // actually uses before mocking it.
     const mockedAuth = auth as unknown as ReturnType<typeof vi.fn<() => Promise<Session | null>>>;
     vi.mocked(mockedAuth).mockResolvedValue({
-      user: { id: demoAdminId, roles: [Role.Admin], tenantId: demoTenantId },
+      user: { id: demoAdminId, roles: [Role.TenantSuperadmin], tenantId: demoTenantId },
     } as unknown as Session);
 
     const { POST } = await import('./route');

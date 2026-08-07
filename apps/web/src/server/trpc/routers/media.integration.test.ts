@@ -22,7 +22,7 @@ function ctxFor(overrides: Partial<Context>): Context {
 }
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 
@@ -41,7 +41,7 @@ describe('Media Manager integration (Wave 7.7c-T5, against seeded demo+clinic te
     expect(demoTenant.tier).toBe('premium');
     demoTenantId = demoTenant.id;
     const demoAdmin = await prismaRaw.user.findFirstOrThrow({
-      where: { tenantId: demoTenantId, name: 'Branch Admin', role: 'admin' },
+      where: { tenantId: demoTenantId, name: 'Branch Admin', role: 'tenant_superadmin' },
       select: { id: true },
     });
     demoAdminId = demoAdmin.id;
@@ -50,7 +50,7 @@ describe('Media Manager integration (Wave 7.7c-T5, against seeded demo+clinic te
     expect(clinicTenant.tier).toBe('free');
     clinicTenantId = clinicTenant.id;
     const clinicAdmin = await prismaRaw.user.findFirstOrThrow({
-      where: { tenantId: clinicTenantId, name: 'Nurse Admin', role: 'admin' },
+      where: { tenantId: clinicTenantId, name: 'Nurse Admin', role: 'tenant_superadmin' },
       select: { id: true },
     });
     clinicAdminId = clinicAdmin.id;

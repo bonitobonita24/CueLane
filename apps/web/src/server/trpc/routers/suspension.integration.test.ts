@@ -21,7 +21,7 @@ function ctxFor(overrides: Partial<Context>): Context {
 }
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 function employeeCallerFor(tenantId: string, userId: string) {
@@ -49,7 +49,7 @@ describe('Suspension enforcement (Wave 7.8-T2)', () => {
     });
     suspendedTenantId = suspended.id;
     suspendedAdminId = (
-      await prismaRaw.user.create({ data: { tenantId: suspendedTenantId, name: 'Susp Admin', role: 'admin', pin: 'x' } })
+      await prismaRaw.user.create({ data: { tenantId: suspendedTenantId, name: 'Susp Admin', role: 'tenant_superadmin', pin: 'x' } })
     ).id;
     suspendedEmployeeId = (
       await prismaRaw.user.create({ data: { tenantId: suspendedTenantId, name: 'Susp Employee', role: 'employee', pin: 'x' } })
@@ -60,7 +60,7 @@ describe('Suspension enforcement (Wave 7.8-T2)', () => {
     });
     activeTenantId = active.id;
     activeAdminId = (
-      await prismaRaw.user.create({ data: { tenantId: activeTenantId, name: 'Active Admin', role: 'admin', pin: 'x' } })
+      await prismaRaw.user.create({ data: { tenantId: activeTenantId, name: 'Active Admin', role: 'tenant_superadmin', pin: 'x' } })
     ).id;
   });
 

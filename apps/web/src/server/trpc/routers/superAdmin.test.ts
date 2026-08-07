@@ -22,14 +22,14 @@ function superAdminCaller() {
     ctxFor({
       session: { user: { id: 'super-admin' } } as unknown as Context['session'],
       userId: 'super-admin',
-      roles: [Role.SuperAdmin],
+      roles: [Role.TenantManager],
       tenantId: null,
     }),
   );
 }
 function tenantAdminCaller(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 function unauthCaller() {
@@ -45,7 +45,7 @@ describe('superAdminRouter (Wave 7.8-T1)', () => {
       data: { slug: `test-sa-${Date.now()}`, companyName: 'Super Admin Test Co.', tagline: 'x', tier: 'free' },
     });
     tenantId = tenant.id;
-    adminId = (await prismaRaw.user.create({ data: { tenantId, name: 'SA Test Admin', role: 'admin', pin: 'x' } })).id;
+    adminId = (await prismaRaw.user.create({ data: { tenantId, name: 'SA Test Admin', role: 'tenant_superadmin', pin: 'x' } })).id;
   });
 
   afterAll(async () => {

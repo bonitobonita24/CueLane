@@ -13,7 +13,7 @@ describe('evaluateProtectedTenantAccess (cross-tenant page guard)', () => {
   it('redirects a non-super-admin whose session tenant slug does NOT match the URL slug, to their OWN slug', () => {
     const decision = evaluateProtectedTenantAccess({
       urlTenantSlug: 'clinic',
-      session: { userId: 'u1', tenantSlug: 'demo', roles: [Role.Admin] },
+      session: { userId: 'u1', tenantSlug: 'demo', roles: [Role.TenantSuperadmin] },
     });
     expect(decision).toEqual({ action: 'redirect-tenant', slug: 'demo' });
   });
@@ -21,7 +21,7 @@ describe('evaluateProtectedTenantAccess (cross-tenant page guard)', () => {
   it('allows a non-super-admin whose session tenant slug matches the URL slug', () => {
     const decision = evaluateProtectedTenantAccess({
       urlTenantSlug: 'demo',
-      session: { userId: 'u1', tenantSlug: 'demo', roles: [Role.Admin] },
+      session: { userId: 'u1', tenantSlug: 'demo', roles: [Role.TenantSuperadmin] },
     });
     expect(decision).toEqual({ action: 'allow' });
   });
@@ -37,7 +37,7 @@ describe('evaluateProtectedTenantAccess (cross-tenant page guard)', () => {
   it('allows a SUPER ADMIN to access ANY tenant (exempt from the slug match)', () => {
     const decision = evaluateProtectedTenantAccess({
       urlTenantSlug: 'clinic',
-      session: { userId: 'super-admin', tenantSlug: null, roles: [Role.SuperAdmin] },
+      session: { userId: 'super-admin', tenantSlug: null, roles: [Role.TenantManager] },
     });
     expect(decision).toEqual({ action: 'allow' });
   });
@@ -49,7 +49,7 @@ describe('evaluateProtectedTenantAccess (cross-tenant page guard)', () => {
     expect(
       evaluateProtectedTenantAccess({
         urlTenantSlug: 'demo',
-        session: { userId: '', tenantSlug: 'demo', roles: [Role.Admin] },
+        session: { userId: '', tenantSlug: 'demo', roles: [Role.TenantSuperadmin] },
       }),
     ).toEqual({ action: 'redirect-login' });
   });
@@ -57,7 +57,7 @@ describe('evaluateProtectedTenantAccess (cross-tenant page guard)', () => {
   it('redirects an authenticated non-super-admin with NO resolvable tenant slug to login (safe fallback)', () => {
     const decision = evaluateProtectedTenantAccess({
       urlTenantSlug: 'demo',
-      session: { userId: 'u3', tenantSlug: null, roles: [Role.Admin] },
+      session: { userId: 'u3', tenantSlug: null, roles: [Role.TenantSuperadmin] },
     });
     expect(decision).toEqual({ action: 'redirect-login' });
   });

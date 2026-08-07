@@ -10,11 +10,11 @@ import { ADMIN_TABS, isAdminRole, isTabGatedForTier, visibleAdminTabs } from './
 
 describe('isAdminRole', () => {
   it('admits Admin', () => {
-    expect(isAdminRole([Role.Admin])).toBe(true);
+    expect(isAdminRole([Role.TenantSuperadmin])).toBe(true);
   });
 
   it('admits SuperAdmin', () => {
-    expect(isAdminRole([Role.SuperAdmin])).toBe(true);
+    expect(isAdminRole([Role.TenantManager])).toBe(true);
   });
 
   it('rejects Employee', () => {

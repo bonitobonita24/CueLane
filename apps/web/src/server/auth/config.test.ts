@@ -63,7 +63,7 @@ describe('authConfig admin-credentials provider (Wave 7.4-T1 regression)', () =>
 
     expect(result).not.toBeNull();
     const user = result as { roles: string[] };
-    expect(user.roles).toEqual(['admin']);
+    expect(user.roles).toEqual(['tenant_superadmin']);
   });
 
   it('rejects a wrong pin for an employee', async () => {

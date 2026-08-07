@@ -39,7 +39,7 @@ describe('authRouter (Wave 7.9-T1)', () => {
     });
     preexistingTenantId = tenant.id;
     const user = await prismaRaw.user.create({
-      data: { tenantId: tenant.id, name: 'Existing Admin', role: 'admin', pin: await bcrypt.hash('OldPassw0rd!', 10) },
+      data: { tenantId: tenant.id, name: 'Existing Admin', role: 'tenant_superadmin', pin: await bcrypt.hash('OldPassw0rd!', 10) },
     });
     preexistingUserId = user.id;
   });
@@ -136,7 +136,7 @@ describe('authRouter (Wave 7.9-T1)', () => {
 
       const admin = await prismaRaw.user.findFirst({ where: { tenantId: tenant.id, name: 'Signup Admin' } });
       expect(admin).not.toBeNull();
-      expect(admin?.role).toBe('admin');
+      expect(admin?.role).toBe('tenant_superadmin');
 
       // Loginable: bcrypt.compare(password, user.pin) must succeed — same check the
       // 'admin-credentials' provider performs (server/auth/config.ts).

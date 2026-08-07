@@ -18,7 +18,7 @@ function ctxFor(overrides: Partial<Context>): Context {
 }
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 
@@ -36,19 +36,19 @@ describe('tenantAdRouter (Wave 7.7c-T2)', () => {
       data: { slug: `test-tad-free-${Date.now()}`, companyName: 'Ad Free Co.', tagline: 'x', tier: 'free' },
     });
     freeTenantId = freeTenant.id;
-    freeAdminId = (await prismaRaw.user.create({ data: { tenantId: freeTenantId, name: 'Free Admin', role: 'admin', pin: 'x' } })).id;
+    freeAdminId = (await prismaRaw.user.create({ data: { tenantId: freeTenantId, name: 'Free Admin', role: 'tenant_superadmin', pin: 'x' } })).id;
 
     const premiumTenant = await prismaRaw.tenant.create({
       data: { slug: `test-tad-prem-${Date.now()}`, companyName: 'Ad Premium Co.', tagline: 'x', tier: 'premium' },
     });
     premiumTenantId = premiumTenant.id;
-    premiumAdminId = (await prismaRaw.user.create({ data: { tenantId: premiumTenantId, name: 'Prem Admin', role: 'admin', pin: 'x' } })).id;
+    premiumAdminId = (await prismaRaw.user.create({ data: { tenantId: premiumTenantId, name: 'Prem Admin', role: 'tenant_superadmin', pin: 'x' } })).id;
 
     const otherPremiumTenant = await prismaRaw.tenant.create({
       data: { slug: `test-tad-prem2-${Date.now()}`, companyName: 'Ad Premium Co 2.', tagline: 'x', tier: 'premium' },
     });
     otherPremiumTenantId = otherPremiumTenant.id;
-    otherPremiumAdminId = (await prismaRaw.user.create({ data: { tenantId: otherPremiumTenantId, name: 'Prem Admin 2', role: 'admin', pin: 'x' } })).id;
+    otherPremiumAdminId = (await prismaRaw.user.create({ data: { tenantId: otherPremiumTenantId, name: 'Prem Admin 2', role: 'tenant_superadmin', pin: 'x' } })).id;
   });
 
   afterAll(async () => {
