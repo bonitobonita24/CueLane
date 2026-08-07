@@ -37,7 +37,7 @@ describe('@cuelane/shared schemas (smoke)', () => {
     ).toBe(false);
   });
 
-  it('rejects a non-4-6-digit PIN and a SuperAdmin tenant role', () => {
+  it('rejects a non-4-6-digit PIN and a TenantManager tenant role', () => {
     expect(
       createUserSchema.safeParse({
         name: 'Alice',
@@ -49,10 +49,22 @@ describe('@cuelane/shared schemas (smoke)', () => {
     expect(
       createUserSchema.safeParse({
         name: 'Mallory',
-        role: Role.SuperAdmin, // not tenant-assignable
+        role: Role.TenantManager, // platform role — not tenant-assignable
         pin: '1234',
       }).success,
     ).toBe(false);
+  });
+
+  it('accepts the tenant-assignable roles (employee, tenant_admin, tenant_superadmin)', () => {
+    for (const role of [Role.Employee, Role.TenantAdmin, Role.TenantSuperadmin]) {
+      expect(
+        createUserSchema.safeParse({
+          name: 'Bob',
+          role,
+          pin: '1234',
+        }).success,
+      ).toBe(true);
+    }
   });
 
   it('defaults a new tenant tier to Free', () => {

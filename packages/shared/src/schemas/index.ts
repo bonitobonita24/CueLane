@@ -154,8 +154,9 @@ export const updateWindowSchema = createWindowSchema.partial();
 
 // ─── User ────────────────────────────────────────────────────────────────────
 
-// SuperAdmin role is not assignable via tenant-level user management
-const tenantRoleSchema = z.enum([Role.Employee, Role.Admin]);
+// TenantManager (platform role) is not assignable via tenant-level user management —
+// only the three tenant-scoped roles are.
+const tenantRoleSchema = z.enum([Role.Employee, Role.TenantAdmin, Role.TenantSuperadmin]);
 
 export const createUserSchema = z.object({
   name: z.string().min(1).max(100),

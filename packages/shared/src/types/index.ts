@@ -2,8 +2,9 @@
 
 export enum Role {
   Employee = 'employee',
-  Admin = 'admin',
-  SuperAdmin = 'super_admin',
+  TenantAdmin = 'tenant_admin',
+  TenantSuperadmin = 'tenant_superadmin',
+  TenantManager = 'tenant_manager',
 }
 
 export enum TenantTier {
