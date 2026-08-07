@@ -176,6 +176,19 @@ export const updateUserRoleSchema = z.object({
   role: tenantRoleSchema,
 });
 
+// ─── Ownership succession (T5) ─────────────────────────────────────────────────
+
+// In-tenant: the current tenant_superadmin hands ownership to another user in the SAME tenant.
+export const transferOwnershipSchema = z.object({
+  newOwnerUserId: idSchema,
+});
+
+// Platform break-glass: TenantManager reassigns a named tenant's owner cross-tenant.
+export const reassignOwnerSchema = z.object({
+  tenantId: idSchema,
+  newOwnerUserId: idSchema,
+});
+
 // ─── Ticket ──────────────────────────────────────────────────────────────────
 
 export const createTicketSchema = z.object({

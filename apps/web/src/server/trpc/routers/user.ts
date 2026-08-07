@@ -7,8 +7,8 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { createUserSchema, updateUserSchema, TenantTier } from '@cuelane/shared';
-import { prisma, withTenant, type Prisma } from '@cuelane/db';
+import { createUserSchema, updateUserSchema, transferOwnershipSchema, TenantTier, Role } from '@cuelane/shared';
+import { prisma, withTenant, writeAuditLog, type Prisma } from '@cuelane/db';
 import { createTRPCRouter, userManagementProcedure } from '../trpc';
 import { AdminDomainError, assertWithinLimit } from '@/server/domain/admin';
 import { rethrowAdmin, idInputSchema, stripUndefined } from '../lib/admin-errors';
@@ -100,6 +100,61 @@ export const userRouter = createTRPCRouter({
     } catch (e) {
       rethrowAdmin(e);
     }
+  }),
+
+  // T5 — in-tenant ownership succession. ONLY the current owner (TenantSuperadmin) may transfer
+  // their own tenant's ownership — a platform TenantManager acting cross-tenant must use the
+  // break-glass `platformUser.reassignOwner` path instead. The partial-unique index
+  // (one_tenant_superadmin_per_tenant, WHERE role='tenant_superadmin' AND tenant_id IS NOT NULL)
+  // is checked by Postgres at EACH statement boundary, so the demote (statement 1) MUST commit
+  // before the promote (statement 2) — both inside the same transaction.
+  transferOwnership: userManagementProcedure.input(transferOwnershipSchema).mutation(async ({ ctx, input }) => {
+    if (!ctx.roles.includes(Role.TenantSuperadmin)) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the current tenant owner may transfer ownership.' });
+    }
+    if (input.newOwnerUserId === ctx.userId) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cannot transfer ownership to yourself.' });
+    }
+
+    const target = await prisma.user.findFirst({ where: { id: input.newOwnerUserId, tenantId: ctx.tenantId } });
+    if (target == null) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Unknown user.' });
+    }
+    if (target.role !== Role.TenantAdmin && target.role !== Role.Employee) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ownership can only transfer to a tenant_admin or employee.' });
+    }
+
+    const previousOwnerId = ctx.userId;
+    return withTenant(ctx.tenantId, async (tx) => {
+      const previousOwnerBefore = await tx.user.findUniqueOrThrow({ where: { id: previousOwnerId } });
+
+      // Statement 1 — demote the current owner FIRST so the partial-unique index never sees two
+      // tenant_superadmin rows for this tenant at once.
+      const demoted = await tx.user.update({ where: { id: previousOwnerId }, data: { role: Role.TenantAdmin } });
+      // Statement 2 — promote the successor.
+      const promoted = await tx.user.update({ where: { id: input.newOwnerUserId }, data: { role: Role.TenantSuperadmin } });
+
+      await writeAuditLog(tx, {
+        tenantId: ctx.tenantId,
+        userId: ctx.userId,
+        action: 'UPDATE',
+        entity: 'users',
+        entityId: demoted.id,
+        before: { role: previousOwnerBefore.role },
+        after: { role: demoted.role },
+      });
+      await writeAuditLog(tx, {
+        tenantId: ctx.tenantId,
+        userId: ctx.userId,
+        action: 'UPDATE',
+        entity: 'users',
+        entityId: promoted.id,
+        before: { role: target.role },
+        after: { role: promoted.role },
+      });
+
+      return { previousOwnerId: demoted.id, newOwnerId: promoted.id };
+    });
   }),
 
   delete: userManagementProcedure.input(idInputSchema).mutation(async ({ ctx, input }) => {

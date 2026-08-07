@@ -6,6 +6,7 @@ import { stationRouter } from './routers/station';
 import { serviceRouter } from './routers/service';
 import { windowRouter } from './routers/window';
 import { userRouter } from './routers/user';
+import { platformUserRouter } from './routers/platformUser';
 import { tenantAdminRouter } from './routers/tenantAdmin';
 import { dashboardRouter } from './routers/dashboard';
 import { mediaRouter } from './routers/media';
@@ -23,6 +24,7 @@ export const appRouter = createTRPCRouter({
   service: serviceRouter,
   window: windowRouter,
   user: userRouter,
+  platformUser: platformUserRouter,
   tenantAdmin: tenantAdminRouter,
   dashboard: dashboardRouter,
   media: mediaRouter,
