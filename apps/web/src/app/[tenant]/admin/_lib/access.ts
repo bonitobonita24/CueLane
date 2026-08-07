@@ -40,7 +40,7 @@ const FREE_GATED_TAB_IDS: ReadonlySet<string> = new Set([]);
 
 /** True when the caller's roles satisfy the Admin Panel gate (Admin or SuperAdmin). */
 export function isAdminRole(roles: readonly Role[]): boolean {
-  return roles.includes(Role.Admin) || roles.includes(Role.SuperAdmin);
+  return roles.includes(Role.TenantSuperadmin) || roles.includes(Role.TenantAdmin) || roles.includes(Role.TenantManager);
 }
 
 /** Tabs visible for a given tier — Free tier filters out FREE_GATED_TAB_IDS. */

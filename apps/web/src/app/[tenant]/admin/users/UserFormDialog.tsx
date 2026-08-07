@@ -32,21 +32,21 @@ const PIN_RE = /^\d{4,6}$/;
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
-  role: z.enum([Role.Employee, Role.Admin]),
+  role: z.enum([Role.Employee, Role.TenantAdmin]),
   pin: z.string().regex(PIN_RE, 'PIN must be 4–6 digits'),
   services: z.array(z.string()).default([]),
 });
 
 const editSchema = z.object({
   name: z.string().min(1).max(100),
-  role: z.enum([Role.Employee, Role.Admin]),
+  role: z.enum([Role.Employee, Role.TenantAdmin]),
   pin: z.union([z.literal(''), z.string().regex(PIN_RE, 'PIN must be 4–6 digits')]),
   services: z.array(z.string()).default([]),
 });
 
 export interface UserFormValues {
   name: string;
-  role: Role.Employee | Role.Admin;
+  role: Role.Employee | Role.TenantAdmin;
   pin: string;
   services: string[];
 }
@@ -131,7 +131,7 @@ export function UserFormDialog({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value={Role.Employee}>Employee</SelectItem>
-                        <SelectItem value={Role.Admin}>Admin</SelectItem>
+                        <SelectItem value={Role.TenantAdmin}>Admin</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

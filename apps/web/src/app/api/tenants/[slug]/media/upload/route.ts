@@ -46,7 +46,7 @@ export async function POST(
 
   // ── 2. Role — mirrors adminProcedure's Admin-only gate ──────────────────────────────────────
   const roles = session.user.roles ?? [];
-  if (!roles.includes(Role.Admin)) {
+  if (!roles.includes(Role.TenantAdmin) && !roles.includes(Role.TenantSuperadmin)) {
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
   }
 

@@ -54,7 +54,7 @@ function rethrow(e: unknown): never {
 // tenant/role/context-narrowing guarantees instead of re-deriving them.
 export const staffProcedure = protectedProcedure
   .use(requireTenant)
-  .use(requireRole(Role.Employee, Role.Admin))
+  .use(requireRole(Role.Employee, Role.TenantAdmin, Role.TenantSuperadmin))
   .use(async ({ ctx, next }) => {
     // requireTenant/requireRole are standalone middleware typed against the base Context
     // (userId/tenantId nullable) — they pass ctx through unnarrowed even though protectedProcedure
@@ -67,7 +67,7 @@ export const staffProcedure = protectedProcedure
     }
     // Wave 7.8-T2 — a suspended tenant's Employee Station must be blocked mid-session, same as
     // adminProcedure (trpc.ts's `assertTenantActive`). Employee sessions never carry
-    // Role.SuperAdmin, so no bypass is needed here (unlike adminProcedure, which super-admin can
+    // Role.TenantManager, so no bypass is needed here (unlike adminProcedure, which super-admin can
     // also hit through shared admin routers).
     await assertTenantActive(tenantId);
     return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));

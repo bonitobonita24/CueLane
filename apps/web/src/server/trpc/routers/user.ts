@@ -9,7 +9,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { createUserSchema, updateUserSchema, TenantTier } from '@cuelane/shared';
 import { prisma, withTenant, type Prisma } from '@cuelane/db';
-import { createTRPCRouter, adminProcedure } from '../trpc';
+import { createTRPCRouter, userManagementProcedure } from '../trpc';
 import { AdminDomainError, assertWithinLimit } from '@/server/domain/admin';
 import { rethrowAdmin, idInputSchema, stripUndefined } from '../lib/admin-errors';
 
@@ -35,7 +35,7 @@ function serializeUser(
 }
 
 export const userRouter = createTRPCRouter({
-  list: adminProcedure.input(z.void()).query(async ({ ctx }) => {
+  list: userManagementProcedure.input(z.void()).query(async ({ ctx }) => {
     const users = await prisma.user.findMany({
       where: { tenantId: ctx.tenantId },
       orderBy: { name: 'asc' },
@@ -45,7 +45,7 @@ export const userRouter = createTRPCRouter({
     return users.map((u) => serializeUser(u, u.userServices.map((us) => us.serviceId)));
   }),
 
-  create: adminProcedure.input(createUserSchema).mutation(async ({ ctx, input }) => {
+  create: userManagementProcedure.input(createUserSchema).mutation(async ({ ctx, input }) => {
     const hashedPin = await bcrypt.hash(input.pin, 10);
     try {
       return await withTenant(ctx.tenantId, async (tx) => {
@@ -68,7 +68,7 @@ export const userRouter = createTRPCRouter({
     }
   }),
 
-  update: adminProcedure.input(idInputSchema.merge(updateUserSchema)).mutation(async ({ ctx, input }) => {
+  update: userManagementProcedure.input(idInputSchema.merge(updateUserSchema)).mutation(async ({ ctx, input }) => {
     const { id, services, pin, name } = input;
     const existing = await prisma.user.findFirst({ where: { id, tenantId: ctx.tenantId } });
     if (existing == null) {
@@ -102,7 +102,7 @@ export const userRouter = createTRPCRouter({
     }
   }),
 
-  delete: adminProcedure.input(idInputSchema).mutation(async ({ ctx, input }) => {
+  delete: userManagementProcedure.input(idInputSchema).mutation(async ({ ctx, input }) => {
     const existing = await prisma.user.findFirst({ where: { id: input.id, tenantId: ctx.tenantId } });
     if (existing == null) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Unknown user.' });

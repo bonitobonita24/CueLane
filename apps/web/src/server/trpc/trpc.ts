@@ -94,7 +94,31 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (!isSuperAdmin && ctx.tenantId == null) {
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'No tenant context in session.' });
   }
-  if (!ctx.roles.includes(Role.Admin)) {
+  if (!ctx.roles.includes(Role.TenantSuperadmin) && !ctx.roles.includes(Role.TenantAdmin)) {
+    throw new TRPCError({ code: 'FORBIDDEN' });
+  }
+
+  const tenantId = ctx.tenantId;
+  const userId = ctx.userId;
+  if (tenantId == null || userId == null) {
+    throw new TRPCError({ code: 'UNAUTHORIZED' });
+  }
+  if (!isSuperAdmin) {
+    await assertTenantActive(tenantId);
+  }
+  return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));
+});
+
+// User-management procedure — protected, tenant-scoped, narrower than adminProcedure.
+// Gates user CRUD (create/update/delete/list) to the tenant OWNER (TenantSuperadmin) or the
+// platform TenantManager only — a plain TenantAdmin (below-owner tier) may NOT manage users,
+// per the tenant-RBAC standard (Billing + User-Management are owner-reserved surfaces).
+export const userManagementProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  const isSuperAdmin = ctx.roles.includes(Role.TenantManager);
+  if (!isSuperAdmin && ctx.tenantId == null) {
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'No tenant context in session.' });
+  }
+  if (!ctx.roles.includes(Role.TenantSuperadmin) && !isSuperAdmin) {
     throw new TRPCError({ code: 'FORBIDDEN' });
   }
 

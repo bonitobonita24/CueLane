@@ -137,7 +137,15 @@ export function UsersClient() {
       id: 'role',
       header: 'Role',
       cell: ({ row }) => (
-        <Badge variant={row.original.role === Role.Admin ? 'default' : 'secondary'}>{row.original.role}</Badge>
+        <Badge
+          variant={
+            row.original.role === Role.TenantAdmin || row.original.role === Role.TenantSuperadmin
+              ? 'default'
+              : 'secondary'
+          }
+        >
+          {row.original.role}
+        </Badge>
       ),
     },
     {
@@ -185,7 +193,7 @@ export function UsersClient() {
         mode={editing ? 'edit' : 'create'}
         initialValues={
           editing
-            ? { name: editing.name, role: editing.role as Role.Employee | Role.Admin, pin: '', services: editing.serviceIds }
+            ? { name: editing.name, role: editing.role as Role.Employee | Role.TenantAdmin, pin: '', services: editing.serviceIds }
             : undefined
         }
         serviceOptions={services}

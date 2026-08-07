@@ -12,6 +12,7 @@ import {
   slugify,
   isReservedSlug,
   isValidSlugShape,
+  Role,
 } from '@cuelane/shared';
 import { prismaRaw } from '@cuelane/db';
 import { addEmailJob } from '@cuelane/jobs';
@@ -130,7 +131,7 @@ export const authRouter = createTRPCRouter({
         data: {
           tenantId: createdTenant.id,
           name: input.adminName,
-          role: 'admin',
+          role: Role.TenantSuperadmin,
           pin: hashedPassword,
         },
       });
@@ -156,7 +157,10 @@ export const authRouter = createTRPCRouter({
     if (tenant == null) return SUCCESS;
 
     const user = await prismaRaw.user.findFirst({
-      where: { tenantId: tenant.id, name: input.identifier, role: 'admin' },
+      // Wave RBAC-3tier: signup always creates the tenant owner as TenantSuperadmin (the sole
+      // account this pre-auth flow needs to find) — never TenantAdmin (a below-owner role added
+      // later by the owner, out of scope for password-reset-by-identifier here).
+      where: { tenantId: tenant.id, name: input.identifier, role: Role.TenantSuperadmin },
       select: { id: true },
     });
     if (user == null) return SUCCESS;

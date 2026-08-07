@@ -60,7 +60,7 @@ export const authConfig: NextAuthConfig = {
             // Role.Employee, and staffProcedure explicitly allows Role.Employee — this filter was
             // the one place that disagreed). The Employee Station requires an employee session,
             // so both roles must be queryable here.
-            role: { in: ['admin', 'employee'] },
+            role: { in: [Role.TenantSuperadmin, Role.TenantAdmin, Role.Employee] },
             tenantId: tenant.id,  // scoped to this tenant — prevents cross-tenant auth
           },
           select: {
