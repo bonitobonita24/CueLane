@@ -3,8 +3,34 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 COMPLETE + Phase 8 sweep DONE. v0.1.0 tagged. Build genuinely complete; hardening scan clean; only deferred future-scope + 1 owner [WHAT] (D2) remain.**
-CURRENT:      Resume session 2026-07-19d (Full Auto) — SHORT SESSION, owner requested save+handoff to rest the PC.
+PHASE:        **RBAC 3-tier retrofit BACKBONE (Scenario 42, T1–T8) COMPLETE + verified on branch `feat/tenant-rbac-3tier`. Phase 7/8 build remains complete. Only gated [WHAT]s + deferred future-scope remain.**
+CURRENT:      Resume session 2026-08-08 (Full Auto, owner asleep). **RBAC 3-tier BACKBONE FINISHED THIS SESSION.**
+              Branch `feat/tenant-rbac-3tier`, LOCAL only (no upstream, HARD HOLD).
+              ✅ DONE THIS SESSION (2026-08-08):
+              (1) **T5 — ownership succession** (commits 7ff65ca + fix 535c9c7). `user.transferOwnership`
+                  (in-tenant, current-owner-only; TenantManager rejected on this path) + `platformUser.reassignOwner`
+                  (platform break-glass, TenantManager only, cross-tenant via prismaRaw). Both DEMOTE-before-PROMOTE
+                  in one txn (partial-unique index checked per statement). L5 writeAuditLog on every role change (its
+                  FIRST call sites). TDD `succession.test.ts` 9/9 vs REAL Postgres (asserts exactly-one-owner
+                  invariant + all rejection/cross-tenant paths). secure-code-guardian-armed Sonnet worker; PM-reviewed diff.
+              (2) **T6 — seed VERIFIED** (no code change needed). `db:seed` runs idempotent vs the migrated 4-value
+                  enum; each tenant has exactly one `tenant_superadmin` + employees; partial index active. The prior
+                  "T6 partial" gap was only the correctly-deferred virtual `tenant_manager` (D-RBAC-1, no DB row).
+              (3) **T8 — full gate + live + back-port.** Full **cache-OFF** gate GREEN: lint 8/8 · typecheck 8/8 ·
+                  build 8/8 · test **268/268** (web 215 · shared 33 · storage 15 · db 5). **Dev container REBUILT off
+                  the branch** (image 2026-08-07T16:30) + LIVE both-tenant browser verify: demo owner (Branch Admin/0000)
+                  AND clinic owner (Nurse Admin/0001) log in through the REAL Auth.js→roleMap→JWT→middleware seam →
+                  full admin panel incl. the owner-only **Users** tab. Screenshot `screenshots/rbac-3tier-clinic-owner-admin.png`.
+                  Back-ported: PRODUCT.md Roles+Permissions + User.role → 3-tier model; DECISIONS_LOG as-built entry
+                  (commit 78a483a). 2 global LESSONS logged (`typescript.eslint.prisma-enum-vs-shared-enum-comparison`
+                  = Prisma-enum vs shared-enum runtime compare trips no-unsafe-enum-comparison + breaks the Next build,
+                  coerce `as unknown as Role`; `process.verification.partial-gate-before-commit-hides-lint-build-break`
+                  = run the FULL cache-OFF gate incl. lint+build before any commit, tsc-green ≠ build-green).
+              **⚠ REGRESSION CAUGHT: T5 first commit (7ff65ca) passed typecheck+tests but BROKE lint+build** (the enum
+                  compare). Caught by the T8 full gate, fixed in 535c9c7. Backbone is now genuinely all-green.
+              **➡ NEXT: RBAC Phase 2 (custom-role matrix, D-RBAC-3) is GATED — do NOT auto-start; needs owner GO.**
+              ── prior session (2026-07-19d) ──
+              Resume session 2026-07-19d (Full Auto) — SHORT SESSION, owner requested save+handoff to rest the PC.
               ✅ DONE THIS SESSION (2026-07-19d):
               (1) **Resume verification** — read STATE + PENDING_DECISIONS; git ground-truth confirmed matches
                   STATE exactly: branch `main`, **126 commits ahead of origin / 0 pushed** (HARD HOLD holding),
@@ -155,10 +181,16 @@ LAST_DONE:    Phase 7 Wave 7.5 — Big Display (2026-07-08). Sonnet worker (died
               flow + transfer+Return-After-Done DB-verified per test-artifacts/phase7-station/NOTES.md +3 png.
               Prior waves: 7.3 Kiosk (b8797d9/0aaf118/cc2fca2), 7.2 SSE (07b792b/83c38a7/cc2dc13/d1ca600),
               7.1 Queue Engine (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a). 55 commits ahead, 0 pushed (HARD HOLD).
-NEXT:         ⭐ PRIMARY (owner-approved 2026-07-19d): **RBAC 3-tier retrofit — Scenario 42, dev-first, HARD HOLD.**
-              CueLane is tenant-based but NOT yet on the fleet standard (current role enum is `Role` with
-              super_admin/admin/employee — NOT tenant_manager/tenant_superadmin/tenant_admin; verify exact
-              literals at packages/db/prisma/schema.prisma before touching). Follow the PROVEN reference:
+NEXT:         ⭐ RBAC 3-tier BACKBONE (T1–T8) is DONE + verified (2026-08-08) — see CURRENT block. The un-gated
+              RBAC queue is now EMPTY. Remaining RBAC work is **RBAC Phase 2 — the tenant-scoped custom-role
+              permission matrix (D-RBAC-3)** — a SEPARATE milestone that is an OPEN owner [WHAT] (is the matrix
+              wanted this cycle?). **Do NOT auto-start it; surface D-RBAC-3 + D-RBAC-1 and wait for owner GO.**
+              Plan for Phase 2 already staged in `docs/planning/RBAC_3TIER_RETROFIT_PLAN.md` §"Phase 2".
+              Branch `feat/tenant-rbac-3tier` stays LOCAL (HARD HOLD) until owner says push/merge. When merged to
+              main, that push is the RELEASE moment → version bump + changelog (owner-gated).
+              ── superseded (historical, owner-approved 2026-07-19d, now DONE) — RBAC retrofit primary ──
+              CueLane was tenant-based but NOT yet on the fleet standard (was `UserRole{employee,admin}`;
+              now `{employee,tenant_admin,tenant_superadmin,tenant_manager}`). Followed the PROVEN reference:
               MG `feat/tenant-rbac-3tier` + `.ai_prompt/scenarios.md` Scenario 42 + `.ai_prompt/rbac.md` (265 ln)
               + global `~/.claude/rules/tenant-rbac-standard.md`. Target shape:
                 • 3 FIXED system tiers: `tenant_manager` (platform, tenant_id=NULL — already effectively the
@@ -245,7 +277,8 @@ KNOWN GAPS (Phase 7/8 follow-ups — NOT blockers):
 BLOCKERS:     Human ⏳ in CREDENTIALS.md before Phase 6 DEPLOY (NOT dev): Docker Hub token, SMTP
               creds, Xendit API keys (TEST+LIVE), Turnstile LIVE keys. Dev uses MailHog +
               Turnstile test keys + the official local-dev super-admin cred (Server-Setups) — not blocked.
-GIT_BRANCH:   main (Phase 5 fixes committed local; UNPUSHED — HARD HOLD, local dev only)
+GIT_BRANCH:   feat/tenant-rbac-3tier (RBAC 3-tier backbone T1–T8 committed local; NO upstream — HARD HOLD,
+              local dev only). Dev stack REBUILT off this branch (2026-08-08). `main` unchanged; merge is owner-gated.
 DEPLOY_HOLD:  ⛔ LOCAL DEV ONLY. No staging/prod push without explicit owner word.
 PORTS (dev):  APP=41716 WORKER=41717 DB=41706 PGBOUNCER=41707 CACHE=41708 MINIO=41709
               MINIO_CONSOLE=41710 MAILHOG_SMTP=41711 MAILHOG_UI=41712 PGADMIN=41713
