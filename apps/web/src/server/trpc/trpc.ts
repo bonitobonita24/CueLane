@@ -90,7 +90,7 @@ export async function assertTenantActive(tenantId: string): Promise<void> {
 }
 
 export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  const isSuperAdmin = ctx.roles.includes(Role.SuperAdmin);
+  const isSuperAdmin = ctx.roles.includes(Role.TenantManager);
   if (!isSuperAdmin && ctx.tenantId == null) {
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'No tenant context in session.' });
   }
@@ -109,7 +109,7 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));
 });
 
-// Super Admin procedure — platform-level, cross-tenant, env-based credential (Role.SuperAdmin,
+// Super Admin procedure — platform-level, cross-tenant, env-based credential (Role.TenantManager,
 // tenantId=null in session — see auth/config.ts's 'super-admin-credentials' provider). Deliberately
 // does NOT wrap in `withTenantContext`: Super Admin operates GLOBALLY across every tenant, so
 // establishing a single tenant's AsyncLocalStorage context here would be wrong (it would either
@@ -118,7 +118,7 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
 // (unguarded), matching the tenant-guard GLOBAL_MODELS convention for Tenant/SystemAd/Subscription
 // and explicit `where: { tenantId }` filters for any per-tenant aggregate.
 export const superAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (!ctx.roles.includes(Role.SuperAdmin)) {
+  if (!ctx.roles.includes(Role.TenantManager)) {
     throw new TRPCError({ code: 'FORBIDDEN' });
   }
   return next({ ctx });

@@ -4,7 +4,7 @@
 import { auth } from '@/server/auth/edge';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import type { Role } from '@cuelane/shared';
+import { Role } from '@cuelane/shared';
 import { evaluateProtectedTenantAccess } from '@/server/auth/tenant-guard';
 
 // Paths that do NOT need auth (kiosk + display are public-facing)
@@ -50,7 +50,7 @@ export default auth((req: NextRequest & { auth: unknown }) => {
       | undefined;
 
     const roles: Role[] = session?.user?.roles ?? [];
-    const isSuperAdmin = roles.includes('super_admin' as Role);
+    const isSuperAdmin = roles.includes(Role.TenantManager);
 
     if (!isSuperAdmin) {
       const loginUrl = req.nextUrl.clone();

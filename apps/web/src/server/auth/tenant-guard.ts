@@ -12,9 +12,9 @@
 // gap only — a tenant admin visiting another tenant's `/admin/*` would render that
 // tenant's chrome populated with their OWN data. This guard closes the gap by
 // carrying the tenant slug in the JWT (no DB call needed edge-side) and comparing.
-import type { Role } from '@cuelane/shared';
+import { Role } from '@cuelane/shared';
 
-const SUPER_ADMIN: Role = 'super_admin' as Role;
+const SUPER_ADMIN: Role = Role.TenantManager;
 
 /** Minimal session shape the guard needs (mapped from `session.user` in middleware).
  *  Fields are `| undefined` (not just optional) so a `session.user` with missing keys

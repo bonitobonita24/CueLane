@@ -34,7 +34,7 @@ export const tenantRouter = createTRPCRouter({
 
   // Super Admin only: list all tenants
   listAll: protectedProcedure
-    .use(requireRole(Role.SuperAdmin))
+    .use(requireRole(Role.TenantManager))
     .input(
       z.object({
         limit: z.number().int().min(1).max(100).default(20),

@@ -78,7 +78,8 @@ export const authConfig: NextAuthConfig = {
         if (!valid) return null;
 
         const roleMap: Record<string, Role> = {
-          admin: Role.Admin,
+          tenant_admin: Role.TenantAdmin,
+          tenant_superadmin: Role.TenantSuperadmin,
           employee: Role.Employee,
         };
 
@@ -130,7 +131,7 @@ export const authConfig: NextAuthConfig = {
           email: superAdminEmail,
           tenantId: null,
           tenantSlug: null, // Super Admin has no home tenant — exempt from the slug guard
-          roles: [Role.SuperAdmin],
+          roles: [Role.TenantManager],
         };
       },
     }),
