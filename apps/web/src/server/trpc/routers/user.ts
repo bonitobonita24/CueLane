@@ -120,7 +120,10 @@ export const userRouter = createTRPCRouter({
     if (target == null) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Unknown user.' });
     }
-    if (target.role !== Role.TenantAdmin && target.role !== Role.Employee) {
+    // `target.role` is the Prisma-generated UserRole enum; coerce to the shared Role enum so the
+    // comparison shares one enum type (satisfies @typescript-eslint/no-unsafe-enum-comparison).
+    const targetRole = target.role as unknown as Role;
+    if (targetRole !== Role.TenantAdmin && targetRole !== Role.Employee) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ownership can only transfer to a tenant_admin or employee.' });
     }
 
