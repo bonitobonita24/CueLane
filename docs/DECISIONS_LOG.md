@@ -629,3 +629,64 @@ with no functional gain for this use case.
 **Reversible:** yes (as a product decision) — if true WebSocket is later required, reopen D1 as a
 Feature Update and swap the browser transport (keep the Valkey pub/sub backbone). The Valkey channel
 layer is transport-agnostic.
+
+---
+
+## 2026-08-08 — RBAC 3-Tier Retrofit (Scenario 42, backbone) — as-built record
+
+**Decision:** CueLane adopts the fleet **3-tier tenant RBAC standard** (`~/.claude/rules/tenant-rbac-standard.md`,
+framework `.ai_prompt/rbac.md`, Rule 34). The DB `UserRole` enum + all authorization guards were migrated,
+data-preserving, from the prior `{ employee, admin }` model to the fixed 3-tier backbone.
+
+**Tag:** `spec-divergent: rbac-3tier` — the implementation drove the spec (LIVING-SPEC / Flow-Back, Rule 1).
+`docs/PRODUCT.md` "Roles + Permissions" table + the User entity `role` line were reconciled to this model
+this session (settled/code-enforced facts only).
+
+**Role model (as built):**
+- `tenant_manager` — platform operator, `tenant_id = NULL`. Formerly the TS-only `Role.SuperAdmin` / the
+  "Super Admin" surface. Kept as a **virtual env-credential identity** (Auth.js `super-admin-credentials`,
+  no DB user row) for the backbone — see OPEN decision **D-RBAC-1** (promote to a vault-seeded DB row?).
+- `tenant_superadmin` — the tenant OWNER. **Exactly one per tenant**, enforced by a Postgres partial-unique
+  index `one_tenant_superadmin_per_tenant ON users(tenant_id) WHERE role='tenant_superadmin' AND tenant_id IS NOT NULL`.
+  Sole holder of Billing + User-Management within the tenant.
+- `tenant_admin` — below the owner. Full Admin Panel EXCEPT User-Management and Billing (enforced:
+  `userManagementProcedure` admits only `tenant_superadmin` | `tenant_manager`; `adminProcedure` admits
+  `tenant_superadmin` | `tenant_admin`).
+- `employee` — app domain role, unchanged.
+
+**Migrations (data-preserving, two separate — Postgres enum add-then-use hazard):**
+- `20260807153601_feat_rbac_enum_extend` — `ALTER TYPE "UserRole" RENAME VALUE 'admin' TO 'tenant_admin'`
+  then `ADD VALUE 'tenant_superadmin'`, `ADD VALUE 'tenant_manager'`. NEVER DROP/CREATE the type
+  (would lose every user's role).
+- `20260807153602_feat_rbac_owner_normalize` — normalize the earliest-`created_at` admin per tenant to
+  `tenant_superadmin`, then create the partial-unique index.
+
+**Ownership succession (T5, this session — commits 7ff65ca + 535c9c7):**
+- `user.transferOwnership` — in-tenant; **only the current owner** (`tenant_superadmin`) may call it; a
+  `tenant_manager` is rejected on this path and must use the break-glass route.
+- `platformUser.reassignOwner` — platform break-glass; `tenant_manager` only; cross-tenant via `prismaRaw`.
+- Both **demote-before-promote** in one transaction (the partial-unique index is checked at each statement
+  boundary, so two owners may never co-exist mid-transaction). L5 `writeAuditLog` on every role change
+  (its first call sites). TDD `succession.test.ts` 9/9 vs real Postgres, asserting the exactly-one-owner
+  invariant + all rejection/cross-tenant paths.
+
+**[HOW] decisions:** (1) `tenant_manager` stays virtual for the backbone (lowest risk, no auth-flow rewrite);
+promotion to a DB row is deferred to D-RBAC-1. (2) A runtime compare of a Prisma `UserRole` value against
+the `@cuelane/shared` `Role` enum trips `no-unsafe-enum-comparison` (distinct enum types) and breaks the
+Next.js build — coerce via `as unknown as Role` first (global lesson
+`typescript.eslint.prisma-enum-vs-shared-enum-comparison`).
+
+**Verification:** full cache-OFF gate green — lint 8/8 · typecheck 8/8 · build 8/8 · test 268/268
+(web 215 · shared 33 · storage 15 · db 5). Dev DB confirmed: 4 enum values present, partial index active,
+each seeded tenant has exactly one `tenant_superadmin`; seed idempotent.
+
+**Pending (do NOT treat as done):** **D-RBAC-3** — the tenant-scoped custom-role permission matrix
+(CustomRole + RolePermission + role-builder UI) is a SEPARATE gated milestone, not built. **D-RBAC-1** —
+platform-identity model. Both tracked in `PENDING_DECISIONS.md`.
+
+**Reversible:** the virtual-`tenant_manager` choice is fully reversible (D-RBAC-1). The enum rename is
+data-preserving but the value strings are now load-bearing across code + JWT.
+
+**Affected files:** `packages/db/prisma/schema.prisma` + 2 migrations; `packages/shared` (Role enum + schemas);
+`apps/web/src/server/{auth,trpc,middleware}` (guards, roleMap, procedures, succession routers);
+`packages/db/prisma/seed.ts`; ~20 test files swept; `docs/PRODUCT.md` (this back-port).
