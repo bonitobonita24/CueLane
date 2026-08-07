@@ -34,9 +34,12 @@ enum VideoMode {
   live
 }
 
+// one_tenant_superadmin_per_tenant partial-unique index created via migration feat_rbac_owner_normalize (Prisma can't model WHERE)
 enum UserRole {
   employee
-  admin
+  tenant_admin
+  tenant_superadmin
+  tenant_manager
 }
 
 enum TicketStatus {
