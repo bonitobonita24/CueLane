@@ -15,10 +15,11 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
   - **Impact if unanswered:** none — backbone proceeds with the virtual identity; DB value `tenant_manager` exists
     but is unused in the users table. Fully reversible later.
 
-- [ ] **D-RBAC-3 — Custom-role permission matrix scope (raised 2026-08-07).**
-  Scenario 42 stages the tenant-scoped custom-role matrix (CustomRole + RolePermission + role-builder UI) as a
-  **separate gated pass** after the 3-tier backbone. Full Auto sequences it as the **next milestone** after the
-  backbone ships. Confirm whether the matrix is wanted this cycle or deferred further.
+- [x] **D-RBAC-3 — Custom-role permission matrix scope (raised 2026-08-07; RESOLVED 2026-08-08 → BUILD).**
+  Owner approved **Full Rule 34 Part B this cycle** (supersedes the gate). Matrix + role-builder are being built
+  on `feat/rbac-view-access` (off `feat/tenant-rbac-3tier`), copy-source FerryBook, HARD HOLD local. Wave 0
+  (schema + resolver + seed, commit 36a637d) done; Waves 1–3 (enforcement, builder UI, verify) pending. See
+  `docs/DECISIONS_LOG.md` 2026-08-09 entry.
   - **Note (non-blocking):** D-RBAC-2 (owner-selection for a hypothetical multi-admin tenant) uses the safe
     deterministic default (earliest-`createdAt` admin → `tenant_superadmin`); seed tenants have exactly one admin, so
     it is not currently ambiguous.

@@ -690,3 +690,28 @@ data-preserving but the value strings are now load-bearing across code + JWT.
 **Affected files:** `packages/db/prisma/schema.prisma` + 2 migrations; `packages/shared` (Role enum + schemas);
 `apps/web/src/server/{auth,trpc,middleware}` (guards, roleMap, procedures, succession routers);
 `packages/db/prisma/seed.ts`; ~20 test files swept; `docs/PRODUCT.md` (this back-port).
+
+---
+
+## 2026-08-09 — D-RBAC-3 RESOLVED: build the custom-role view-access matrix this cycle (Full Rule 34 Part B)
+
+**Decision (owner, 2026-08-08):** D-RBAC-3 is **resolved → BUILD**. The owner approved the fleet-wide RBAC
+per-role/per-custom-role module VIEW-access retrofit and chose **Full Part B** scope (schema + resolver +
+enforcement + custom-role builder UI), which **supersedes the D-RBAC-3 gate** that had parked the matrix as
+a separate milestone. Copy-source = **FerryBook** (only sibling with the full impl on this machine).
+Branch `feat/rbac-view-access` off `feat/tenant-rbac-3tier`. HARD HOLD (local only). D-RBAC-1 (platform
+identity) stays open + non-blocking.
+
+**Wave 0 built (commit 36a637d):** Feature registry + CustomRole/RolePreset + RolePermission
+(view/write/update/delete, deny-by-default) + `User.customRoleId`; migration
+`20260808155140_add_rbac_view_access_matrix`; resolver `apps/web/src/lib/rbac/*` (`hasPermission` — 3 fixed
+tiers short-circuit, `tenant_admin` denied on owner-only `{users,roles}`, employee/custom via matrix
+deny-by-default; `resolvePrincipal`; `visibleFeatures`); idempotent Feature seed (9 keys). Fixed tiers are
+unaffected by the matrix, so no existing user loses a menu on migrate. Gate green: db+web typecheck, eslint,
+10 rbac unit tests. **No enforcement wired yet** (Waves 1–3 pending).
+
+**[HOW] note for Wave 1:** the resolver keys on the Prisma `UserRole` literal union (string `switch`), which
+sidesteps the `no-unsafe-enum-comparison` trap between Prisma `UserRole` and `@cuelane/shared` `Role`
+(lesson `typescript.eslint.prisma-enum-vs-shared-enum-comparison`) — Wave 1 wiring (`matrixProcedure`, nav
+filter, route guards) must derive role via `resolvePrincipal` (DB `user.role`), not compare `ctx.roles`
+against `UserRole` directly.
