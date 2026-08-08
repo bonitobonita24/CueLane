@@ -114,7 +114,7 @@ interface ServiceSpec {
 
 interface UserSpec {
   name: string;
-  role: 'tenant_superadmin' | 'employee';
+  role: 'tenant_superadmin' | 'tenant_admin' | 'employee';
   pin: string;
   /** Indices into the tenant's `services` array this employee is assigned to. Admins ignore this. */
   services?: number[];
@@ -184,6 +184,8 @@ const demoSpec: TenantSeedSpec = {
     { name: 'Carmela Cruz',   role: 'employee', pin: '2468', services: [5, 6] },
     { name: 'Dominic Ilagan', role: 'employee', pin: '1357', services: [2, 3, 7] },
     { name: 'Elena Mercado',  role: 'employee', pin: '9090', services: [1, 4, 5, 6, 7] },
+    // Appended last so existing employee indices (1–5, referenced by tickets' servedByIdx) stay stable.
+    { name: 'Branch Manager', role: 'tenant_admin', pin: '4321' },
   ],
   tickets: [
     // Waiting
@@ -335,7 +337,11 @@ async function seedTenant(spec: TenantSeedSpec): Promise<void> {
   // Dev PINs only — never use these in production. Production auth rolls out separately
   // (Server-Setups universal-admin credential).
 
-  async function findOrUpsertUser(name: string, role: 'tenant_superadmin' | 'employee', pin: string) {
+  async function findOrUpsertUser(
+    name: string,
+    role: 'tenant_superadmin' | 'tenant_admin' | 'employee',
+    pin: string,
+  ) {
     return findOrUpsert(
       () => prisma.user.findFirst({ where: { tenantId: tenant.id, name } }),
       () => prisma.user.create({ data: { tenantId: tenant.id, name, role, pin: hashPin(pin) } }),
