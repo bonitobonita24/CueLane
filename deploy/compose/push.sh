@@ -39,6 +39,33 @@ push_tags() {
   done
 }
 
+# ── Dev-freshness coupling (fleet standard: ~/.claude/rules/deploy-discipline.md) ──
+# A staging/prod ship is NOT complete until local dev is rebuilt off the same main/sha —
+# app AND worker (an app-only --build leaves the worker stale). Dev serves a prebuilt image
+# with no source bind-mount, so code only appears on REBUILD; a ship recreates staging/prod
+# but never touches dev, so dev would silently serve STALE code. Set DEV_REBUILD=0 to skip
+# (e.g. "just promote, no dev rebuild").
+DEV_REBUILD="${DEV_REBUILD:-1}"
+
+rebuild_local_dev() {
+  if [[ "$DEV_REBUILD" != "1" ]]; then
+    echo "⏭  DEV_REBUILD=0 — skipping coupled local-dev rebuild (dev may now be STALE vs main)."
+    return 0
+  fi
+  echo "=== Coupled step: rebuilding local dev off main (app + worker, sha=$SHA) ==="
+  bash "$REPO_ROOT/deploy/compose/start.sh" dev up -d --build
+  echo "=== Verifying dev freshness vs main ==="
+  if command -v dev-freshness-check.sh >/dev/null 2>&1; then
+    dev-freshness-check.sh "$REPO_ROOT" || {
+      echo "✗ Local dev is BEHIND main after rebuild — investigate before considering the ship complete." >&2
+      return 2
+    }
+  else
+    echo "⚠  dev-freshness-check.sh not on PATH — skipped freshness verification."
+  fi
+  echo "✓ Local dev rebuilt + verified fresh vs main."
+}
+
 # ── Stages ───────────────────────────────────────────────────────────────────
 case "$TARGET" in
   dev)
@@ -76,6 +103,7 @@ case "$TARGET" in
     docker tag "$WORKER_IMAGE:dev-latest" "$WORKER_IMAGE:staging-latest"
     push_tags "$WORKER_IMAGE:staging-$SHA" "$WORKER_IMAGE:staging-latest"
     echo "✓ Worker staging image pushed: $WORKER_IMAGE:staging-$SHA + :staging-latest"
+    rebuild_local_dev
     ;;
 
   prod)
@@ -96,6 +124,7 @@ case "$TARGET" in
     echo "✓ Worker production image pushed: $WORKER_IMAGE:prod-$SHA + :latest"
     echo "  Next: update APP_IMAGE_TAG in .env.prod and run:"
     echo "    bash deploy/compose/start.sh prod up -d"
+    rebuild_local_dev
     ;;
 
   *)
