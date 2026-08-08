@@ -424,8 +424,42 @@ async function seedTenant(spec: TenantSeedSpec): Promise<void> {
   console.log(`    ✓ SequenceCounter reservations: ${counterReservations.length} keys`);
 }
 
+// ─── Feature registry (Wave 0b — RolePermission.featureKey FK target) ─────────
+// Global, tenant-agnostic catalog of admin-shell modules. Must exist before any
+// RolePermission row can be created (real DB FK). `surface` = the admin route
+// slug for that feature — matches the AdminTab `href` values in
+// apps/web/src/app/[tenant]/admin/_lib/access.ts (dashboard's href is '', the
+// admin root); 'roles' has no AdminTab yet (custom-role builder UI not built),
+// its surface is reserved as 'roles' to match the future /admin/roles route.
+
+const FEATURE_SURFACES: Record<string, string> = {
+  dashboard: '',
+  services: 'services',
+  windows: 'windows',
+  users: 'users',
+  media: 'media',
+  settings: 'settings',
+  theme: 'theme',
+  usage: 'usage',
+  roles: 'roles',
+};
+
+async function seedFeatures(): Promise<void> {
+  const keys = Object.keys(FEATURE_SURFACES) as Prisma.FeatureCreateInput['featureKey'][];
+  for (const featureKey of keys) {
+    await prisma.feature.upsert({
+      where: { featureKey },
+      update: { surface: FEATURE_SURFACES[featureKey] },
+      create: { featureKey, surface: FEATURE_SURFACES[featureKey] },
+    });
+  }
+  console.log(`✓ Feature registry (${keys.length}): ${keys.join(', ')}\n`);
+}
+
 async function main(): Promise<void> {
   console.log('🌱 Seeding CueLane dev database (2 tenants — Wave 7.6-T9 rich demo dataset)...\n');
+
+  await seedFeatures();
 
   for (const spec of [demoSpec, clinicSpec]) {
     await seedTenant(spec);

@@ -67,6 +67,27 @@ enum AdType {
   uploaded
 }
 
+// RBAC view-access matrix (Rule 34 Part B). Feature = fixed catalog of admin modules;
+// RolePermission = per-tenant custom-role × feature CRUD matrix.
+enum FeatureKey {
+  dashboard
+  services
+  windows
+  users
+  media
+  settings
+  theme
+  usage
+  roles
+}
+
+enum RolePreset {
+  supervisor
+  operator
+  contributor
+  viewer
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model Tenant {
@@ -93,6 +114,8 @@ model Tenant {
   subscription        Subscription?
   passwordResetTokens PasswordResetToken[]
   auditLogs           AuditLog[]           @relation("TenantAuditLogs")
+  customRoles         CustomRole[]
+  rolePermissions     RolePermission[]
 
   @@map("tenants")
 }
@@ -140,16 +163,69 @@ model User {
   role      UserRole @default(employee)
   // Stored hashed (bcrypt in production, SHA-256 dev hash in seed). See Part 5 auth layer.
   pin       String
+  // Only set when role = tenant_admin AND the tenant has opted into a custom role preset.
+  customRoleId String? @map("custom_role_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customRole          CustomRole?          @relation(fields: [customRoleId], references: [id])
   userServices        UserService[]
   servedTickets       Ticket[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([tenantId])
   @@map("users")
+}
+
+// Fixed catalog of admin-shell modules a role's view-access matrix can grant/deny.
+// Not tenant-scoped — the feature list itself is global; per-tenant grants live on RolePermission.
+model Feature {
+  featureKey FeatureKey @id @map("feature_key")
+  surface    String // admin route/nav-item this feature key maps to, e.g. "/admin/services"
+
+  rolePermissions RolePermission[]
+
+  @@map("features")
+}
+
+// Tenant-scoped custom role (Rule 34 Part B). Ceiling is always <= tenant_admin;
+// never grants Billing or User-Management regardless of RolePermission rows.
+model CustomRole {
+  id        String     @id @default(cuid())
+  tenantId  String     @map("tenant_id")
+  name      String
+  preset    RolePreset
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users           User[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("custom_roles")
+}
+
+// Per-tenant custom-role x feature CRUD matrix. tenantId is denormalized onto this row
+// (not just reachable via customRole) for the L6 Prisma tenant-isolation guard.
+model RolePermission {
+  id           String     @id @default(cuid())
+  tenantId     String     @map("tenant_id")
+  customRoleId String     @map("custom_role_id")
+  featureKey   FeatureKey @map("feature_key")
+  view         Boolean    @default(false)
+  write        Boolean    @default(false)
+  update       Boolean    @default(false)
+  delete       Boolean    @default(false)
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customRole CustomRole @relation(fields: [customRoleId], references: [id], onDelete: Cascade)
+  feature    Feature    @relation(fields: [featureKey], references: [featureKey])
+
+  @@unique([customRoleId, featureKey])
+  @@index([tenantId])
+  @@map("role_permissions")
 }
 
 // Explicit join table: User ↔ Service (many-to-many, tenantId for L6 guard)
