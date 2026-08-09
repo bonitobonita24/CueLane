@@ -3,8 +3,33 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **RBAC 3-tier retrofit BACKBONE (Scenario 42, T1–T8) COMPLETE + verified on branch `feat/tenant-rbac-3tier`. Phase 7/8 build remains complete. Only gated [WHAT]s + deferred future-scope remain.**
-CURRENT:      Resume session 2026-08-08 (Full Auto, owner asleep). **RBAC 3-tier BACKBONE FINISHED THIS SESSION.**
+PHASE:        **RBAC view-access retrofit (Rule 34 Part B) — Wave 0 (schema+resolver) + Wave 1 (enforcement) DONE + verified on `feat/rbac-view-access`. Waves 2–3 pending (owner-gated). Phase 7/8 build complete.**
+CURRENT:      Resume session 2026-08-09. **RBAC view-access WAVE 1 (matrix enforcement) BUILT + VERIFIED THIS SESSION.**
+              Branch `feat/rbac-view-access` (off feat/tenant-rbac-3tier). Wave 1 committed `ae8b333` (code) +
+              governance (this file + DECISIONS_LOG). LOCAL only — NOT pushed (was pushed to origin last session
+              through Wave 0; Wave 1 commit is local until owner says push). HARD HOLD.
+              ✅ DONE THIS SESSION (2026-08-09):
+              **Wave 1 — matrix-driven view-access enforcement wired to all 3 surfaces (rbac.md B3):**
+              (1) tRPC `matrixProcedure(feature, action)` factory (server/trpc/trpc.ts) — superset of
+                  adminProcedure; fixed tiers short-circuit allow BEFORE resolvePrincipal (platform
+                  tenant_manager has NO user row → would throw). Swapped routers: service/window/media (CRUD→
+                  view/write/update/delete), dashboard (view), tenantAdmin (usage:view, settings:view/update).
+                  user stays owner-only; tenantAd (Premium ads) stays admin-only (conservative Wave-1 deny).
+              (2) Nav — ADMIN_TABS carry FeatureKey; visibleAdminTabs(principal, tier) matrix-filters;
+                  admin/layout.tsx resolves DB principal + redirects out when 0 tabs visible.
+              (3) Per-page requireFeatureView guards on every admin sub-page; admin root routes a
+                  dashboard-denied caller to their first visible tab (loop-safe).
+              (4) Behavior change (correct, logged): tenant_admin no longer sees the Users tab (OWNER_ONLY) —
+                  now matches userManagementProcedure. No fixed-tier user loses legitimate access.
+              (5) Tests: new matrixProcedure.test.ts (custom-role grant + deny-by-default e2e via windowRouter) +
+                  access.test.ts updated for the principal signature.
+              **Verified cache-OFF:** typecheck 8/8, lint 8/8; all RBAC-affected tests green (matrixProcedure +
+              access + 5 swapped routers = 52/53 in isolated run). The 1 fail (station.getWindow) + the other
+              suite fails (storage/display/media-upload = MinIO cred mismatch, auth = SMTP, station = Valkey)
+              are PRE-EXISTING env gaps in code I did NOT touch — confirmed via git diff (station/context/auth/
+              storage untouched). Global lesson logged: rbac.matrix-procedure.platform-tier-has-no-user-row.
+              ── prior session (2026-08-08) — RBAC 3-tier BACKBONE ──
+              Resume session 2026-08-08 (Full Auto, owner asleep). **RBAC 3-tier BACKBONE FINISHED THAT SESSION.**
               Branch `feat/tenant-rbac-3tier`, LOCAL only (no upstream, HARD HOLD).
               ✅ DONE THIS SESSION (2026-08-08):
               (1) **T5 — ownership succession** (commits 7ff65ca + fix 535c9c7). `user.transferOwnership`
@@ -145,7 +170,7 @@ PREV_SESSION: Post-Phase-7 polish + Phase-8 sweep (2026-07-10). Phase 7 (waves 7
 PREV_DONE:    Phase 7 Wave 7.7a — Admin Dashboard (2026-07-09). 146ecbd/d2531ba/8595d4f. 8 KPIs, tier-gated advanced
               blocks, searchable ticket log. Barrel/RSC bug found+fixed (ToggleGroup → dedicated subpaths). PM-verified
               typecheck 8/8, test 130/130, build 8/8, live both tenants match psql. See memory for detail.
-LAST_DONE:    Phase 7 Wave 7.5 — Big Display (2026-07-08). Sonnet worker (died mid-verify on an API drop; PM
+LAST_DONE:    RBAC view-access Wave 1 — matrix-driven enforcement (matrixProcedure + nav filter + per-page guards); commit ae8b333, cache-off typecheck/lint green, RBAC tests green (2026-08-09).
               finished container-rebuild + E2E + commit). Commits e3d4278 (T0 — public queue.state read:
               kioskProcedure, tenantSlug-resolved, single round-trip returning now-serving/up-next(6, prio-FIFO)/
               totalWaiting/branding(companyName+tier); Tenant is GLOBAL_MODEL so no withTenantContext wrap; test
@@ -181,7 +206,7 @@ LAST_DONE:    Phase 7 Wave 7.5 — Big Display (2026-07-08). Sonnet worker (died
               flow + transfer+Return-After-Done DB-verified per test-artifacts/phase7-station/NOTES.md +3 png.
               Prior waves: 7.3 Kiosk (b8797d9/0aaf118/cc2fca2), 7.2 SSE (07b792b/83c38a7/cc2dc13/d1ca600),
               7.1 Queue Engine (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a). 55 commits ahead, 0 pushed (HARD HOLD).
-NEXT:         ⭐ RBAC 3-tier BACKBONE (T1–T8) is DONE + verified (2026-08-08) — see CURRENT block. The un-gated
+NEXT:         ⭐ RBAC Wave 2 (owner-gated — needs "build Wave 2"/"continue RBAC"): role-builder UI (tenant_superadmin-only, shadcn Data Table/Checkbox/Form + RHF+Zod, rbac.md B4) + a `customRoles` tRPC router (create/rename/assign, ≤ tenant_admin ceiling, NEVER users/roles, only tenant_superadmin+manager). Then Wave 3: verify-all-pages (Playwright, employee-with-custom-role live) + full cache-off gate. Copy-source FerryBook. D-RBAC-1 (virtual vs DB tenant_manager) stays open + non-blocking. Old un-gated
               RBAC queue is now EMPTY. Remaining RBAC work is **RBAC Phase 2 — the tenant-scoped custom-role
               permission matrix (D-RBAC-3)** — a SEPARATE milestone that is an OPEN owner [WHAT] (is the matrix
               wanted this cycle?). **Do NOT auto-start it; surface D-RBAC-3 + D-RBAC-1 and wait for owner GO.**
@@ -277,7 +302,7 @@ KNOWN GAPS (Phase 7/8 follow-ups — NOT blockers):
 BLOCKERS:     Human ⏳ in CREDENTIALS.md before Phase 6 DEPLOY (NOT dev): Docker Hub token, SMTP
               creds, Xendit API keys (TEST+LIVE), Turnstile LIVE keys. Dev uses MailHog +
               Turnstile test keys + the official local-dev super-admin cred (Server-Setups) — not blocked.
-GIT_BRANCH:   feat/tenant-rbac-3tier (RBAC 3-tier backbone T1–T8 committed local; NO upstream — HARD HOLD,
+GIT_BRANCH:   feat/rbac-view-access (off feat/tenant-rbac-3tier). Wave 0 PUSHED to origin last session; Wave 1 commit ae8b333 LOCAL only — HARD HOLD, no push/deploy without owner word. main untouched.
               local dev only). Dev stack REBUILT off this branch (2026-08-08). `main` unchanged; merge is owner-gated.
 DEPLOY_HOLD:  ⛔ LOCAL DEV ONLY. No staging/prod push without explicit owner word.
 PORTS (dev):  APP=41716 WORKER=41717 DB=41706 PGBOUNCER=41707 CACHE=41708 MINIO=41709

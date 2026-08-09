@@ -715,3 +715,38 @@ sidesteps the `no-unsafe-enum-comparison` trap between Prisma `UserRole` and `@c
 (lesson `typescript.eslint.prisma-enum-vs-shared-enum-comparison`) — Wave 1 wiring (`matrixProcedure`, nav
 filter, route guards) must derive role via `resolvePrincipal` (DB `user.role`), not compare `ctx.roles`
 against `UserRole` directly.
+
+---
+
+## 2026-08-09 — RBAC Wave 1 BUILT: matrix-driven view-access enforcement (commit ae8b333)
+
+**Built (branch `feat/rbac-view-access`, LOCAL / HARD HOLD):** the Wave 0 resolver is now wired into all
+three enforcement surfaces (`.ai_prompt/rbac.md` Rule 34 Part B B3):
+- **tRPC** — `matrixProcedure(feature, action)` factory in `server/trpc/trpc.ts`: a faithful superset of
+  `adminProcedure` (same protected + tenant-scope + suspension + AsyncLocalStorage plumbing) with the flat
+  Admin gate replaced by `hasPermission(principal, feature, action)`. Swapped routers: `service`/`window`/
+  `media` (CRUD → view/write/update/delete), `dashboard` (view), `tenantAdmin` (usage:view, settings:view/
+  update). `user` stays `userManagementProcedure` (owner-only); `tenantAd` (Premium ads) stays
+  `adminProcedure` (conservative deny for Wave 1 — employees/custom-roles cannot reach premium tenant ads).
+- **Route/nav** — `ADMIN_TABS` carry a `FeatureKey`; `visibleAdminTabs(principal, tier)` filters via the
+  matrix. `admin/layout.tsx` resolves the DB principal and redirects out (→ `/{tenant}/kiosk`) when zero
+  tabs are visible. Per-page `requireFeatureView` guards on every admin sub-page; the admin root routes a
+  dashboard-denied caller to their first visible tab (loop-safe).
+
+**[HOW] — fixed-tier short-circuit BEFORE the DB read (critical).** `matrixProcedure` decides
+manager/superadmin/tenant_admin allow/deny from `ctx.roles` and NEVER calls `resolvePrincipal` for them —
+the platform `tenant_manager` is a virtual credential identity with **no user row**, so resolving it would
+throw. Only the employee/custom-role path hits `resolvePrincipal(userId, prismaRaw)`. Logged to the global
+lessons ledger (`rbac.matrix-procedure.platform-tier-has-no-user-row`).
+
+**Behavior change (deliberate, correct):** a `tenant_admin` no longer sees the **Users** tab (an OWNER_ONLY
+feature) — this now matches `userManagementProcedure`, which already forbade `tenant_admin` from user CRUD.
+Previously the tab rendered but its data calls 403'd. No fixed-tier user loses any *legitimate* access.
+
+**Verified cache-off:** typecheck 8/8, lint 8/8; new `matrixProcedure.test.ts` (custom-role grant path +
+deny-by-default, end-to-end) + updated `access.test.ts` green; all 5 swapped routers green. Remaining suite
+failures (storage/display/media-upload = MinIO cred mismatch, auth = SMTP, station = Valkey) are pre-existing
+env gaps in untouched code, not this change.
+
+**Pending:** Wave 2 (role-builder UI + `customRoles` tRPC router, tenant_superadmin-only — B4) and Wave 3
+(verify-all-pages + full gate). D-RBAC-1 (platform identity) stays open + non-blocking.
