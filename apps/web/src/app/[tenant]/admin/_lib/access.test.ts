@@ -6,7 +6,22 @@
 // via these pure functions — the same testing shape server/domain/admin.ts already uses.
 import { describe, expect, it } from 'vitest';
 import { Role, TenantTier } from '@cuelane/shared';
+import { FeatureKey } from '@cuelane/db';
+import type { Principal, PermissionFlags } from '@/lib/rbac';
 import { ADMIN_TABS, isAdminRole, isTabGatedForTier, visibleAdminTabs } from './access';
+
+// Fixed-tier principals (no matrix — hasPermission short-circuits by role).
+function principalFor(role: Principal['role']): Principal {
+  return { userId: 'u1', tenantId: 't1', role, customRoleId: null, permissions: new Map() };
+}
+// An employee principal carrying a custom-role matrix.
+function employeePrincipal(grants: Partial<Record<FeatureKey, Partial<PermissionFlags>>>): Principal {
+  const permissions = new Map<FeatureKey, PermissionFlags>();
+  for (const [key, flags] of Object.entries(grants)) {
+    permissions.set(key as FeatureKey, { view: false, write: false, update: false, delete: false, ...flags });
+  }
+  return { userId: 'u2', tenantId: 't1', role: 'employee', customRoleId: 'cr1', permissions };
+}
 
 describe('isAdminRole', () => {
   it('admits Admin', () => {
@@ -26,17 +41,33 @@ describe('isAdminRole', () => {
   });
 });
 
-describe('visibleAdminTabs', () => {
-  it('Free tier sees the Theme tab (Wave 7.7b — presets are free; only custom is Premium-gated)', () => {
-    const tabs = visibleAdminTabs(TenantTier.Free);
+describe('visibleAdminTabs (Wave 1 — matrix-driven)', () => {
+  it('tenant_superadmin sees every tab on Free tier (fixed tier — full access, presets are free)', () => {
+    const tabs = visibleAdminTabs(principalFor('tenant_superadmin'), TenantTier.Free);
     expect(tabs.map((t) => t.id)).toContain('theme');
     expect(tabs.length).toBe(ADMIN_TABS.length);
   });
 
-  it('Premium tier sees every tab, including Theme', () => {
-    const tabs = visibleAdminTabs(TenantTier.Premium);
-    expect(tabs.map((t) => t.id)).toContain('theme');
+  it('tenant_superadmin sees every tab on Premium tier, including Users', () => {
+    const tabs = visibleAdminTabs(principalFor('tenant_superadmin'), TenantTier.Premium);
+    expect(tabs.map((t) => t.id)).toContain('users');
     expect(tabs.length).toBe(ADMIN_TABS.length);
+  });
+
+  it('tenant_admin sees every tab EXCEPT Users (OWNER_ONLY — matches userManagementProcedure)', () => {
+    const tabs = visibleAdminTabs(principalFor('tenant_admin'), TenantTier.Premium);
+    expect(tabs.map((t) => t.id)).not.toContain('users');
+    expect(tabs.length).toBe(ADMIN_TABS.length - 1);
+  });
+
+  it('an employee custom role granting only services:view sees exactly the Services tab', () => {
+    const tabs = visibleAdminTabs(employeePrincipal({ [FeatureKey.services]: { view: true } }), TenantTier.Premium);
+    expect(tabs.map((t) => t.id)).toEqual(['services']);
+  });
+
+  it('an employee with no grants sees no tabs (deny-by-default)', () => {
+    const tabs = visibleAdminTabs(employeePrincipal({}), TenantTier.Premium);
+    expect(tabs).toHaveLength(0);
   });
 });
 

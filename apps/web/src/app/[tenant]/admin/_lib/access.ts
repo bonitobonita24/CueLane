@@ -6,6 +6,9 @@
 // these two functions plus the redirect/render side effects that can't be unit-tested without a
 // browser-render harness.
 import { Role, TenantTier } from '@cuelane/shared';
+import { FeatureKey } from '@cuelane/db';
+import { hasPermission } from '@/lib/rbac';
+import type { Principal } from '@/lib/rbac';
 
 export interface AdminTab {
   id: string;
@@ -14,21 +17,25 @@ export interface AdminTab {
    *  string ('') is the special case for the admin ROOT (Dashboard) — AdminTabsNav renders it as
    *  `/{tenant}/admin` with no trailing slash, not `/{tenant}/admin/`. */
   href: string;
+  /** The view-access FeatureKey this tab maps to (Wave 1 — Rule 34 Part B). The sidebar renders a
+   *  tab only when the caller's Principal has `view` on this feature; the matching sub-page
+   *  re-guards it server-side (defense-in-depth) and the tRPC router gates its data. */
+  feature: FeatureKey;
 }
 
 /** All Admin Panel tabs, tenant-agnostic (no tenant/slug baked in — layout.tsx prefixes href).
- *  Wave 7.7a-T3: 'dashboard' (href '') is the admin index — always visible on every tier (the KPI
- *  cards + rate bars render for Free; only the advanced blocks inside dashboard-client.tsx are
- *  tier-gated, so this tab itself is never in FREE_GATED_TAB_IDS). */
+ *  Wave 7.7a-T3: 'dashboard' (href '') is the admin index. Wave 1: each tab carries its FeatureKey
+ *  so nav visibility flows from the per-role / custom-role view-access matrix (`visibleAdminTabs`),
+ *  not a flat role check. The tab `id` intentionally equals its FeatureKey value. */
 export const ADMIN_TABS: readonly AdminTab[] = [
-  { id: 'dashboard', label: 'Dashboard', href: '' },
-  { id: 'services', label: 'Services', href: 'services' },
-  { id: 'windows', label: 'Windows', href: 'windows' },
-  { id: 'users', label: 'Users', href: 'users' },
-  { id: 'media', label: 'Media', href: 'media' },
-  { id: 'settings', label: 'Printer', href: 'settings' },
-  { id: 'theme', label: 'Theme', href: 'theme' },
-  { id: 'usage', label: 'Usage', href: 'usage' },
+  { id: 'dashboard', label: 'Dashboard', href: '', feature: FeatureKey.dashboard },
+  { id: 'services', label: 'Services', href: 'services', feature: FeatureKey.services },
+  { id: 'windows', label: 'Windows', href: 'windows', feature: FeatureKey.windows },
+  { id: 'users', label: 'Users', href: 'users', feature: FeatureKey.users },
+  { id: 'media', label: 'Media', href: 'media', feature: FeatureKey.media },
+  { id: 'settings', label: 'Printer', href: 'settings', feature: FeatureKey.settings },
+  { id: 'theme', label: 'Theme', href: 'theme', feature: FeatureKey.theme },
+  { id: 'usage', label: 'Usage', href: 'usage', feature: FeatureKey.usage },
 ] as const;
 
 /** Tab ids hidden on the Free tier. Wave 7.7b: 'theme' is REMOVED from this set — Free tenants now
@@ -43,10 +50,21 @@ export function isAdminRole(roles: readonly Role[]): boolean {
   return roles.includes(Role.TenantSuperadmin) || roles.includes(Role.TenantAdmin) || roles.includes(Role.TenantManager);
 }
 
-/** Tabs visible for a given tier — Free tier filters out FREE_GATED_TAB_IDS. */
-export function visibleAdminTabs(tier: TenantTier): AdminTab[] {
-  if (tier === TenantTier.Premium) return [...ADMIN_TABS];
-  return ADMIN_TABS.filter((tab) => !FREE_GATED_TAB_IDS.has(tab.id));
+/**
+ * Tabs a given Principal may see, in ADMIN_TABS order (Wave 1 — Rule 34 Part B).
+ * A tab is shown only when BOTH hold:
+ *   1. The Principal has `view` on the tab's FeatureKey (the per-role / custom-role matrix —
+ *      fixed tiers short-circuit allow; tenant_admin is denied OWNER_ONLY features; employees
+ *      resolve through role_permissions, deny-by-default).
+ *   2. It is not tier-gated away (Free tenants drop FREE_GATED_TAB_IDS — currently empty).
+ * The nav is a convenience filter; the real boundary is the tRPC matrixProcedure + the per-page
+ * server guard, both reading the SAME resolver — so nav can never show what tRPC would forbid.
+ */
+export function visibleAdminTabs(principal: Principal, tier: TenantTier): AdminTab[] {
+  return ADMIN_TABS.filter((tab) => {
+    if (tier !== TenantTier.Premium && FREE_GATED_TAB_IDS.has(tab.id)) return false;
+    return hasPermission(principal, tab.feature, 'view');
+  });
 }
 
 /** True when `tabId` is gated away for `tier` (used by sub-pages as a defense-in-depth check,

@@ -12,10 +12,11 @@
 // owns the server-side theme CSS-var injection (unchanged), so it applies to this shell too.
 import { redirect } from 'next/navigation';
 import { auth } from '@/server/auth';
-import { prisma } from '@cuelane/db';
-import { Role, TenantTier } from '@cuelane/shared';
+import { prisma, prismaRaw } from '@cuelane/db';
+import { TenantTier } from '@cuelane/shared';
 import { AppShell, type AppShellNavItem } from '@/components/AppShell';
-import { isAdminRole, visibleAdminTabs } from './_lib/access';
+import { visibleAdminTabs } from './_lib/access';
+import { resolvePrincipal, type Principal } from '@/lib/rbac';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -26,8 +27,22 @@ export default async function AdminLayout({ children, params }: AdminLayoutProps
   const { tenant: tenantSlug } = await params;
   const session = await auth();
 
-  const roles = (session?.user as { roles?: Role[] } | undefined)?.roles ?? [];
-  if (!isAdminRole(roles)) {
+  const userId = session?.user?.id ?? null;
+  if (userId == null || userId === '') {
+    redirect('/login');
+  }
+
+  // Wave 1 (Rule 34 Part B): the Admin Panel gate is now the view-access MATRIX, not a flat
+  // Admin/SuperAdmin role check. Resolve the caller's DB Principal (fixed system role + any
+  // custom-role permission matrix), then let the nav — and the shell-entry guard below — flow from
+  // it. Fixed tiers (manager/superadmin/tenant_admin) short-circuit to full access inside
+  // hasPermission; an employee with a custom role gets exactly the tabs their matrix grants. The
+  // platform tenant_manager has no user row and never belongs in a tenant admin shell, so a
+  // missing row = not authorized here.
+  let principal: Principal;
+  try {
+    principal = await resolvePrincipal(userId, prismaRaw);
+  } catch {
     redirect(`/${tenantSlug}/kiosk`);
   }
 
@@ -42,7 +57,12 @@ export default async function AdminLayout({ children, params }: AdminLayoutProps
     redirect('/login');
   }
 
-  const tabs = visibleAdminTabs(tenant.tier as TenantTier);
+  const tabs = visibleAdminTabs(principal, tenant.tier as TenantTier);
+  // No visible tab → the caller has no admin-module access at all (a plain employee with no
+  // custom-role grants) → bounce out of the admin shell entirely, same target as before.
+  if (tabs.length === 0) {
+    redirect(`/${tenantSlug}/kiosk`);
+  }
 
   // Resolve each tier-filtered tab into a fully-serializable nav item with an absolute href. The
   // Dashboard tab (href '') is the admin ROOT (`/{tenant}/admin`, no trailing slash) and is

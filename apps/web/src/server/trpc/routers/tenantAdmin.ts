@@ -4,8 +4,8 @@
 // resolved from `ctx.tenantId` (session-derived) — never a client-supplied tenant id.
 import { z } from 'zod';
 import { updateTenantSettingsSchema } from '@cuelane/shared';
-import { prisma, prismaRaw, type Prisma } from '@cuelane/db';
-import { createTRPCRouter, adminProcedure } from '../trpc';
+import { prisma, prismaRaw, type Prisma, FeatureKey } from '@cuelane/db';
+import { createTRPCRouter, matrixProcedure } from '../trpc';
 import { getUsage as domainGetUsage } from '@/server/domain/admin';
 import { stripUndefined } from '../lib/admin-errors';
 
@@ -15,11 +15,11 @@ export const tenantAdminRouter = createTRPCRouter({
   // result) is a structurally-narrower extended-client type that doesn't match `PrismaClient`
   // exactly. domain/admin.ts already filters every query by the explicit `tenantId` parameter
   // (same L2/L6 convention as queue.ts's domain layer), so this is safe without the guard.
-  getUsage: adminProcedure.input(z.void()).query(async ({ ctx }) => {
+  getUsage: matrixProcedure(FeatureKey.usage, 'view').input(z.void()).query(async ({ ctx }) => {
     return domainGetUsage(prismaRaw, ctx.tenantId);
   }),
 
-  getSettings: adminProcedure.input(z.void()).query(async ({ ctx }) => {
+  getSettings: matrixProcedure(FeatureKey.settings, 'view').input(z.void()).query(async ({ ctx }) => {
     const tenant = await prisma.tenant.findUniqueOrThrow({
       where: { id: ctx.tenantId },
       select: { companyName: true, tagline: true, logoUrl: true, tier: true, settings: true },
@@ -27,7 +27,7 @@ export const tenantAdminRouter = createTRPCRouter({
     return tenant;
   }),
 
-  updateSettings: adminProcedure.input(updateTenantSettingsSchema).mutation(async ({ ctx, input }) => {
+  updateSettings: matrixProcedure(FeatureKey.settings, 'update').input(updateTenantSettingsSchema).mutation(async ({ ctx, input }) => {
     const { settings: settingsPatch, ...tenantFields } = input;
 
     const existing = await prisma.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { settings: true } });
