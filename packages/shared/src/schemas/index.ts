@@ -7,6 +7,8 @@ import {
   TicketStatus,
   MediaType,
   AdType,
+  FeatureKey,
+  RolePreset,
   THEME_PRESETS,
   SERVICE_ICON_OPTIONS,
   SERVICE_COLOR_OPTIONS,
@@ -158,17 +160,24 @@ export const updateWindowSchema = createWindowSchema.partial();
 // only the three tenant-scoped roles are.
 const tenantRoleSchema = z.enum([Role.Employee, Role.TenantAdmin, Role.TenantSuperadmin]);
 
+// RBAC Wave 2 (Task 3) — `customRoleId` is meaningful ONLY for `role: Role.Employee` (the resolver
+// `apps/web/src/lib/rbac/hasPermission.ts` applies the permission matrix exclusively to the
+// `employee` tier; tenant_admin/tenant_superadmin/tenant_manager always short-circuit to full or
+// OWNER_ONLY-gated access regardless of any customRoleId). The router forces it to `null` for any
+// non-employee role — never trust the client to only send it when appropriate.
 export const createUserSchema = z.object({
   name: z.string().min(1).max(100),
   role: tenantRoleSchema,
   pin: pinSchema,
   services: z.array(idSchema).default([]),
+  customRoleId: idSchema.optional().nullable(),
 });
 
 export const updateUserSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   pin: pinSchema.optional(),
   services: z.array(idSchema).optional(),
+  customRoleId: idSchema.optional().nullable(),
 });
 
 export const updateUserRoleSchema = z.object({
@@ -401,6 +410,26 @@ export const consumePasswordResetSchema = z.object({
   newPassword: z.string().min(8).max(100),
 });
 
+// ─── RBAC custom-role view-access matrix (Rule 34 Part B) ───────────────────────
+
+export const permissionRowSchema = z.object({
+  featureKey: z.nativeEnum(FeatureKey),
+  view: z.boolean(),
+  write: z.boolean(),
+  update: z.boolean(),
+  delete: z.boolean(),
+});
+
+export const createCustomRoleSchema = z.object({
+  name: z.string().trim().min(1),
+  preset: z.nativeEnum(RolePreset),
+  permissions: z.array(permissionRowSchema),
+});
+
+export const updateCustomRoleSchema = createCustomRoleSchema.extend({
+  id: z.string().min(1),
+});
+
 // ─── Dashboard (Wave 7.7a) ─────────────────────────────────────────────────────
 
 export const dashboardRangeSchema = z.object({
@@ -451,3 +480,7 @@ export type ConsumePasswordResetInput = z.infer<typeof consumePasswordResetSchem
 
 export type DashboardRangeInput = z.infer<typeof dashboardRangeSchema>;
 export type DashboardTicketLogInput = z.infer<typeof dashboardTicketLogSchema>;
+
+export type PermissionRowInput = z.infer<typeof permissionRowSchema>;
+export type CreateCustomRoleInput = z.infer<typeof createCustomRoleSchema>;
+export type UpdateCustomRoleInput = z.infer<typeof updateCustomRoleSchema>;

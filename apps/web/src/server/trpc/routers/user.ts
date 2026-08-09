@@ -28,10 +28,46 @@ async function assertServicesBelongToTenant(
 }
 
 function serializeUser(
-  user: { id: string; tenantId: string; name: string; role: string; createdAt: Date },
+  user: { id: string; tenantId: string; name: string; role: string; customRoleId: string | null; createdAt: Date },
   serviceIds: string[],
 ) {
-  return { id: user.id, tenantId: user.tenantId, name: user.name, role: user.role, createdAt: user.createdAt, serviceIds };
+  return {
+    id: user.id,
+    tenantId: user.tenantId,
+    name: user.name,
+    role: user.role,
+    customRoleId: user.customRoleId,
+    createdAt: user.createdAt,
+    serviceIds,
+  };
+}
+
+/** RBAC Wave 2 (Task 3) — `customRoleId` is meaningful ONLY for `role: Role.Employee` (see
+ *  hasPermission.ts: tenant_admin/tenant_superadmin/tenant_manager never consult the matrix).
+ *  Forces the value to `null` for any other role regardless of what the client sent, and — when a
+ *  non-null id IS being assigned — validates it belongs to THIS tenant (never trust a
+ *  client-supplied roleId across tenants, L6). Returns the id to persist. */
+async function resolveCustomRoleId(
+  db: Prisma.TransactionClient,
+  tenantId: string,
+  role: string,
+  requestedCustomRoleId: string | null | undefined,
+): Promise<string | null> {
+  // `role` may arrive as either the shared `Role` enum (create, from createUserSchema) or the
+  // Prisma-generated `UserRole` enum (update, from `existing.role`) — coerce to one nominal type
+  // for the comparison, same pattern as transferOwnership's `targetRole` above (satisfies
+  // @typescript-eslint/no-unsafe-enum-comparison).
+  if ((role as unknown as Role) !== Role.Employee) {
+    return null;
+  }
+  if (requestedCustomRoleId == null) {
+    return null;
+  }
+  const found = await db.customRole.findFirst({ where: { id: requestedCustomRoleId, tenantId }, select: { id: true } });
+  if (found == null) {
+    throw new AdminDomainError('BAD_REQUEST', 'Custom role does not belong to this tenant.');
+  }
+  return requestedCustomRoleId;
 }
 
 export const userRouter = createTRPCRouter({
@@ -52,9 +88,10 @@ export const userRouter = createTRPCRouter({
         const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { tier: true } });
         await assertWithinLimit(tx, 'users', ctx.tenantId, tenant.tier as TenantTier);
         await assertServicesBelongToTenant(tx, ctx.tenantId, input.services);
+        const customRoleId = await resolveCustomRoleId(tx, ctx.tenantId, input.role, input.customRoleId);
 
         const user = await tx.user.create({
-          data: { tenantId: ctx.tenantId, name: input.name, role: input.role, pin: hashedPin },
+          data: { tenantId: ctx.tenantId, name: input.name, role: input.role, pin: hashedPin, customRoleId },
         });
         if (input.services.length > 0) {
           await tx.userService.createMany({
@@ -69,13 +106,13 @@ export const userRouter = createTRPCRouter({
   }),
 
   update: userManagementProcedure.input(idInputSchema.merge(updateUserSchema)).mutation(async ({ ctx, input }) => {
-    const { id, services, pin, name } = input;
+    const { id, services, pin, name, customRoleId: requestedCustomRoleId } = input;
     const existing = await prisma.user.findFirst({ where: { id, tenantId: ctx.tenantId } });
     if (existing == null) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Unknown user.' });
     }
 
-    const patch: { name?: string; pin?: string } = stripUndefined({
+    const patch: { name?: string; pin?: string; customRoleId?: string | null } = stripUndefined({
       name,
       pin: pin === undefined ? undefined : await bcrypt.hash(pin, 10),
     });
@@ -91,6 +128,12 @@ export const userRouter = createTRPCRouter({
               data: services.map((serviceId) => ({ tenantId: ctx.tenantId, userId: id, serviceId })),
             });
           }
+        }
+
+        // requestedCustomRoleId undefined = "no change from the client" (skip); explicit null/id =
+        // resolve against the EXISTING role (this mutation never changes `role`).
+        if (requestedCustomRoleId !== undefined) {
+          patch.customRoleId = await resolveCustomRoleId(tx, ctx.tenantId, existing.role, requestedCustomRoleId);
         }
 
         const updated = Object.keys(patch).length > 0 ? await tx.user.update({ where: { id }, data: patch }) : existing;

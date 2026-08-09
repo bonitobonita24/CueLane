@@ -750,3 +750,48 @@ env gaps in untouched code, not this change.
 
 **Pending:** Wave 2 (role-builder UI + `customRoles` tRPC router, tenant_superadmin-only — B4) and Wave 3
 (verify-all-pages + full gate). D-RBAC-1 (platform identity) stays open + non-blocking.
+
+---
+
+## 2026-08-09 — RBAC Wave 2 BUILT: custom-role builder UI + `customRoles` tRPC router (tenant_superadmin-only)
+
+**Built (branch `feat/rbac-view-access`, LOCAL / HARD HOLD — Rule 34 Part B B4/B5, Full Part B per D-RBAC-3):**
+the tenant-owner custom-role builder, completing the view-access matrix system. Four dispatched tasks +
+one build-break fix, all PM-verified cache-off.
+
+- **Backend — `customRoles` router** (`server/trpc/routers/roles.ts`, registered `roles` in `root.ts`):
+  `featureCatalog`/`list`/`get`/`create`/`update`/`delete`, every procedure guarded by
+  `userManagementProcedure` (owner-only: `tenant_superadmin` + platform `tenant_manager`; a `tenant_admin`
+  is FORBIDDEN — role-authoring is never matrix-evaluated for them). Server-side HARD ceiling
+  `assertNoOwnerOnlyGrant` rejects any grant on an OWNER_ONLY feature (`users`, `roles`) with BAD_REQUEST
+  regardless of client payload (Part C). `$transaction` atomicity (create = insert role + granted rows;
+  update = replace rows; delete blocked while any user is still assigned, TOCTOU-safe in-tx). Duplicate name
+  → P2002→CONFLICT. `tenantId` always from `ctx.tenantId`, never input (L6). Zod schemas in `@cuelane/shared`.
+- **Preset→matrix mapping** (`lib/rbac/presets.ts`, `presetMatrix()`) — AUTHORED (FerryBook stores the preset
+  as a label only; Rule 34 B5 wants presets to seed a starting matrix). supervisor/operator/contributor/viewer
+  expand across the 7 WRITABLE features; owner picks a preset → matrix pre-fills → owner fine-tunes cells.
+- **Role-builder UI** — `app/[tenant]/admin/roles/` (`page.tsx` guarded `requireFeatureView(tenant, roles)`;
+  vanilla-tRPC-client `roles-client.tsx` list + create/edit/delete; `RoleFormDialog.tsx` = 7-feature × 4-action
+  (view/write/update/delete) shadcn Checkbox matrix, preset Select seeds it). New `roles` tab in `ADMIN_TABS`
+  (OWNER_ONLY → auto-hidden from tenant_admin/employees, like `users`).
+- **Assignment** — `user.ts` + `@cuelane/shared` user schemas gain optional `customRoleId`;
+  `resolveCustomRoleId()` forces `null` for any non-`employee` role (matrix applies only to the employee tier
+  per the resolver) and validates the role belongs to the caller's tenant (L6). Users form shows a "Custom
+  role" Select only when role = employee.
+
+**[HOW] — build-break fix (client bundle / server barrel).** The role-builder is the first `'use client'`
+importer of `@/lib/rbac`; `features.ts`/`presets.ts` value-imported `FeatureKey`/`RolePreset` from `@cuelane/db`,
+whose index drags `tenant-guard` → `node:async_hooks` into the client bundle → **build failed** (typecheck/lint/
+vitest all PASSED — only `next build` caught it). Fixed at root: `@cuelane/shared` `FeatureKey`/`RolePreset`
+converted from nominal `enum` to `const`-object + literal-union (structurally interchangeable with Prisma's
+generated shape — zero casts), and `lib/rbac` given zero-import local mirrors. Global lesson logged
+(`nextjs.client-bundle.server-barrel-drags-async-hooks`).
+
+**Verified cache-off (full authority — 2+3 compiled a shared tree, so PM re-ran the integrated gate):**
+all-package typecheck 8/8, lint 8/8, `@cuelane/web` build ✓ (27 routes), full web suite **234 passed / 4
+pre-existing env failures (MinIO cred, SMTP, Valkey — untouched code, = documented baseline, zero regression)**.
+New tests: `roles.test.ts` (6 — owner-only ceiling, round-trip, delete-blocked-while-assigned, tenant isolation,
+preset) + `user.test.ts` customRoleId block (assign / cross-tenant reject / non-employee forced null / clear).
+
+**Pending:** Wave 3 (verify-all-pages per role via Playwright — employee-with-custom-role live login — + dev
+rebuild + evidence). D-RBAC-1 (virtual vs DB platform `tenant_manager`) stays open + non-blocking.

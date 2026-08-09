@@ -54,10 +54,11 @@ describe('visibleAdminTabs (Wave 1 — matrix-driven)', () => {
     expect(tabs.length).toBe(ADMIN_TABS.length);
   });
 
-  it('tenant_admin sees every tab EXCEPT Users (OWNER_ONLY — matches userManagementProcedure)', () => {
+  it('tenant_admin sees every tab EXCEPT Users and Roles (OWNER_ONLY — matches userManagementProcedure)', () => {
     const tabs = visibleAdminTabs(principalFor('tenant_admin'), TenantTier.Premium);
     expect(tabs.map((t) => t.id)).not.toContain('users');
-    expect(tabs.length).toBe(ADMIN_TABS.length - 1);
+    expect(tabs.map((t) => t.id)).not.toContain('roles');
+    expect(tabs.length).toBe(ADMIN_TABS.length - 2);
   });
 
   it('an employee custom role granting only services:view sees exactly the Services tab', () => {

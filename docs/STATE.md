@@ -3,31 +3,46 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **RBAC view-access retrofit (Rule 34 Part B) — Wave 0 (schema+resolver) + Wave 1 (enforcement) DONE + verified on `feat/rbac-view-access`. Waves 2–3 pending (owner-gated). Phase 7/8 build complete.**
-CURRENT:      Resume session 2026-08-09. **RBAC view-access WAVE 1 (matrix enforcement) BUILT + VERIFIED THIS SESSION.**
-              Branch `feat/rbac-view-access` (off feat/tenant-rbac-3tier). Wave 1 committed `ae8b333` (code) +
-              governance (this file + DECISIONS_LOG). LOCAL only — NOT pushed (was pushed to origin last session
-              through Wave 0; Wave 1 commit is local until owner says push). HARD HOLD.
-              ✅ DONE THIS SESSION (2026-08-09):
-              **Wave 1 — matrix-driven view-access enforcement wired to all 3 surfaces (rbac.md B3):**
-              (1) tRPC `matrixProcedure(feature, action)` factory (server/trpc/trpc.ts) — superset of
-                  adminProcedure; fixed tiers short-circuit allow BEFORE resolvePrincipal (platform
-                  tenant_manager has NO user row → would throw). Swapped routers: service/window/media (CRUD→
-                  view/write/update/delete), dashboard (view), tenantAdmin (usage:view, settings:view/update).
-                  user stays owner-only; tenantAd (Premium ads) stays admin-only (conservative Wave-1 deny).
-              (2) Nav — ADMIN_TABS carry FeatureKey; visibleAdminTabs(principal, tier) matrix-filters;
-                  admin/layout.tsx resolves DB principal + redirects out when 0 tabs visible.
-              (3) Per-page requireFeatureView guards on every admin sub-page; admin root routes a
-                  dashboard-denied caller to their first visible tab (loop-safe).
-              (4) Behavior change (correct, logged): tenant_admin no longer sees the Users tab (OWNER_ONLY) —
-                  now matches userManagementProcedure. No fixed-tier user loses legitimate access.
-              (5) Tests: new matrixProcedure.test.ts (custom-role grant + deny-by-default e2e via windowRouter) +
-                  access.test.ts updated for the principal signature.
-              **Verified cache-OFF:** typecheck 8/8, lint 8/8; all RBAC-affected tests green (matrixProcedure +
-              access + 5 swapped routers = 52/53 in isolated run). The 1 fail (station.getWindow) + the other
-              suite fails (storage/display/media-upload = MinIO cred mismatch, auth = SMTP, station = Valkey)
-              are PRE-EXISTING env gaps in code I did NOT touch — confirmed via git diff (station/context/auth/
-              storage untouched). Global lesson logged: rbac.matrix-procedure.platform-tier-has-no-user-row.
+PHASE:        **RBAC view-access retrofit (Rule 34 Part B) — Waves 0 (schema+resolver) + 1 (enforcement) + 2 (custom-role builder) DONE + verified on `feat/rbac-view-access`. Wave 3 (verify-all-pages) pending. Phase 7/8 build complete.**
+CURRENT:      Resume session 2026-08-09 (owner: "build wave 2"). **RBAC view-access WAVE 2 (custom-role builder UI + `customRoles` router) BUILT + VERIFIED THIS SESSION.**
+              Branch `feat/rbac-view-access` (off feat/tenant-rbac-3tier). Wave 2 = ONE local commit (code +
+              governance). LOCAL only — NOT pushed; Wave 0 was pushed to origin, Wave 1 + Wave 2 commits are
+              local until owner says push. HARD HOLD.
+              ✅ DONE THIS SESSION (2026-08-09 sess-6) — Wave 2, PM-orchestrated (4 spec-executor tasks + 1 build-fix):
+              **Rule 34 Part B B4/B5 — tenant-owner custom-role builder (Full Part B per D-RBAC-3):**
+              (1) `customRoles` router (server/trpc/routers/roles.ts, registered `roles`): featureCatalog/list/
+                  get/create/update/delete, all guarded userManagementProcedure (owner-only; tenant_admin
+                  FORBIDDEN). Server HARD ceiling assertNoOwnerOnlyGrant rejects users/roles grants (BAD_REQUEST)
+                  regardless of payload. $transaction atomicity; delete blocked while users assigned (TOCTOU-safe);
+                  dup name P2002→CONFLICT; tenantId always from ctx (L6). Zod in @cuelane/shared.
+              (2) presetMatrix() (lib/rbac/presets.ts) — AUTHORED (FerryBook lacks it; B5): supervisor/operator/
+                  contributor/viewer seed a starting matrix over the 7 WRITABLE features.
+              (3) Role-builder UI app/[tenant]/admin/roles/ (page guard + vanilla-tRPC client + RoleFormDialog =
+                  7×4 shadcn Checkbox matrix, preset Select seeds it) + new `roles` OWNER_ONLY tab (auto-hidden
+                  from tenant_admin/employees).
+              (4) Assignment: user.ts + shared schemas gain optional customRoleId; resolveCustomRoleId() forces
+                  null for non-employee roles + validates tenant ownership (L6); users form shows Custom-role
+                  Select only for role=employee.
+              (5) ⚠ BUILD-BREAK CAUGHT BY THE INTEGRATED GATE: role-builder is the first 'use client' importer of
+                  @/lib/rbac → features/presets value-imported FeatureKey from @cuelane/db → dragged
+                  node:async_hooks into the client bundle → `next build` FAILED (typecheck+lint+vitest all PASSED).
+                  Fixed at root: shared FeatureKey/RolePreset enum→const-object+union (structural, zero casts) +
+                  lib/rbac zero-import local mirrors. Global lesson `nextjs.client-bundle.server-barrel-drags-async-hooks`.
+              **Verified cache-OFF (PM re-ran integrated gate — parallel tasks shared a compile tree):** all-package
+              typecheck 8/8, lint 8/8, @cuelane/web build ✓ (27 routes), full web suite **234 passed / 4 pre-existing
+              env failures (MinIO cred, SMTP, Valkey — untouched code = documented baseline, ZERO regression)**.
+              New tests: roles.test.ts (6) + user.test.ts customRoleId (assign/cross-tenant-reject/non-employee-null/clear).
+              **➡ NEXT: RBAC Wave 3 — verify-all-pages per role (Playwright, employee-with-custom-role LIVE login) +
+              dev rebuild off branch + evidence screenshots + one final full cache-off gate. Owner-gated for the
+              LIVE-verify pass. D-RBAC-1 (virtual vs DB tenant_manager) stays open + non-blocking. All commits LOCAL
+              — push only on owner's explicit word.**
+              ── prior session (2026-08-09 sess-5) — RBAC Wave 1 ENFORCEMENT ──
+              **Wave 1 — matrix-driven view-access enforcement, 3 surfaces (rbac.md B3), commit ae8b333 (LOCAL):**
+              tRPC matrixProcedure(feature,action) factory (fixed tiers short-circuit BEFORE resolvePrincipal —
+              platform tenant_manager has no user row); service/window/media/dashboard/tenantAdmin routers swapped;
+              ADMIN_TABS FeatureKey + visibleAdminTabs(principal,tier) nav filter; per-page requireFeatureView guards;
+              tenant_admin loses Users tab (correct, = userManagementProcedure). Cache-off typecheck/lint/RBAC-tests
+              green. Lesson: rbac.matrix-procedure.platform-tier-has-no-user-row.
               ── prior session (2026-08-08) — RBAC 3-tier BACKBONE ──
               Resume session 2026-08-08 (Full Auto, owner asleep). **RBAC 3-tier BACKBONE FINISHED THAT SESSION.**
               Branch `feat/tenant-rbac-3tier`, LOCAL only (no upstream, HARD HOLD).

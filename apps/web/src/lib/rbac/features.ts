@@ -1,5 +1,5 @@
 /**
- * RBAC feature registry re-exports (Wave 0b — per-role menu/module view-access retrofit).
+ * RBAC feature registry (Wave 0b — per-role menu/module view-access retrofit).
  *
  * `FeatureKey` is the fixed catalog of admin-shell modules a role/custom-role's
  * view-access matrix can grant/deny (packages/db/prisma/schema.prisma `Feature`
@@ -7,10 +7,32 @@
  * feature keys that may NEVER be granted via a tenant custom-role permission
  * matrix — they stay exclusive to `tenant_admin`+ (users/roles = User-Management,
  * never matrix-grantable per the Rule 34 guardrail).
+ *
+ * CLIENT-SAFE BY CONSTRUCTION (Wave 2 build-break fix): this file is imported by a
+ * `'use client'` component (RoleFormDialog.tsx), so `FeatureKey` MUST NOT be a value
+ * import from `@cuelane/db` — that package's barrel (`packages/db/src/index.ts`)
+ * transitively imports `middleware/tenant-guard.ts`, which uses `node:async_hooks`
+ * and is illegal in a client bundle (webpack: "Import trace ... tenant-guard.ts →
+ * node:async_hooks"). `FeatureKey` is instead a LOCAL, self-contained, zero-import
+ * const-object + derived literal-union type — the exact same shape/values as
+ * `@cuelane/db`'s Prisma-generated `FeatureKey` (itself a plain literal union, not a
+ * nominal `enum` — see packages/shared/src/types/index.ts's matching comment), so it
+ * stays structurally interchangeable with `@cuelane/db`'s FeatureKey (server routers,
+ * `matrixProcedure`) and `@cuelane/shared`'s FeatureKey (Zod-validated tRPC input)
+ * in both directions, with no cast required.
  */
-import { FeatureKey } from '@cuelane/db';
-
-export { FeatureKey };
+export const FeatureKey = {
+  dashboard: 'dashboard',
+  services: 'services',
+  windows: 'windows',
+  users: 'users',
+  media: 'media',
+  settings: 'settings',
+  theme: 'theme',
+  usage: 'usage',
+  roles: 'roles',
+} as const;
+export type FeatureKey = (typeof FeatureKey)[keyof typeof FeatureKey];
 
 export const OWNER_ONLY_FEATURES: ReadonlySet<FeatureKey> = new Set([
   FeatureKey.users,

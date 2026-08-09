@@ -18,3 +18,4 @@ export {
   type PermissionFlags,
 } from './principal';
 export { visibleFeatures } from './visibleFeatures';
+export { presetMatrix, type PresetPermissionRow } from './presets';
