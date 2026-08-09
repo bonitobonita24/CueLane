@@ -53,7 +53,7 @@ CURRENT:      Resume session 2026-08-09. **RBAC view-access WAVE 1 (matrix enfor
                   = run the FULL cache-OFF gate incl. lint+build before any commit, tsc-green ≠ build-green).
               **⚠ REGRESSION CAUGHT: T5 first commit (7ff65ca) passed typecheck+tests but BROKE lint+build** (the enum
                   compare). Caught by the T8 full gate, fixed in 535c9c7. Backbone is now genuinely all-green.
-              **➡ NEXT: RBAC Phase 2 (custom-role matrix, D-RBAC-3) is GATED — do NOT auto-start; needs owner GO.**
+              **➡ NEXT: RBAC Wave 2 — role-builder UI (tenant_superadmin-only, shadcn) + `customRoles` tRPC router (create/rename/assign; ceiling ≤ tenant_admin; NEVER users/roles). OWNER-GATED — needs "build Wave 2"/"continue RBAC". Then Wave 3 = verify-all-pages + full cache-off gate. Wave 0+1 (schema/resolver/enforcement) DONE.**
               ── prior session (2026-07-19d) ──
               Resume session 2026-07-19d (Full Auto) — SHORT SESSION, owner requested save+handoff to rest the PC.
               ✅ DONE THIS SESSION (2026-07-19d):
