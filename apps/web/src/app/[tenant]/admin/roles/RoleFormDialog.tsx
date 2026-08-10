@@ -82,13 +82,13 @@ function matrixFromPreset(preset: RolePreset): Matrix {
   return matrix;
 }
 
-// @cuelane/shared cannot depend on @cuelane/db, so PermissionRowInput['featureKey'] is a
-// structurally-identical-but-nominally-different enum from @cuelane/db's FeatureKey (both mirror
-// the same schema.prisma string values — see packages/shared/src/types/index.ts). Same safe-cast
-// pattern the roles router (apps/web/src/server/trpc/routers/roles.ts) already documents.
+// WRITABLE_FEATURES (@/lib/rbac) and PermissionRowInput['featureKey'] (@cuelane/shared) are now the
+// SAME structural literal union of the schema.prisma FeatureKey string values (post Wave 2
+// enum→const-object conversion — see packages/shared/src/types/index.ts + lib/rbac/features.ts), so
+// no cast is needed here (the prior `as unknown as` is now flagged unnecessary by eslint).
 function matrixToArray(matrix: Matrix): PermissionRowInput[] {
   return WRITABLE_FEATURES.map((featureKey) => ({
-    featureKey: featureKey as unknown as PermissionRowInput['featureKey'],
+    featureKey,
     ...matrix[featureKey],
   }));
 }
@@ -120,7 +120,7 @@ export function RoleFormDialog({ open, onOpenChange, mode, roleId, submitting, o
         .query({ id: roleId })
         .then((role) => {
           setName(role.name);
-          setPreset(role.preset as unknown as RolePreset);
+          setPreset(role.preset);
           setMatrix(matrixFromRows(role.permissions));
         })
         .finally(() => setLoading(false));
