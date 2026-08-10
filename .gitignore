@@ -9,6 +9,12 @@ dist/
 build/
 *.tsbuildinfo
 
+# Playwright (e2e verify) artifacts — never commit run outputs
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
 # Environment files — NEVER commit real credentials
 .env
 .env.*

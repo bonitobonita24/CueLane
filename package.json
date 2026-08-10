@@ -23,12 +23,12 @@
     "tools:hydration-lint": "node tools/hydration-lint.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "eslint": "^9",
+    "prettier": "^3",
     "turbo": "^2",
     "typescript": "^5",
-    "eslint": "^9",
     "typescript-eslint": "^8",
-    "prettier": "^3",
     "yaml": "^2"
   }
 }
-

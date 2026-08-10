@@ -3,7 +3,68 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **RBAC view-access retrofit (Rule 34 Part B) — Waves 0 (schema+resolver) + 1 (enforcement) + 2 (custom-role builder) DONE + verified on `feat/rbac-view-access`. Wave 3 (verify-all-pages) pending. Phase 7/8 build complete.**
+## RBAC Wave 3 — verify-all-pages per role — DONE + VERIFIED (2026-08-10 sess-7)
+
+Rule 32 Verifiable-Done evidence for the RBAC view-access retrofit (Rule 34 Part B) LIVE per-role verify.
+Ran against the dev container REBUILT off `feat/rbac-view-access` (app+worker, cuelane_dev_app → localhost:41716,
+recreated 2026-08-10T17:03Z, healthy) — dev-freshness coupled to this verify (owner: "dev rebuild off branch").
+
+- **evidence.contract:** For each principal on the `demo` tenant, the admin-shell nav + per-page server guards
+  match the view-access resolver (`apps/web/src/lib/rbac` + `admin/_lib/access.ts`), verified via LIVE
+  name+PIN login (real `admin-credentials` flow):
+    · `tenant_superadmin` ("Branch Admin"/0000) → ALL 9 tabs incl. Users + Roles; `/admin/roles` renders.
+    · `tenant_admin` ("QA Branch Manager"/4321) → 7 tabs; Users + Roles HIDDEN **and** direct-URL guarded
+      (redirected off `/admin/users` + `/admin/roles`).
+    · `employee` + `contributor` custom role ("QA Contributor Emp"/2020) → EXACTLY 4 tabs
+      (dashboard/services/windows/media); `/admin/services` renders; `/admin/theme` (view:false) URL-guarded.
+    · `employee`, no custom role ("Alice Santos"/1234) → bounced out of `/admin` to `/demo/kiosk`.
+  PLUS: no code regression across the blast radius (RoleFormDialog assertion fix + `/superadmin` route rename +
+  fixtures file) — full cache-off typecheck+lint+build 24/24 and the web logic suite green (baseline env fails only).
+- **evidence.check_command:**
+    ```
+    # 0. dev container rebuilt off-branch (app+worker), healthy at :41716
+    bash deploy/compose/start.sh dev up -d --build
+    # 1. seed deterministic RBAC fixtures on `demo` (tenant_admin + contributor custom role + employee holding it)
+    set -a; source .env.dev; set +a
+    pnpm --filter @cuelane/db exec tsx prisma/rbac-fixtures.ts
+    # 2. LIVE per-role verify-all-pages
+    pnpm exec playwright test e2e/rbac-view-access.spec.ts
+    # 3. full cache-off regression gate
+    pnpm exec turbo run typecheck lint build --force --continue   # → 24 successful, 24 total
+    pnpm exec turbo run test --force --continue                   # → web 234 passed / 4 MinIO-env baseline fails
+    ```
+- **evidence.captured_output:**
+    ```
+    # --- pnpm exec playwright test e2e/rbac-view-access.spec.ts ---
+    Running 4 tests using 1 worker
+
+      ✓  1 …rbac-view-access.spec.ts:57 › tenant_superadmin (Branch Admin) sees all 9 tabs incl. Users + Roles (997ms)
+      ✓  2 …rbac-view-access.spec.ts:66 › tenant_admin (QA Branch Manager) sees 7 tabs; Users + Roles hidden AND URL-guarded (784ms)
+      ✓  3 …rbac-view-access.spec.ts:77 › employee + contributor custom role sees only 4 permitted tabs (725ms)
+      ✓  4 …rbac-view-access.spec.ts:89 › employee with NO custom role is bounced out of the admin shell (363ms)
+
+      4 passed (3.6s)
+
+    # --- turbo run typecheck lint build --force --continue ---
+    Tasks:    24 successful, 24 total
+
+    # --- turbo run test --force --continue (code-logic packages) ---
+    @cuelane/web:test:       Tests  4 failed | 234 passed | 4 skipped (242)   # 4 fails = InvalidAccessKeyId (MinIO), matches Wave 2 baseline
+    @cuelane/shared:test:    Tests  33 passed (33)
+    @cuelane/db:test:        Tests  5 passed (5)
+    @cuelane/storage:test:   Tests  7 failed | 8 passed (15)                  # all InvalidAccessKeyId — host-shell MinIO creds, env not code
+
+    # --- route rename live (dev container) ---
+    curl /superadmin            -> 200
+    curl /super-admin/dashboard -> 404
+    ```
+
+Fixtures: `packages/db/prisma/rbac-fixtures.ts` (idempotent, QA-prefixed, additive — seed.ts untouched).
+Harness: `playwright.config.ts` (no webServer — reuses running dev) + `e2e/rbac-view-access.spec.ts`.
+
+---
+
+PHASE:        **RBAC view-access retrofit (Rule 34 Part B) — Waves 0 (schema+resolver) + 1 (enforcement) + 2 (custom-role builder) + 3 (verify-all-pages, LIVE per-role) ALL DONE + verified on `feat/rbac-view-access`. Phase 7/8 build complete.**
 CURRENT:      Resume session 2026-08-09 (owner: "build wave 2"). **RBAC view-access WAVE 2 (custom-role builder UI + `customRoles` router) BUILT + VERIFIED THIS SESSION.**
               Branch `feat/rbac-view-access` (off feat/tenant-rbac-3tier). Wave 2 = ONE local commit (code +
               governance). LOCAL only — NOT pushed; Wave 0 was pushed to origin, Wave 1 + Wave 2 commits are
