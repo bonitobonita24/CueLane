@@ -44,10 +44,8 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
   - **Impact if unanswered:** **dev-only build is unaffected** (HARD HOLD = dev). Only blocks local-upload Display
     playback in staging/prod, which are owner-gated deploys anyway. Loop proceeds.
 
-- [ ] **Super Admin route path: `/super-admin` vs `/superadmin` (raised Wave 7.8, 2026-07-09).**
-  The Super Admin surface was built at **`/super-admin/*`** (matching the pre-existing scaffolded
-  `super-admin/dashboard` page + the auth callback). **`docs/PRODUCT.md` writes it as `/superadmin`** (no hyphen).
-  - **Question for owner (`[WHAT]`, trivial):** which spelling is canonical? Default technical reconciliation is to
-    make the route match PRODUCT.md (source of truth) — a one-directory rename + auth-callback update — unless you
-    prefer the hyphenated `/super-admin`, in which case PRODUCT.md gets the one-word edit.
-  - **Impact if unanswered:** cosmetic URL only; the surface fully works at `/super-admin`. Loop proceeds.
+- [x] **Super Admin route path: `/super-admin` vs `/superadmin` (raised Wave 7.8, 2026-07-09; RESOLVED 2026-08-10 → `/superadmin`).**
+  Owner decided: **match PRODUCT.md** (`/superadmin`, no hyphen). DONE this session — route directory
+  `app/super-admin` → `app/superadmin`, middleware + login-form URL strings updated (internal provider id
+  `super-admin-credentials` + mode literal left unchanged, non-routes). Commit `95e0063` on `feat/rbac-view-access`
+  (LOCAL/HARD HOLD). Verified live: `/superadmin` → 200, old `/super-admin/dashboard` → 404; web build 24/24 green.
