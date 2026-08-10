@@ -12,7 +12,7 @@ interface LoginFormProps {
 }
 
 // Derives sign-in mode purely from the callbackUrl's first path segment.
-// - absent, or first segment === 'super-admin' -> super-admin mode
+// - absent, or first segment === 'superadmin' -> super-admin mode
 // - any other first segment -> tenant-admin mode, segment is the tenant slug
 function deriveTarget(callbackUrl: string | null): {
   mode: 'super-admin' | 'tenant-admin';
@@ -20,14 +20,14 @@ function deriveTarget(callbackUrl: string | null): {
   redirectTarget: string;
 } {
   if (callbackUrl == null || callbackUrl === '') {
-    return { mode: 'super-admin', tenantSlug: null, redirectTarget: '/super-admin/dashboard' };
+    return { mode: 'super-admin', tenantSlug: null, redirectTarget: '/superadmin/dashboard' };
   }
 
   const segments = callbackUrl.split('/').filter(Boolean);
   const firstSegment = segments[0];
 
-  if (firstSegment == null || firstSegment === '' || firstSegment === 'super-admin') {
-    return { mode: 'super-admin', tenantSlug: null, redirectTarget: '/super-admin/dashboard' };
+  if (firstSegment == null || firstSegment === '' || firstSegment === 'superadmin') {
+    return { mode: 'super-admin', tenantSlug: null, redirectTarget: '/superadmin/dashboard' };
   }
 
   return { mode: 'tenant-admin', tenantSlug: firstSegment, redirectTarget: callbackUrl };

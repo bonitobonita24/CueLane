@@ -1,5 +1,5 @@
 // Wave 7.8-T3 / Wave 8-sidebar — Super Admin shell. middleware.ts already gates every
-// /super-admin/* path behind Role.TenantManager (redirects to /login otherwise); this layout adds the
+// /superadmin/* path behind Role.TenantManager (redirects to /login otherwise); this layout adds the
 // same defense-in-depth server-side re-check used by [tenant]/admin/layout.tsx.
 //
 // Wave 8-sidebar: the old top-tab SuperAdminNav is replaced by the shared left-sidebar AppShell
@@ -16,9 +16,9 @@ interface SuperAdminLayoutProps {
 }
 
 const NAV_ITEMS: AppShellNavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', href: '/super-admin/dashboard' },
-  { id: 'tenants', label: 'Tenants', href: '/super-admin/tenants' },
-  { id: 'system-ads', label: 'System Ads', href: '/super-admin/system-ads' },
+  { id: 'dashboard', label: 'Dashboard', href: '/superadmin/dashboard' },
+  { id: 'tenants', label: 'Tenants', href: '/superadmin/tenants' },
+  { id: 'system-ads', label: 'System Ads', href: '/superadmin/system-ads' },
 ];
 
 export default async function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
