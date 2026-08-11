@@ -3,5 +3,4 @@
 //
 // Keep in sync with the root `package.json` "version" field and the annotated git tag
 // `vX.Y.Z` (git tags are the fleet source of truth — see ~/.claude/rules/versioning-standard.md).
-// Pre-1.0 (0.y.z) = still in development / never shipped to production.
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '1.0.0';
