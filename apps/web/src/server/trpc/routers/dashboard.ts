@@ -13,12 +13,12 @@
 // domain/admin.ts and domain/queue.ts), so this is safe without the guard — and this router only
 // runs behind `adminProcedure`, which has already established tenant context.
 import { dashboardRangeSchema, dashboardTicketLogSchema } from '@cuelane/shared';
-import { prismaRaw } from '@cuelane/db';
-import { createTRPCRouter, adminProcedure } from '../trpc';
+import { prismaRaw, FeatureKey } from '@cuelane/db';
+import { createTRPCRouter, matrixProcedure } from '../trpc';
 import { computeDashboard, getRangeBounds } from '@/server/domain/dashboard';
 
 export const dashboardRouter = createTRPCRouter({
-  get: adminProcedure.input(dashboardRangeSchema).query(async ({ ctx, input }) => {
+  get: matrixProcedure(FeatureKey.dashboard, 'view').input(dashboardRangeSchema).query(async ({ ctx, input }) => {
     const [result, tenant] = await Promise.all([
       computeDashboard(prismaRaw, ctx.tenantId, input),
       prismaRaw.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { tier: true } }),
@@ -26,7 +26,7 @@ export const dashboardRouter = createTRPCRouter({
     return { ...result, tier: tenant.tier };
   }),
 
-  ticketLog: adminProcedure.input(dashboardTicketLogSchema).query(async ({ ctx, input }) => {
+  ticketLog: matrixProcedure(FeatureKey.dashboard, 'view').input(dashboardTicketLogSchema).query(async ({ ctx, input }) => {
     const { start, end } = getRangeBounds(input.range);
     const search = input.search?.trim() ?? '';
 

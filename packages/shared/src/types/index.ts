@@ -2,8 +2,9 @@
 
 export enum Role {
   Employee = 'employee',
-  Admin = 'admin',
-  SuperAdmin = 'super_admin',
+  TenantAdmin = 'tenant_admin',
+  TenantSuperadmin = 'tenant_superadmin',
+  TenantManager = 'tenant_manager',
 }
 
 export enum TenantTier {
@@ -45,6 +46,44 @@ export enum AdType {
   YouTube = 'youtube',
   Uploaded = 'uploaded',
 }
+
+// RBAC view-access matrix (Rule 34 Part B) — mirrors packages/db/prisma/schema.prisma
+// `FeatureKey`/`RolePreset` enums (Prisma is the source of truth; this local mirror follows
+// the same pattern as Role/TenantTier/etc. above, keeping packages/shared free of a
+// dependency on @cuelane/db, which itself depends on @cuelane/shared).
+//
+// Deliberately a const-object + derived literal-union TYPE (NOT a TS `enum`) — this mirrors
+// Prisma's own generated `$Enums.FeatureKey`/`$Enums.RolePreset` shape exactly. A real TS
+// `enum` is nominally branded, so a value from `@cuelane/db`'s FeatureKey (itself a plain
+// literal union, not a nominal enum) could never satisfy a parameter typed against a real
+// `enum FeatureKey` here — that mismatch is what broke the Wave 2 client build (webpack
+// import trace: apps/web/src/lib/rbac/features.ts pulling the whole `@cuelane/db` barrel,
+// incl. `node:async_hooks`-using `tenant-guard.ts`, into a `'use client'` bundle just to get
+// a nominally-compatible `FeatureKey`). A structural literal-union type is compatible in both
+// directions with any identically-shaped union (db's, this one, or a local same-shape mirror),
+// with zero import required at all — see apps/web/src/lib/rbac/features.ts + presets.ts, which
+// now define their own local, self-contained, client-safe mirrors of this same shape instead of
+// importing FeatureKey/RolePreset as a value from `@cuelane/db`.
+export const FeatureKey = {
+  Dashboard: 'dashboard',
+  Services: 'services',
+  Windows: 'windows',
+  Users: 'users',
+  Media: 'media',
+  Settings: 'settings',
+  Theme: 'theme',
+  Usage: 'usage',
+  Roles: 'roles',
+} as const;
+export type FeatureKey = (typeof FeatureKey)[keyof typeof FeatureKey];
+
+export const RolePreset = {
+  Supervisor: 'supervisor',
+  Operator: 'operator',
+  Contributor: 'contributor',
+  Viewer: 'viewer',
+} as const;
+export type RolePreset = (typeof RolePreset)[keyof typeof RolePreset];
 
 // ─── Wave 7.6 — Admin Core CRUD constants ─────────────────────────────────────
 // PM-locked decisions (docs/DECISIONS_LOG.md 2026-07-08 "Wave 7.6 Admin Core CRUD"). Tier limits

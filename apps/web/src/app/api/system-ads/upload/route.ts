@@ -8,7 +8,7 @@
 //
 // SECURITY: this route manually re-implements the `superAdminProcedure` guard (trpc.ts) since it
 // sits outside tRPC entirely — resolve the Auth.js session → assert authenticated → assert
-// Role.SuperAdmin. There is no tenant to check (Super Admin is platform-global).
+// Role.TenantManager. There is no tenant to check (Super Admin is platform-global).
 import { NextResponse, type NextRequest } from 'next/server';
 import { auth } from '@/server/auth';
 import { Role } from '@cuelane/shared';
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   // ── 2. Role — Super Admin only ───────────────────────────────────────────────────────────────
   const roles = session.user.roles ?? [];
-  if (!roles.includes(Role.SuperAdmin)) {
+  if (!roles.includes(Role.TenantManager)) {
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
   }
 

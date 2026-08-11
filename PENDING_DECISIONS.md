@@ -5,6 +5,25 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
 
 ## Open
 
+- [ ] **D-RBAC-1 — Platform admin identity model (raised during RBAC 3-tier retrofit, 2026-08-07).**
+  The retrofit keeps the platform `tenant_manager` as a **virtual env-credentials identity** (Auth.js
+  `super-admin-credentials`, `tenantId=NULL`, no DB user row) for the backbone pass — lowest risk, no auth-flow
+  rewrite. The fleet standard (`~/.claude/rules` universal-login vault) + Scenario 42 step 6 envision a **real DB
+  `tenant_manager` row** seeded from `tenantadmin@powerbyteitsolutions.com`.
+  - **Question for owner:** promote `tenant_manager` to a vault-backed DB user now, or keep it virtual until
+    multi-platform-admin is actually needed? Rolling the vault cred into an already-built app is owner-gated (HARD HOLD).
+  - **Impact if unanswered:** none — backbone proceeds with the virtual identity; DB value `tenant_manager` exists
+    but is unused in the users table. Fully reversible later.
+
+- [x] **D-RBAC-3 — Custom-role permission matrix scope (raised 2026-08-07; RESOLVED 2026-08-08 → BUILD).**
+  Owner approved **Full Rule 34 Part B this cycle** (supersedes the gate). Matrix + role-builder are being built
+  on `feat/rbac-view-access` (off `feat/tenant-rbac-3tier`), copy-source FerryBook, HARD HOLD local. Wave 0
+  (schema + resolver + seed, commit 36a637d) done; Waves 1–3 (enforcement, builder UI, verify) pending. See
+  `docs/DECISIONS_LOG.md` 2026-08-09 entry.
+  - **Note (non-blocking):** D-RBAC-2 (owner-selection for a hypothetical multi-admin tenant) uses the safe
+    deterministic default (earliest-`createdAt` admin → `tenant_superadmin`); seed tenants have exactly one admin, so
+    it is not currently ambiguous.
+
 - [ ] **Free-tier Theme tab visibility (raised Wave 7.7b, 2026-07-09).**
   Wave 7.7b **un-gated the Theme tab for the Free tier** — Free tenants now see the Theme tab with the 8 presets
   available, but the **custom color picker disabled** behind upgrade copy (Premium-only). This **reverses the
@@ -25,10 +44,8 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
   - **Impact if unanswered:** **dev-only build is unaffected** (HARD HOLD = dev). Only blocks local-upload Display
     playback in staging/prod, which are owner-gated deploys anyway. Loop proceeds.
 
-- [ ] **Super Admin route path: `/super-admin` vs `/superadmin` (raised Wave 7.8, 2026-07-09).**
-  The Super Admin surface was built at **`/super-admin/*`** (matching the pre-existing scaffolded
-  `super-admin/dashboard` page + the auth callback). **`docs/PRODUCT.md` writes it as `/superadmin`** (no hyphen).
-  - **Question for owner (`[WHAT]`, trivial):** which spelling is canonical? Default technical reconciliation is to
-    make the route match PRODUCT.md (source of truth) — a one-directory rename + auth-callback update — unless you
-    prefer the hyphenated `/super-admin`, in which case PRODUCT.md gets the one-word edit.
-  - **Impact if unanswered:** cosmetic URL only; the surface fully works at `/super-admin`. Loop proceeds.
+- [x] **Super Admin route path: `/super-admin` vs `/superadmin` (raised Wave 7.8, 2026-07-09; RESOLVED 2026-08-10 → `/superadmin`).**
+  Owner decided: **match PRODUCT.md** (`/superadmin`, no hyphen). DONE this session — route directory
+  `app/super-admin` → `app/superadmin`, middleware + login-form URL strings updated (internal provider id
+  `super-admin-credentials` + mode literal left unchanged, non-routes). Commit `95e0063` on `feat/rbac-view-access`
+  (LOCAL/HARD HOLD). Verified live: `/superadmin` → 200, old `/super-admin/dashboard` → 404; web build 24/24 green.

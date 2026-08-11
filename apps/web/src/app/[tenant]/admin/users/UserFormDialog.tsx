@@ -29,29 +29,43 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@cuelane/ui/form';
 
 const PIN_RE = /^\d{4,6}$/;
+// Radix `Select.Item` forbids an empty-string `value` — this sentinel represents "— None —" in
+// the UI only; translated to/from `''` on the form field (never sent to the server as a literal).
+const NONE_VALUE = '__none__';
 
+// customRoleId: '' sentinel = "— None —" in the Select (Radix Select rejects an empty-string
+// item value); coerced to `null` at submit time in the parent (users-client.tsx).
 const createSchema = z.object({
   name: z.string().min(1).max(100),
-  role: z.enum([Role.Employee, Role.Admin]),
+  role: z.enum([Role.Employee, Role.TenantAdmin]),
   pin: z.string().regex(PIN_RE, 'PIN must be 4–6 digits'),
   services: z.array(z.string()).default([]),
+  customRoleId: z.string().default(''),
 });
 
 const editSchema = z.object({
   name: z.string().min(1).max(100),
-  role: z.enum([Role.Employee, Role.Admin]),
+  role: z.enum([Role.Employee, Role.TenantAdmin]),
   pin: z.union([z.literal(''), z.string().regex(PIN_RE, 'PIN must be 4–6 digits')]),
   services: z.array(z.string()).default([]),
+  customRoleId: z.string().default(''),
 });
 
 export interface UserFormValues {
   name: string;
-  role: Role.Employee | Role.Admin;
+  role: Role.Employee | Role.TenantAdmin;
   pin: string;
   services: string[];
+  /** '' = no custom role (— None —). Only meaningful when role === Role.Employee. */
+  customRoleId: string;
 }
 
 export interface UserServiceOption {
+  id: string;
+  name: string;
+}
+
+export interface CustomRoleOption {
   id: string;
   name: string;
 }
@@ -62,11 +76,12 @@ interface UserFormDialogProps {
   mode: 'create' | 'edit';
   initialValues?: UserFormValues | undefined;
   serviceOptions: UserServiceOption[];
+  customRoleOptions: CustomRoleOption[];
   submitting: boolean;
   onSubmit: (values: UserFormValues) => Promise<void>;
 }
 
-const DEFAULTS: UserFormValues = { name: '', role: Role.Employee, pin: '', services: [] };
+const DEFAULTS: UserFormValues = { name: '', role: Role.Employee, pin: '', services: [], customRoleId: '' };
 
 export function UserFormDialog({
   open,
@@ -74,6 +89,7 @@ export function UserFormDialog({
   mode,
   initialValues,
   serviceOptions,
+  customRoleOptions,
   submitting,
   onSubmit,
 }: UserFormDialogProps) {
@@ -88,6 +104,18 @@ export function UserFormDialog({
       form.reset(initialValues ?? DEFAULTS);
     }
   }, [open, initialValues, form]);
+
+  // Watched so the custom-role picker reacts live when the Role select changes in create mode.
+  const watchedRole = form.watch('role');
+  const isEmployee = watchedRole === Role.Employee;
+
+  // Role no longer Employee → customRoleId is meaningless server-side (forced to null there too);
+  // clear it here so a stale selection never silently resubmits.
+  useEffect(() => {
+    if (!isEmployee && form.getValues('customRoleId') !== '') {
+      form.setValue('customRoleId', '');
+    }
+  }, [isEmployee, form]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
     await onSubmit(values);
@@ -131,7 +159,7 @@ export function UserFormDialog({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value={Role.Employee}>Employee</SelectItem>
-                        <SelectItem value={Role.Admin}>Admin</SelectItem>
+                        <SelectItem value={Role.TenantAdmin}>Admin</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -153,6 +181,34 @@ export function UserFormDialog({
                 </FormItem>
               )}
             />
+
+            {isEmployee && (
+              <FormField
+                control={form.control}
+                name="customRoleId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Custom Role</FormLabel>
+                    <Select value={field.value === '' ? NONE_VALUE : field.value} onValueChange={(v) => field.onChange(v === NONE_VALUE ? '' : v)}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="— None —" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NONE_VALUE}>— None —</SelectItem>
+                        {customRoleOptions.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>
+                            {r.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

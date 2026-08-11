@@ -154,8 +154,11 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 |------|-------|--------|-----------|
 | **Customer** | Public | Select transaction at kiosk, receive ticket, view Big Display | Cannot access Employee Station, Admin, Mobile, or any backend function. Cannot cancel ticket. Cannot activate priority mode (staff-assisted only). |
 | **Employee** | Tenant | Log in with PIN, select window, call/complete/skip/noshow/recall/transfer tickets, view own stats and queue, use mobile calling (Premium) | Cannot access Admin Panel. Cannot manage users/transactions/windows. Cannot view other employees' performance. Cannot assign transactions to themselves. Cannot change tier or branding. |
-| **Tenant Admin** | Tenant | Full Admin Panel: manage users + transactions + windows + media + printer + theme + tenant settings, view all reports and employee performance, upgrade/cancel subscription via Xendit | Cannot serve customers from Admin (must use Employee Station). Cannot access other tenants' data. Cannot manually override their own tier (must use payment flow or contact support). |
-| **Super Admin** | Global | View all tenants, toggle tiers (manual override), suspend/reactivate accounts, view platform analytics, manage system ads | Does not access individual tenant queue operations. Cannot see employee PINs. Cannot modify tenant queue data. |
+| **Tenant Owner** (`tenant_superadmin`) | Tenant | Everything Tenant Admin can do PLUS: manage users (add/remove/role), Billing/Subscription (upgrade/cancel via Xendit), and transfer tenant ownership to another user. **Exactly one owner per tenant** (enforced by a partial-unique DB index). | Cannot serve customers from Admin (must use Employee Station). Cannot access other tenants' data. Cannot manually override their own tier (must use payment flow or contact support). |
+| **Tenant Admin** (`tenant_admin`) | Tenant | Admin Panel EXCEPT User Management and Billing: manage transactions + windows + media + printer + theme + tenant settings, view all reports and employee performance | Cannot manage users, cannot change the subscription/billing, cannot transfer ownership. Sits below the Owner (custom-role permission ceiling — see note; the fine-grained matrix is a pending milestone). Cannot access other tenants' data. |
+| **Platform Manager** (`tenant_manager`) | Global (platform, `tenant_id = NULL`) | View all tenants, toggle tiers (manual override), suspend/reactivate accounts, view platform analytics, manage system ads; break-glass reassignment of a tenant's owner | Does not access individual tenant queue operations. Cannot see employee PINs. Cannot modify tenant queue data. |
+
+> **3-tier RBAC standard (as built — see `docs/DECISIONS_LOG.md` 2026-08-08).** The fixed system tiers are `tenant_manager` (platform) / `tenant_superadmin` (tenant owner, exactly one) / `tenant_admin` (below owner), with `employee` as the app domain role beneath. Ownership succession: the current owner can `transferOwnership` in-tenant; a Platform Manager can break-glass `reassignOwner`. A tenant-scoped **custom-role permission matrix** (a further sub-division beneath `tenant_admin`, never granting Billing or User-Management) is a **pending milestone** (`PENDING_DECISIONS.md` D-RBAC-3); the platform-identity model (virtual env-credential vs a seeded DB row) is likewise pending (D-RBAC-1).
 
 ## Data Entities
 
@@ -165,7 +168,7 @@ Walk-in service centers — banks, government offices, clinics, telcos — suffe
 
 **Window:** id, tenantId, name
 
-**User:** id, tenantId, name, role (employee | admin), pin (string, 4-6 digits), services (array of serviceIds the employee can handle)
+**User:** id, tenantId, name, role (employee | tenant_admin | tenant_superadmin | tenant_manager — 3-tier RBAC; `tenant_manager` is platform-level with `tenantId = NULL`), pin (string, 4-6 digits), services (array of serviceIds the employee can handle)
 
 **Ticket:** id (format: P-NNN for priority, {serviceNumber}-NNN for regular), tenantId, serviceId, status (waiting | serving | completed | skipped | noshow), windowId (nullable), createdAt (timestamp), calledAt (timestamp, nullable), completedAt (timestamp, nullable), servedBy (userId, nullable), priority (boolean), transferred (boolean), transferredFrom (windowId, nullable), returnTo (windowId, nullable — set during transfer with Return After Done), returnedFromTransfer (boolean)
 

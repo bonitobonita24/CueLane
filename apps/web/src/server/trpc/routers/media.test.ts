@@ -20,7 +20,7 @@ function ctxFor(overrides: Partial<Context>): Context {
 }
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 function employeeCallerFor(tenantId: string, userId: string) {
@@ -42,14 +42,14 @@ describe('mediaRouter (Wave 7.7c-T2)', () => {
       data: { slug: `test-media-a-${Date.now()}`, companyName: 'Media Tenant A', tagline: 'x', tier: 'free' },
     });
     tenantAId = tenantA.id;
-    adminAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Admin A', role: 'admin', pin: 'x' } })).id;
+    adminAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Admin A', role: 'tenant_superadmin', pin: 'x' } })).id;
     employeeAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Emp A', role: 'employee', pin: 'x' } })).id;
 
     const tenantB = await prismaRaw.tenant.create({
       data: { slug: `test-media-b-${Date.now()}`, companyName: 'Media Tenant B', tagline: 'x', tier: 'premium' },
     });
     tenantBId = tenantB.id;
-    adminBId = (await prismaRaw.user.create({ data: { tenantId: tenantBId, name: 'Admin B', role: 'admin', pin: 'x' } })).id;
+    adminBId = (await prismaRaw.user.create({ data: { tenantId: tenantBId, name: 'Admin B', role: 'tenant_superadmin', pin: 'x' } })).id;
   });
 
   afterAll(async () => {

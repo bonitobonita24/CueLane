@@ -1,4 +1,4 @@
-// Wave 7.8-T1 — superAdminRouter. Platform-level, cross-tenant (Role.SuperAdmin only — see
+// Wave 7.8-T1 — superAdminRouter. Platform-level, cross-tenant (Role.TenantManager only — see
 // `superAdminProcedure` in trpc.ts). Every resolver uses `prismaRaw` (the UNGUARDED client) —
 // there is no single tenant AsyncLocalStorage context for a platform-wide operation (Tenant /
 // SystemAd / Subscription are GLOBAL_MODELS that bypass the L6 guard anyway; User / Ticket counts

@@ -3,8 +3,135 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
-PHASE:        **Phase 7 COMPLETE + Phase 8 sweep DONE. v0.1.0 tagged. Build genuinely complete; hardening scan clean; only deferred future-scope + 1 owner [WHAT] (D2) remain.**
-CURRENT:      Resume session 2026-07-19d (Full Auto) — SHORT SESSION, owner requested save+handoff to rest the PC.
+## RBAC Wave 3 — verify-all-pages per role — DONE + VERIFIED (2026-08-10 sess-7)
+
+Rule 32 Verifiable-Done evidence for the RBAC view-access retrofit (Rule 34 Part B) LIVE per-role verify.
+Ran against the dev container REBUILT off `feat/rbac-view-access` (app+worker, cuelane_dev_app → localhost:41716,
+recreated 2026-08-10T17:03Z, healthy) — dev-freshness coupled to this verify (owner: "dev rebuild off branch").
+
+- **evidence.contract:** For each principal on the `demo` tenant, the admin-shell nav + per-page server guards
+  match the view-access resolver (`apps/web/src/lib/rbac` + `admin/_lib/access.ts`), verified via LIVE
+  name+PIN login (real `admin-credentials` flow):
+    · `tenant_superadmin` ("Branch Admin"/0000) → ALL 9 tabs incl. Users + Roles; `/admin/roles` renders.
+    · `tenant_admin` ("QA Branch Manager"/4321) → 7 tabs; Users + Roles HIDDEN **and** direct-URL guarded
+      (redirected off `/admin/users` + `/admin/roles`).
+    · `employee` + `contributor` custom role ("QA Contributor Emp"/2020) → EXACTLY 4 tabs
+      (dashboard/services/windows/media); `/admin/services` renders; `/admin/theme` (view:false) URL-guarded.
+    · `employee`, no custom role ("Alice Santos"/1234) → bounced out of `/admin` to `/demo/kiosk`.
+  PLUS: no code regression across the blast radius (RoleFormDialog assertion fix + `/superadmin` route rename +
+  fixtures file) — full cache-off typecheck+lint+build 24/24 and the web logic suite green (baseline env fails only).
+- **evidence.check_command:**
+    ```
+    # 0. dev container rebuilt off-branch (app+worker), healthy at :41716
+    bash deploy/compose/start.sh dev up -d --build
+    # 1. seed deterministic RBAC fixtures on `demo` (tenant_admin + contributor custom role + employee holding it)
+    set -a; source .env.dev; set +a
+    pnpm --filter @cuelane/db exec tsx prisma/rbac-fixtures.ts
+    # 2. LIVE per-role verify-all-pages
+    pnpm exec playwright test e2e/rbac-view-access.spec.ts
+    # 3. full cache-off regression gate
+    pnpm exec turbo run typecheck lint build --force --continue   # → 24 successful, 24 total
+    pnpm exec turbo run test --force --continue                   # → web 234 passed / 4 MinIO-env baseline fails
+    ```
+- **evidence.captured_output:**
+    ```
+    # --- pnpm exec playwright test e2e/rbac-view-access.spec.ts ---
+    Running 4 tests using 1 worker
+
+      ✓  1 …rbac-view-access.spec.ts:57 › tenant_superadmin (Branch Admin) sees all 9 tabs incl. Users + Roles (997ms)
+      ✓  2 …rbac-view-access.spec.ts:66 › tenant_admin (QA Branch Manager) sees 7 tabs; Users + Roles hidden AND URL-guarded (784ms)
+      ✓  3 …rbac-view-access.spec.ts:77 › employee + contributor custom role sees only 4 permitted tabs (725ms)
+      ✓  4 …rbac-view-access.spec.ts:89 › employee with NO custom role is bounced out of the admin shell (363ms)
+
+      4 passed (3.6s)
+
+    # --- turbo run typecheck lint build --force --continue ---
+    Tasks:    24 successful, 24 total
+
+    # --- turbo run test --force --continue (code-logic packages) ---
+    @cuelane/web:test:       Tests  4 failed | 234 passed | 4 skipped (242)   # 4 fails = InvalidAccessKeyId (MinIO), matches Wave 2 baseline
+    @cuelane/shared:test:    Tests  33 passed (33)
+    @cuelane/db:test:        Tests  5 passed (5)
+    @cuelane/storage:test:   Tests  7 failed | 8 passed (15)                  # all InvalidAccessKeyId — host-shell MinIO creds, env not code
+
+    # --- route rename live (dev container) ---
+    curl /superadmin            -> 200
+    curl /super-admin/dashboard -> 404
+    ```
+
+Fixtures: `packages/db/prisma/rbac-fixtures.ts` (idempotent, QA-prefixed, additive — seed.ts untouched).
+Harness: `playwright.config.ts` (no webServer — reuses running dev) + `e2e/rbac-view-access.spec.ts`.
+
+---
+
+PHASE:        **RBAC view-access retrofit (Rule 34 Part B) — Waves 0 (schema+resolver) + 1 (enforcement) + 2 (custom-role builder) + 3 (verify-all-pages, LIVE per-role) ALL DONE + verified on `feat/rbac-view-access`. Phase 7/8 build complete.**
+CURRENT:      Resume session 2026-08-09 (owner: "build wave 2"). **RBAC view-access WAVE 2 (custom-role builder UI + `customRoles` router) BUILT + VERIFIED THIS SESSION.**
+              Branch `feat/rbac-view-access` (off feat/tenant-rbac-3tier). Wave 2 = ONE local commit (code +
+              governance). LOCAL only — NOT pushed; Wave 0 was pushed to origin, Wave 1 + Wave 2 commits are
+              local until owner says push. HARD HOLD.
+              ✅ DONE THIS SESSION (2026-08-09 sess-6) — Wave 2, PM-orchestrated (4 spec-executor tasks + 1 build-fix):
+              **Rule 34 Part B B4/B5 — tenant-owner custom-role builder (Full Part B per D-RBAC-3):**
+              (1) `customRoles` router (server/trpc/routers/roles.ts, registered `roles`): featureCatalog/list/
+                  get/create/update/delete, all guarded userManagementProcedure (owner-only; tenant_admin
+                  FORBIDDEN). Server HARD ceiling assertNoOwnerOnlyGrant rejects users/roles grants (BAD_REQUEST)
+                  regardless of payload. $transaction atomicity; delete blocked while users assigned (TOCTOU-safe);
+                  dup name P2002→CONFLICT; tenantId always from ctx (L6). Zod in @cuelane/shared.
+              (2) presetMatrix() (lib/rbac/presets.ts) — AUTHORED (FerryBook lacks it; B5): supervisor/operator/
+                  contributor/viewer seed a starting matrix over the 7 WRITABLE features.
+              (3) Role-builder UI app/[tenant]/admin/roles/ (page guard + vanilla-tRPC client + RoleFormDialog =
+                  7×4 shadcn Checkbox matrix, preset Select seeds it) + new `roles` OWNER_ONLY tab (auto-hidden
+                  from tenant_admin/employees).
+              (4) Assignment: user.ts + shared schemas gain optional customRoleId; resolveCustomRoleId() forces
+                  null for non-employee roles + validates tenant ownership (L6); users form shows Custom-role
+                  Select only for role=employee.
+              (5) ⚠ BUILD-BREAK CAUGHT BY THE INTEGRATED GATE: role-builder is the first 'use client' importer of
+                  @/lib/rbac → features/presets value-imported FeatureKey from @cuelane/db → dragged
+                  node:async_hooks into the client bundle → `next build` FAILED (typecheck+lint+vitest all PASSED).
+                  Fixed at root: shared FeatureKey/RolePreset enum→const-object+union (structural, zero casts) +
+                  lib/rbac zero-import local mirrors. Global lesson `nextjs.client-bundle.server-barrel-drags-async-hooks`.
+              **Verified cache-OFF (PM re-ran integrated gate — parallel tasks shared a compile tree):** all-package
+              typecheck 8/8, lint 8/8, @cuelane/web build ✓ (27 routes), full web suite **234 passed / 4 pre-existing
+              env failures (MinIO cred, SMTP, Valkey — untouched code = documented baseline, ZERO regression)**.
+              New tests: roles.test.ts (6) + user.test.ts customRoleId (assign/cross-tenant-reject/non-employee-null/clear).
+              **➡ NEXT: RBAC Wave 3 — verify-all-pages per role (Playwright, employee-with-custom-role LIVE login) +
+              dev rebuild off branch + evidence screenshots + one final full cache-off gate. Owner-gated for the
+              LIVE-verify pass. D-RBAC-1 (virtual vs DB tenant_manager) stays open + non-blocking. All commits LOCAL
+              — push only on owner's explicit word.**
+              ── prior session (2026-08-09 sess-5) — RBAC Wave 1 ENFORCEMENT ──
+              **Wave 1 — matrix-driven view-access enforcement, 3 surfaces (rbac.md B3), commit ae8b333 (LOCAL):**
+              tRPC matrixProcedure(feature,action) factory (fixed tiers short-circuit BEFORE resolvePrincipal —
+              platform tenant_manager has no user row); service/window/media/dashboard/tenantAdmin routers swapped;
+              ADMIN_TABS FeatureKey + visibleAdminTabs(principal,tier) nav filter; per-page requireFeatureView guards;
+              tenant_admin loses Users tab (correct, = userManagementProcedure). Cache-off typecheck/lint/RBAC-tests
+              green. Lesson: rbac.matrix-procedure.platform-tier-has-no-user-row.
+              ── prior session (2026-08-08) — RBAC 3-tier BACKBONE ──
+              Resume session 2026-08-08 (Full Auto, owner asleep). **RBAC 3-tier BACKBONE FINISHED THAT SESSION.**
+              Branch `feat/tenant-rbac-3tier`, LOCAL only (no upstream, HARD HOLD).
+              ✅ DONE THIS SESSION (2026-08-08):
+              (1) **T5 — ownership succession** (commits 7ff65ca + fix 535c9c7). `user.transferOwnership`
+                  (in-tenant, current-owner-only; TenantManager rejected on this path) + `platformUser.reassignOwner`
+                  (platform break-glass, TenantManager only, cross-tenant via prismaRaw). Both DEMOTE-before-PROMOTE
+                  in one txn (partial-unique index checked per statement). L5 writeAuditLog on every role change (its
+                  FIRST call sites). TDD `succession.test.ts` 9/9 vs REAL Postgres (asserts exactly-one-owner
+                  invariant + all rejection/cross-tenant paths). secure-code-guardian-armed Sonnet worker; PM-reviewed diff.
+              (2) **T6 — seed VERIFIED** (no code change needed). `db:seed` runs idempotent vs the migrated 4-value
+                  enum; each tenant has exactly one `tenant_superadmin` + employees; partial index active. The prior
+                  "T6 partial" gap was only the correctly-deferred virtual `tenant_manager` (D-RBAC-1, no DB row).
+              (3) **T8 — full gate + live + back-port.** Full **cache-OFF** gate GREEN: lint 8/8 · typecheck 8/8 ·
+                  build 8/8 · test **268/268** (web 215 · shared 33 · storage 15 · db 5). **Dev container REBUILT off
+                  the branch** (image 2026-08-07T16:30) + LIVE both-tenant browser verify: demo owner (Branch Admin/0000)
+                  AND clinic owner (Nurse Admin/0001) log in through the REAL Auth.js→roleMap→JWT→middleware seam →
+                  full admin panel incl. the owner-only **Users** tab. Screenshot `screenshots/rbac-3tier-clinic-owner-admin.png`.
+                  Back-ported: PRODUCT.md Roles+Permissions + User.role → 3-tier model; DECISIONS_LOG as-built entry
+                  (commit 78a483a). 2 global LESSONS logged (`typescript.eslint.prisma-enum-vs-shared-enum-comparison`
+                  = Prisma-enum vs shared-enum runtime compare trips no-unsafe-enum-comparison + breaks the Next build,
+                  coerce `as unknown as Role`; `process.verification.partial-gate-before-commit-hides-lint-build-break`
+                  = run the FULL cache-OFF gate incl. lint+build before any commit, tsc-green ≠ build-green).
+              **⚠ REGRESSION CAUGHT: T5 first commit (7ff65ca) passed typecheck+tests but BROKE lint+build** (the enum
+                  compare). Caught by the T8 full gate, fixed in 535c9c7. Backbone is now genuinely all-green.
+              **➡ NEXT: RBAC Wave 2 — role-builder UI (tenant_superadmin-only, shadcn) + `customRoles` tRPC router (create/rename/assign; ceiling ≤ tenant_admin; NEVER users/roles). OWNER-GATED — needs "build Wave 2"/"continue RBAC". Then Wave 3 = verify-all-pages + full cache-off gate. Wave 0+1 (schema/resolver/enforcement) DONE.**
+              ── prior session (2026-07-19d) ──
+              Resume session 2026-07-19d (Full Auto) — SHORT SESSION, owner requested save+handoff to rest the PC.
               ✅ DONE THIS SESSION (2026-07-19d):
               (1) **Resume verification** — read STATE + PENDING_DECISIONS; git ground-truth confirmed matches
                   STATE exactly: branch `main`, **126 commits ahead of origin / 0 pushed** (HARD HOLD holding),
@@ -119,7 +246,7 @@ PREV_SESSION: Post-Phase-7 polish + Phase-8 sweep (2026-07-10). Phase 7 (waves 7
 PREV_DONE:    Phase 7 Wave 7.7a — Admin Dashboard (2026-07-09). 146ecbd/d2531ba/8595d4f. 8 KPIs, tier-gated advanced
               blocks, searchable ticket log. Barrel/RSC bug found+fixed (ToggleGroup → dedicated subpaths). PM-verified
               typecheck 8/8, test 130/130, build 8/8, live both tenants match psql. See memory for detail.
-LAST_DONE:    Phase 7 Wave 7.5 — Big Display (2026-07-08). Sonnet worker (died mid-verify on an API drop; PM
+LAST_DONE:    RBAC view-access Wave 1 — matrix-driven enforcement (matrixProcedure + nav filter + per-page guards); commit ae8b333, cache-off typecheck/lint green, RBAC tests green (2026-08-09).
               finished container-rebuild + E2E + commit). Commits e3d4278 (T0 — public queue.state read:
               kioskProcedure, tenantSlug-resolved, single round-trip returning now-serving/up-next(6, prio-FIFO)/
               totalWaiting/branding(companyName+tier); Tenant is GLOBAL_MODEL so no withTenantContext wrap; test
@@ -155,10 +282,16 @@ LAST_DONE:    Phase 7 Wave 7.5 — Big Display (2026-07-08). Sonnet worker (died
               flow + transfer+Return-After-Done DB-verified per test-artifacts/phase7-station/NOTES.md +3 png.
               Prior waves: 7.3 Kiosk (b8797d9/0aaf118/cc2fca2), 7.2 SSE (07b792b/83c38a7/cc2dc13/d1ca600),
               7.1 Queue Engine (f1fa3a1/90627a7/afb709f/a937cf8), /login (f99916a). 55 commits ahead, 0 pushed (HARD HOLD).
-NEXT:         ⭐ PRIMARY (owner-approved 2026-07-19d): **RBAC 3-tier retrofit — Scenario 42, dev-first, HARD HOLD.**
-              CueLane is tenant-based but NOT yet on the fleet standard (current role enum is `Role` with
-              super_admin/admin/employee — NOT tenant_manager/tenant_superadmin/tenant_admin; verify exact
-              literals at packages/db/prisma/schema.prisma before touching). Follow the PROVEN reference:
+NEXT:         ⭐ RBAC Wave 2 (owner-gated — needs "build Wave 2"/"continue RBAC"): role-builder UI (tenant_superadmin-only, shadcn Data Table/Checkbox/Form + RHF+Zod, rbac.md B4) + a `customRoles` tRPC router (create/rename/assign, ≤ tenant_admin ceiling, NEVER users/roles, only tenant_superadmin+manager). Then Wave 3: verify-all-pages (Playwright, employee-with-custom-role live) + full cache-off gate. Copy-source FerryBook. D-RBAC-1 (virtual vs DB tenant_manager) stays open + non-blocking. Old un-gated
+              RBAC queue is now EMPTY. Remaining RBAC work is **RBAC Phase 2 — the tenant-scoped custom-role
+              permission matrix (D-RBAC-3)** — a SEPARATE milestone that is an OPEN owner [WHAT] (is the matrix
+              wanted this cycle?). **Do NOT auto-start it; surface D-RBAC-3 + D-RBAC-1 and wait for owner GO.**
+              Plan for Phase 2 already staged in `docs/planning/RBAC_3TIER_RETROFIT_PLAN.md` §"Phase 2".
+              Branch `feat/tenant-rbac-3tier` stays LOCAL (HARD HOLD) until owner says push/merge. When merged to
+              main, that push is the RELEASE moment → version bump + changelog (owner-gated).
+              ── superseded (historical, owner-approved 2026-07-19d, now DONE) — RBAC retrofit primary ──
+              CueLane was tenant-based but NOT yet on the fleet standard (was `UserRole{employee,admin}`;
+              now `{employee,tenant_admin,tenant_superadmin,tenant_manager}`). Followed the PROVEN reference:
               MG `feat/tenant-rbac-3tier` + `.ai_prompt/scenarios.md` Scenario 42 + `.ai_prompt/rbac.md` (265 ln)
               + global `~/.claude/rules/tenant-rbac-standard.md`. Target shape:
                 • 3 FIXED system tiers: `tenant_manager` (platform, tenant_id=NULL — already effectively the
@@ -245,7 +378,8 @@ KNOWN GAPS (Phase 7/8 follow-ups — NOT blockers):
 BLOCKERS:     Human ⏳ in CREDENTIALS.md before Phase 6 DEPLOY (NOT dev): Docker Hub token, SMTP
               creds, Xendit API keys (TEST+LIVE), Turnstile LIVE keys. Dev uses MailHog +
               Turnstile test keys + the official local-dev super-admin cred (Server-Setups) — not blocked.
-GIT_BRANCH:   main (Phase 5 fixes committed local; UNPUSHED — HARD HOLD, local dev only)
+GIT_BRANCH:   feat/rbac-view-access (off feat/tenant-rbac-3tier). Wave 0 PUSHED to origin last session; Wave 1 commit ae8b333 LOCAL only — HARD HOLD, no push/deploy without owner word. main untouched.
+              local dev only). Dev stack REBUILT off this branch (2026-08-08). `main` unchanged; merge is owner-gated.
 DEPLOY_HOLD:  ⛔ LOCAL DEV ONLY. No staging/prod push without explicit owner word.
 PORTS (dev):  APP=41716 WORKER=41717 DB=41706 PGBOUNCER=41707 CACHE=41708 MINIO=41709
               MINIO_CONSOLE=41710 MAILHOG_SMTP=41711 MAILHOG_UI=41712 PGADMIN=41713

@@ -31,7 +31,7 @@ function ctxFor(overrides: Partial<Context>): Context {
 /** Always a tenant-Admin session — NEVER super_admin (this wave's non-negotiable testing rule). */
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 
@@ -39,7 +39,7 @@ async function makeFreeTenant(label: string): Promise<{ tenantId: string; adminI
   const tenant = await prismaRaw.tenant.create({
     data: { slug: `test-admin-integ-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, companyName: `Integ ${label}`, tagline: 'x', tier: 'free' },
   });
-  const admin = await prismaRaw.user.create({ data: { tenantId: tenant.id, name: `Admin ${label}`, role: 'admin', pin: 'x' } });
+  const admin = await prismaRaw.user.create({ data: { tenantId: tenant.id, name: `Admin ${label}`, role: 'tenant_superadmin', pin: 'x' } });
   return { tenantId: tenant.id, adminId: admin.id };
 }
 

@@ -8,17 +8,17 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { createServiceSchema, updateServiceSchema, TenantTier } from '@cuelane/shared';
-import { prisma, withTenant } from '@cuelane/db';
-import { createTRPCRouter, adminProcedure } from '../trpc';
+import { prisma, withTenant, FeatureKey } from '@cuelane/db';
+import { createTRPCRouter, matrixProcedure } from '../trpc';
 import { assertWithinLimit, nextServiceNumber } from '@/server/domain/admin';
 import { rethrowAdmin, idInputSchema, stripUndefined } from '../lib/admin-errors';
 
 export const serviceRouter = createTRPCRouter({
-  list: adminProcedure.input(z.void()).query(async ({ ctx }) => {
+  list: matrixProcedure(FeatureKey.services, 'view').input(z.void()).query(async ({ ctx }) => {
     return prisma.service.findMany({ where: { tenantId: ctx.tenantId }, orderBy: { number: 'asc' } });
   }),
 
-  create: adminProcedure.input(createServiceSchema).mutation(async ({ ctx, input }) => {
+  create: matrixProcedure(FeatureKey.services, 'write').input(createServiceSchema).mutation(async ({ ctx, input }) => {
     try {
       return await withTenant(ctx.tenantId, async (tx) => {
         const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { tier: true } });
@@ -31,7 +31,7 @@ export const serviceRouter = createTRPCRouter({
     }
   }),
 
-  update: adminProcedure
+  update: matrixProcedure(FeatureKey.services, 'update')
     .input(idInputSchema.merge(updateServiceSchema))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
@@ -42,7 +42,7 @@ export const serviceRouter = createTRPCRouter({
       return prisma.service.update({ where: { id }, data: stripUndefined(data) });
     }),
 
-  delete: adminProcedure.input(idInputSchema).mutation(async ({ ctx, input }) => {
+  delete: matrixProcedure(FeatureKey.services, 'delete').input(idInputSchema).mutation(async ({ ctx, input }) => {
     const existing = await prisma.service.findFirst({ where: { id: input.id, tenantId: ctx.tenantId } });
     if (existing == null) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Unknown service.' });

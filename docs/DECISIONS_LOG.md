@@ -629,3 +629,169 @@ with no functional gain for this use case.
 **Reversible:** yes (as a product decision) — if true WebSocket is later required, reopen D1 as a
 Feature Update and swap the browser transport (keep the Valkey pub/sub backbone). The Valkey channel
 layer is transport-agnostic.
+
+---
+
+## 2026-08-08 — RBAC 3-Tier Retrofit (Scenario 42, backbone) — as-built record
+
+**Decision:** CueLane adopts the fleet **3-tier tenant RBAC standard** (`~/.claude/rules/tenant-rbac-standard.md`,
+framework `.ai_prompt/rbac.md`, Rule 34). The DB `UserRole` enum + all authorization guards were migrated,
+data-preserving, from the prior `{ employee, admin }` model to the fixed 3-tier backbone.
+
+**Tag:** `spec-divergent: rbac-3tier` — the implementation drove the spec (LIVING-SPEC / Flow-Back, Rule 1).
+`docs/PRODUCT.md` "Roles + Permissions" table + the User entity `role` line were reconciled to this model
+this session (settled/code-enforced facts only).
+
+**Role model (as built):**
+- `tenant_manager` — platform operator, `tenant_id = NULL`. Formerly the TS-only `Role.SuperAdmin` / the
+  "Super Admin" surface. Kept as a **virtual env-credential identity** (Auth.js `super-admin-credentials`,
+  no DB user row) for the backbone — see OPEN decision **D-RBAC-1** (promote to a vault-seeded DB row?).
+- `tenant_superadmin` — the tenant OWNER. **Exactly one per tenant**, enforced by a Postgres partial-unique
+  index `one_tenant_superadmin_per_tenant ON users(tenant_id) WHERE role='tenant_superadmin' AND tenant_id IS NOT NULL`.
+  Sole holder of Billing + User-Management within the tenant.
+- `tenant_admin` — below the owner. Full Admin Panel EXCEPT User-Management and Billing (enforced:
+  `userManagementProcedure` admits only `tenant_superadmin` | `tenant_manager`; `adminProcedure` admits
+  `tenant_superadmin` | `tenant_admin`).
+- `employee` — app domain role, unchanged.
+
+**Migrations (data-preserving, two separate — Postgres enum add-then-use hazard):**
+- `20260807153601_feat_rbac_enum_extend` — `ALTER TYPE "UserRole" RENAME VALUE 'admin' TO 'tenant_admin'`
+  then `ADD VALUE 'tenant_superadmin'`, `ADD VALUE 'tenant_manager'`. NEVER DROP/CREATE the type
+  (would lose every user's role).
+- `20260807153602_feat_rbac_owner_normalize` — normalize the earliest-`created_at` admin per tenant to
+  `tenant_superadmin`, then create the partial-unique index.
+
+**Ownership succession (T5, this session — commits 7ff65ca + 535c9c7):**
+- `user.transferOwnership` — in-tenant; **only the current owner** (`tenant_superadmin`) may call it; a
+  `tenant_manager` is rejected on this path and must use the break-glass route.
+- `platformUser.reassignOwner` — platform break-glass; `tenant_manager` only; cross-tenant via `prismaRaw`.
+- Both **demote-before-promote** in one transaction (the partial-unique index is checked at each statement
+  boundary, so two owners may never co-exist mid-transaction). L5 `writeAuditLog` on every role change
+  (its first call sites). TDD `succession.test.ts` 9/9 vs real Postgres, asserting the exactly-one-owner
+  invariant + all rejection/cross-tenant paths.
+
+**[HOW] decisions:** (1) `tenant_manager` stays virtual for the backbone (lowest risk, no auth-flow rewrite);
+promotion to a DB row is deferred to D-RBAC-1. (2) A runtime compare of a Prisma `UserRole` value against
+the `@cuelane/shared` `Role` enum trips `no-unsafe-enum-comparison` (distinct enum types) and breaks the
+Next.js build — coerce via `as unknown as Role` first (global lesson
+`typescript.eslint.prisma-enum-vs-shared-enum-comparison`).
+
+**Verification:** full cache-OFF gate green — lint 8/8 · typecheck 8/8 · build 8/8 · test 268/268
+(web 215 · shared 33 · storage 15 · db 5). Dev DB confirmed: 4 enum values present, partial index active,
+each seeded tenant has exactly one `tenant_superadmin`; seed idempotent.
+
+**Pending (do NOT treat as done):** **D-RBAC-3** — the tenant-scoped custom-role permission matrix
+(CustomRole + RolePermission + role-builder UI) is a SEPARATE gated milestone, not built. **D-RBAC-1** —
+platform-identity model. Both tracked in `PENDING_DECISIONS.md`.
+
+**Reversible:** the virtual-`tenant_manager` choice is fully reversible (D-RBAC-1). The enum rename is
+data-preserving but the value strings are now load-bearing across code + JWT.
+
+**Affected files:** `packages/db/prisma/schema.prisma` + 2 migrations; `packages/shared` (Role enum + schemas);
+`apps/web/src/server/{auth,trpc,middleware}` (guards, roleMap, procedures, succession routers);
+`packages/db/prisma/seed.ts`; ~20 test files swept; `docs/PRODUCT.md` (this back-port).
+
+---
+
+## 2026-08-09 — D-RBAC-3 RESOLVED: build the custom-role view-access matrix this cycle (Full Rule 34 Part B)
+
+**Decision (owner, 2026-08-08):** D-RBAC-3 is **resolved → BUILD**. The owner approved the fleet-wide RBAC
+per-role/per-custom-role module VIEW-access retrofit and chose **Full Part B** scope (schema + resolver +
+enforcement + custom-role builder UI), which **supersedes the D-RBAC-3 gate** that had parked the matrix as
+a separate milestone. Copy-source = **FerryBook** (only sibling with the full impl on this machine).
+Branch `feat/rbac-view-access` off `feat/tenant-rbac-3tier`. HARD HOLD (local only). D-RBAC-1 (platform
+identity) stays open + non-blocking.
+
+**Wave 0 built (commit 36a637d):** Feature registry + CustomRole/RolePreset + RolePermission
+(view/write/update/delete, deny-by-default) + `User.customRoleId`; migration
+`20260808155140_add_rbac_view_access_matrix`; resolver `apps/web/src/lib/rbac/*` (`hasPermission` — 3 fixed
+tiers short-circuit, `tenant_admin` denied on owner-only `{users,roles}`, employee/custom via matrix
+deny-by-default; `resolvePrincipal`; `visibleFeatures`); idempotent Feature seed (9 keys). Fixed tiers are
+unaffected by the matrix, so no existing user loses a menu on migrate. Gate green: db+web typecheck, eslint,
+10 rbac unit tests. **No enforcement wired yet** (Waves 1–3 pending).
+
+**[HOW] note for Wave 1:** the resolver keys on the Prisma `UserRole` literal union (string `switch`), which
+sidesteps the `no-unsafe-enum-comparison` trap between Prisma `UserRole` and `@cuelane/shared` `Role`
+(lesson `typescript.eslint.prisma-enum-vs-shared-enum-comparison`) — Wave 1 wiring (`matrixProcedure`, nav
+filter, route guards) must derive role via `resolvePrincipal` (DB `user.role`), not compare `ctx.roles`
+against `UserRole` directly.
+
+---
+
+## 2026-08-09 — RBAC Wave 1 BUILT: matrix-driven view-access enforcement (commit ae8b333)
+
+**Built (branch `feat/rbac-view-access`, LOCAL / HARD HOLD):** the Wave 0 resolver is now wired into all
+three enforcement surfaces (`.ai_prompt/rbac.md` Rule 34 Part B B3):
+- **tRPC** — `matrixProcedure(feature, action)` factory in `server/trpc/trpc.ts`: a faithful superset of
+  `adminProcedure` (same protected + tenant-scope + suspension + AsyncLocalStorage plumbing) with the flat
+  Admin gate replaced by `hasPermission(principal, feature, action)`. Swapped routers: `service`/`window`/
+  `media` (CRUD → view/write/update/delete), `dashboard` (view), `tenantAdmin` (usage:view, settings:view/
+  update). `user` stays `userManagementProcedure` (owner-only); `tenantAd` (Premium ads) stays
+  `adminProcedure` (conservative deny for Wave 1 — employees/custom-roles cannot reach premium tenant ads).
+- **Route/nav** — `ADMIN_TABS` carry a `FeatureKey`; `visibleAdminTabs(principal, tier)` filters via the
+  matrix. `admin/layout.tsx` resolves the DB principal and redirects out (→ `/{tenant}/kiosk`) when zero
+  tabs are visible. Per-page `requireFeatureView` guards on every admin sub-page; the admin root routes a
+  dashboard-denied caller to their first visible tab (loop-safe).
+
+**[HOW] — fixed-tier short-circuit BEFORE the DB read (critical).** `matrixProcedure` decides
+manager/superadmin/tenant_admin allow/deny from `ctx.roles` and NEVER calls `resolvePrincipal` for them —
+the platform `tenant_manager` is a virtual credential identity with **no user row**, so resolving it would
+throw. Only the employee/custom-role path hits `resolvePrincipal(userId, prismaRaw)`. Logged to the global
+lessons ledger (`rbac.matrix-procedure.platform-tier-has-no-user-row`).
+
+**Behavior change (deliberate, correct):** a `tenant_admin` no longer sees the **Users** tab (an OWNER_ONLY
+feature) — this now matches `userManagementProcedure`, which already forbade `tenant_admin` from user CRUD.
+Previously the tab rendered but its data calls 403'd. No fixed-tier user loses any *legitimate* access.
+
+**Verified cache-off:** typecheck 8/8, lint 8/8; new `matrixProcedure.test.ts` (custom-role grant path +
+deny-by-default, end-to-end) + updated `access.test.ts` green; all 5 swapped routers green. Remaining suite
+failures (storage/display/media-upload = MinIO cred mismatch, auth = SMTP, station = Valkey) are pre-existing
+env gaps in untouched code, not this change.
+
+**Pending:** Wave 2 (role-builder UI + `customRoles` tRPC router, tenant_superadmin-only — B4) and Wave 3
+(verify-all-pages + full gate). D-RBAC-1 (platform identity) stays open + non-blocking.
+
+---
+
+## 2026-08-09 — RBAC Wave 2 BUILT: custom-role builder UI + `customRoles` tRPC router (tenant_superadmin-only)
+
+**Built (branch `feat/rbac-view-access`, LOCAL / HARD HOLD — Rule 34 Part B B4/B5, Full Part B per D-RBAC-3):**
+the tenant-owner custom-role builder, completing the view-access matrix system. Four dispatched tasks +
+one build-break fix, all PM-verified cache-off.
+
+- **Backend — `customRoles` router** (`server/trpc/routers/roles.ts`, registered `roles` in `root.ts`):
+  `featureCatalog`/`list`/`get`/`create`/`update`/`delete`, every procedure guarded by
+  `userManagementProcedure` (owner-only: `tenant_superadmin` + platform `tenant_manager`; a `tenant_admin`
+  is FORBIDDEN — role-authoring is never matrix-evaluated for them). Server-side HARD ceiling
+  `assertNoOwnerOnlyGrant` rejects any grant on an OWNER_ONLY feature (`users`, `roles`) with BAD_REQUEST
+  regardless of client payload (Part C). `$transaction` atomicity (create = insert role + granted rows;
+  update = replace rows; delete blocked while any user is still assigned, TOCTOU-safe in-tx). Duplicate name
+  → P2002→CONFLICT. `tenantId` always from `ctx.tenantId`, never input (L6). Zod schemas in `@cuelane/shared`.
+- **Preset→matrix mapping** (`lib/rbac/presets.ts`, `presetMatrix()`) — AUTHORED (FerryBook stores the preset
+  as a label only; Rule 34 B5 wants presets to seed a starting matrix). supervisor/operator/contributor/viewer
+  expand across the 7 WRITABLE features; owner picks a preset → matrix pre-fills → owner fine-tunes cells.
+- **Role-builder UI** — `app/[tenant]/admin/roles/` (`page.tsx` guarded `requireFeatureView(tenant, roles)`;
+  vanilla-tRPC-client `roles-client.tsx` list + create/edit/delete; `RoleFormDialog.tsx` = 7-feature × 4-action
+  (view/write/update/delete) shadcn Checkbox matrix, preset Select seeds it). New `roles` tab in `ADMIN_TABS`
+  (OWNER_ONLY → auto-hidden from tenant_admin/employees, like `users`).
+- **Assignment** — `user.ts` + `@cuelane/shared` user schemas gain optional `customRoleId`;
+  `resolveCustomRoleId()` forces `null` for any non-`employee` role (matrix applies only to the employee tier
+  per the resolver) and validates the role belongs to the caller's tenant (L6). Users form shows a "Custom
+  role" Select only when role = employee.
+
+**[HOW] — build-break fix (client bundle / server barrel).** The role-builder is the first `'use client'`
+importer of `@/lib/rbac`; `features.ts`/`presets.ts` value-imported `FeatureKey`/`RolePreset` from `@cuelane/db`,
+whose index drags `tenant-guard` → `node:async_hooks` into the client bundle → **build failed** (typecheck/lint/
+vitest all PASSED — only `next build` caught it). Fixed at root: `@cuelane/shared` `FeatureKey`/`RolePreset`
+converted from nominal `enum` to `const`-object + literal-union (structurally interchangeable with Prisma's
+generated shape — zero casts), and `lib/rbac` given zero-import local mirrors. Global lesson logged
+(`nextjs.client-bundle.server-barrel-drags-async-hooks`).
+
+**Verified cache-off (full authority — 2+3 compiled a shared tree, so PM re-ran the integrated gate):**
+all-package typecheck 8/8, lint 8/8, `@cuelane/web` build ✓ (27 routes), full web suite **234 passed / 4
+pre-existing env failures (MinIO cred, SMTP, Valkey — untouched code, = documented baseline, zero regression)**.
+New tests: `roles.test.ts` (6 — owner-only ceiling, round-trip, delete-blocked-while-assigned, tenant isolation,
+preset) + `user.test.ts` customRoleId block (assign / cross-tenant reject / non-employee forced null / clear).
+
+**Pending:** Wave 3 (verify-all-pages per role via Playwright — employee-with-custom-role live login — + dev
+rebuild + evidence). D-RBAC-1 (virtual vs DB platform `tenant_manager`) stays open + non-blocking.

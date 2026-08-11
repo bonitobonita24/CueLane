@@ -4,7 +4,7 @@
 import { auth } from '@/server/auth/edge';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import type { Role } from '@cuelane/shared';
+import { Role } from '@cuelane/shared';
 import { evaluateProtectedTenantAccess } from '@/server/auth/tenant-guard';
 
 // Paths that do NOT need auth (kiosk + display are public-facing)
@@ -18,7 +18,7 @@ const TURNSTILE_PATHS = ['/login', '/register', '/forgot-password'];
 
 // Paths that bypass all tenant/auth middleware (Next.js internals + static assets).
 // IMPORTANT: Do NOT use pathname.includes('.') — it would bypass auth for any
-// URL path containing a dot (e.g. /super-admin/report.csv).
+// URL path containing a dot (e.g. /superadmin/report.csv).
 // Instead, check for a file extension only at the END of the last path segment.
 const STATIC_EXT_RE = /\.\w{1,8}$/;
 
@@ -43,14 +43,14 @@ export default auth((req: NextRequest & { auth: unknown }) => {
   }
 
   // 2. Super Admin routes — require super_admin role
-  if (pathname.startsWith('/super-admin')) {
+  if (pathname.startsWith('/superadmin')) {
     const session = req.auth as
       | { user?: { roles?: Role[]; id?: string } }
       | null
       | undefined;
 
     const roles: Role[] = session?.user?.roles ?? [];
-    const isSuperAdmin = roles.includes('super_admin' as Role);
+    const isSuperAdmin = roles.includes(Role.TenantManager);
 
     if (!isSuperAdmin) {
       const loginUrl = req.nextUrl.clone();

@@ -5,17 +5,17 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { createWindowSchema, updateWindowSchema, TenantTier } from '@cuelane/shared';
-import { prisma, withTenant } from '@cuelane/db';
-import { createTRPCRouter, adminProcedure } from '../trpc';
+import { prisma, withTenant, FeatureKey } from '@cuelane/db';
+import { createTRPCRouter, matrixProcedure } from '../trpc';
 import { assertWithinLimit } from '@/server/domain/admin';
 import { rethrowAdmin, idInputSchema, stripUndefined } from '../lib/admin-errors';
 
 export const windowRouter = createTRPCRouter({
-  list: adminProcedure.input(z.void()).query(async ({ ctx }) => {
+  list: matrixProcedure(FeatureKey.windows, 'view').input(z.void()).query(async ({ ctx }) => {
     return prisma.window.findMany({ where: { tenantId: ctx.tenantId }, orderBy: { name: 'asc' } });
   }),
 
-  create: adminProcedure.input(createWindowSchema).mutation(async ({ ctx, input }) => {
+  create: matrixProcedure(FeatureKey.windows, 'write').input(createWindowSchema).mutation(async ({ ctx, input }) => {
     try {
       return await withTenant(ctx.tenantId, async (tx) => {
         const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { tier: true } });
@@ -27,7 +27,7 @@ export const windowRouter = createTRPCRouter({
     }
   }),
 
-  update: adminProcedure
+  update: matrixProcedure(FeatureKey.windows, 'update')
     .input(idInputSchema.merge(updateWindowSchema))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
@@ -38,7 +38,7 @@ export const windowRouter = createTRPCRouter({
       return prisma.window.update({ where: { id }, data: stripUndefined(data) });
     }),
 
-  delete: adminProcedure.input(idInputSchema).mutation(async ({ ctx, input }) => {
+  delete: matrixProcedure(FeatureKey.windows, 'delete').input(idInputSchema).mutation(async ({ ctx, input }) => {
     const existing = await prisma.window.findFirst({ where: { id: input.id, tenantId: ctx.tenantId } });
     if (existing == null) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Unknown window.' });

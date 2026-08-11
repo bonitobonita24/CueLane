@@ -23,13 +23,14 @@ import { Role } from '@cuelane/shared';
 import { DataTable } from '../_components/DataTable';
 import { UsageMeter } from '../_components/UsageMeter';
 import { isAddDisabled } from '../_lib/limits';
-import { UserFormDialog, type UserFormValues } from './UserFormDialog';
+import { UserFormDialog, type CustomRoleOption, type UserFormValues } from './UserFormDialog';
 
 interface UserRow {
   id: string;
   name: string;
   role: Role;
   serviceIds: string[];
+  customRoleId: string | null;
 }
 
 interface ServiceOption {
@@ -47,6 +48,7 @@ const client = createClient('/api/trpc');
 export function UsersClient() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [services, setServices] = useState<ServiceOption[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRoleOption[]>([]);
   const [usage, setUsage] = useState<UsageState | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -55,14 +57,16 @@ export function UsersClient() {
   const [submitting, setSubmitting] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [userList, serviceList, usageResult] = await Promise.all([
+    const [userList, serviceList, roleList, usageResult] = await Promise.all([
       client.user.list.query(),
       client.service.list.query(),
+      client.roles.list.query(),
       client.tenantAdmin.getUsage.query(),
     ]);
     // Server returns `role` as a plain string column (Prisma), always one of the Role enum values.
     setUsers(userList.map((u) => ({ ...u, role: u.role as Role })));
     setServices(serviceList.map((s) => ({ id: s.id, name: s.name })));
+    setCustomRoles(roleList.map((r) => ({ id: r.id, name: r.name })));
     setUsage(usageResult.users);
   }, []);
 
@@ -88,12 +92,16 @@ export function UsersClient() {
   const handleSubmit = async (values: UserFormValues) => {
     setSubmitting(true);
     try {
+      // '' sentinel (— None —, or role !== Employee) → null; server also force-nulls it for any
+      // non-employee role, this just avoids sending the placeholder string either way.
+      const customRoleId = values.customRoleId === '' ? null : values.customRoleId;
       if (editing) {
         await client.user.update.mutate({
           id: editing.id,
           name: values.name,
           ...(values.pin !== '' ? { pin: values.pin } : {}),
           services: values.services,
+          customRoleId,
         });
         toast.success('User updated.');
       } else {
@@ -102,6 +110,7 @@ export function UsersClient() {
           role: values.role,
           pin: values.pin,
           services: values.services,
+          customRoleId,
         });
         toast.success('User added.');
       }
@@ -137,7 +146,15 @@ export function UsersClient() {
       id: 'role',
       header: 'Role',
       cell: ({ row }) => (
-        <Badge variant={row.original.role === Role.Admin ? 'default' : 'secondary'}>{row.original.role}</Badge>
+        <Badge
+          variant={
+            row.original.role === Role.TenantAdmin || row.original.role === Role.TenantSuperadmin
+              ? 'default'
+              : 'secondary'
+          }
+        >
+          {row.original.role}
+        </Badge>
       ),
     },
     {
@@ -185,10 +202,17 @@ export function UsersClient() {
         mode={editing ? 'edit' : 'create'}
         initialValues={
           editing
-            ? { name: editing.name, role: editing.role as Role.Employee | Role.Admin, pin: '', services: editing.serviceIds }
+            ? {
+                name: editing.name,
+                role: editing.role as Role.Employee | Role.TenantAdmin,
+                pin: '',
+                services: editing.serviceIds,
+                customRoleId: editing.customRoleId ?? '',
+              }
             : undefined
         }
         serviceOptions={services}
+        customRoleOptions={customRoles}
         submitting={submitting}
         onSubmit={handleSubmit}
       />

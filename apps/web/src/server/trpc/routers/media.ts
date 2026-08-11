@@ -13,18 +13,18 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { createPlaylistEntrySchema, reorderPlaylistSchema, MediaType, TenantTier } from '@cuelane/shared';
-import { prisma, prismaRaw, withTenant } from '@cuelane/db';
+import { prisma, prismaRaw, withTenant, FeatureKey } from '@cuelane/db';
 import { deleteObject } from '@cuelane/storage';
-import { createTRPCRouter, adminProcedure } from '../trpc';
+import { createTRPCRouter, matrixProcedure } from '../trpc';
 import { assertWithinPlaylistLimit, reorderPlaylistEntries } from '@/server/domain/media';
 import { rethrowAdmin, idInputSchema } from '../lib/admin-errors';
 
 export const mediaRouter = createTRPCRouter({
-  list: adminProcedure.input(z.void()).query(async ({ ctx }) => {
+  list: matrixProcedure(FeatureKey.media, 'view').input(z.void()).query(async ({ ctx }) => {
     return prisma.playlistEntry.findMany({ where: { tenantId: ctx.tenantId }, orderBy: { sortOrder: 'asc' } });
   }),
 
-  createYoutube: adminProcedure.input(createPlaylistEntrySchema).mutation(async ({ ctx, input }) => {
+  createYoutube: matrixProcedure(FeatureKey.media, 'write').input(createPlaylistEntrySchema).mutation(async ({ ctx, input }) => {
     if (input.type !== MediaType.YouTube) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
@@ -57,7 +57,7 @@ export const mediaRouter = createTRPCRouter({
     }
   }),
 
-  reorder: adminProcedure.input(reorderPlaylistSchema).mutation(async ({ ctx, input }) => {
+  reorder: matrixProcedure(FeatureKey.media, 'update').input(reorderPlaylistSchema).mutation(async ({ ctx, input }) => {
     try {
       // prismaRaw (unguarded), not the L6-guarded `prisma` — same convention as tenantAdmin.ts:
       // domain/media.ts's Db type (Prisma.TransactionClient | PrismaClient) doesn't structurally
@@ -70,7 +70,7 @@ export const mediaRouter = createTRPCRouter({
     return { ok: true };
   }),
 
-  delete: adminProcedure.input(idInputSchema).mutation(async ({ ctx, input }) => {
+  delete: matrixProcedure(FeatureKey.media, 'delete').input(idInputSchema).mutation(async ({ ctx, input }) => {
     const existing = await prisma.playlistEntry.findFirst({ where: { id: input.id, tenantId: ctx.tenantId } });
     if (existing == null) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Unknown playlist entry.' });

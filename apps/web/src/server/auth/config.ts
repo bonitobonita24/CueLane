@@ -60,7 +60,7 @@ export const authConfig: NextAuthConfig = {
             // Role.Employee, and staffProcedure explicitly allows Role.Employee — this filter was
             // the one place that disagreed). The Employee Station requires an employee session,
             // so both roles must be queryable here.
-            role: { in: ['admin', 'employee'] },
+            role: { in: [Role.TenantSuperadmin, Role.TenantAdmin, Role.Employee] },
             tenantId: tenant.id,  // scoped to this tenant — prevents cross-tenant auth
           },
           select: {
@@ -78,7 +78,8 @@ export const authConfig: NextAuthConfig = {
         if (!valid) return null;
 
         const roleMap: Record<string, Role> = {
-          admin: Role.Admin,
+          tenant_admin: Role.TenantAdmin,
+          tenant_superadmin: Role.TenantSuperadmin,
           employee: Role.Employee,
         };
 
@@ -130,7 +131,7 @@ export const authConfig: NextAuthConfig = {
           email: superAdminEmail,
           tenantId: null,
           tenantSlug: null, // Super Admin has no home tenant — exempt from the slug guard
-          roles: [Role.SuperAdmin],
+          roles: [Role.TenantManager],
         };
       },
     }),

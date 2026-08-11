@@ -24,7 +24,12 @@ export default async function StationPage({ params }: StationPageProps) {
   const session = await auth();
 
   const roles = (session?.user as { roles?: Role[] } | undefined)?.roles ?? [];
-  if (!roles.includes(Role.Employee) && !roles.includes(Role.Admin) && !roles.includes(Role.SuperAdmin)) {
+  if (
+    !roles.includes(Role.Employee) &&
+    !roles.includes(Role.TenantAdmin) &&
+    !roles.includes(Role.TenantSuperadmin) &&
+    !roles.includes(Role.TenantManager)
+  ) {
     redirect(`/login?callbackUrl=${encodeURIComponent(`/${tenantSlug}/station`)}`);
   }
 

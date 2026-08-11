@@ -84,7 +84,7 @@ interface ServiceSpec {
 
 interface UserSpec {
   name: string;
-  role: 'admin' | 'employee';
+  role: 'tenant_superadmin' | 'employee';
   pin: string;
   /** Indices into the tenant's `services` array this employee is assigned to. Admins ignore this. */
   services?: number[];
@@ -148,7 +148,7 @@ const demoSpec: TenantSeedSpec = {
   ],
   windows: ['Window 1', 'Window 2', 'Window 3', 'Window 4', 'Window 5'],
   users: [
-    { name: 'Branch Admin',   role: 'admin',    pin: '0000' },
+    { name: 'Branch Admin',   role: 'tenant_superadmin', pin: '0000' },
     { name: 'Alice Santos',   role: 'employee', pin: '1234', services: [0, 1] },
     { name: 'Bob Reyes',      role: 'employee', pin: '5678', services: [0, 2, 3, 4] },
     { name: 'Carmela Cruz',   role: 'employee', pin: '2468', services: [5, 6] },
@@ -205,7 +205,7 @@ const clinicSpec: TenantSeedSpec = {
   ],
   windows: ['Window 1', 'Window 2', 'Window 3', 'Window 4'],
   users: [
-    { name: 'Nurse Admin',    role: 'admin',    pin: '0001' },
+    { name: 'Nurse Admin',    role: 'tenant_superadmin', pin: '0001' },
     { name: 'Fely Bautista',  role: 'employee', pin: '1111', services: [0, 1] },
     { name: 'Grace Villamor', role: 'employee', pin: '2222', services: [2, 3] },
     { name: 'Hector Ramos',   role: 'employee', pin: '3333', services: [4, 5] },
@@ -305,7 +305,7 @@ async function seedTenant(spec: TenantSeedSpec): Promise<void> {
   // Dev PINs only — never use these in production. Production auth rolls out separately
   // (Server-Setups universal-admin credential).
 
-  async function findOrUpsertUser(name: string, role: 'admin' | 'employee', pin: string) {
+  async function findOrUpsertUser(name: string, role: 'tenant_superadmin' | 'employee', pin: string) {
     return findOrUpsert(
       () => prisma.user.findFirst({ where: { tenantId: tenant.id, name } }),
       () => prisma.user.create({ data: { tenantId: tenant.id, name, role, pin: hashPin(pin) } }),
@@ -424,8 +424,42 @@ async function seedTenant(spec: TenantSeedSpec): Promise<void> {
   console.log(`    ✓ SequenceCounter reservations: ${counterReservations.length} keys`);
 }
 
+// ─── Feature registry (Wave 0b — RolePermission.featureKey FK target) ─────────
+// Global, tenant-agnostic catalog of admin-shell modules. Must exist before any
+// RolePermission row can be created (real DB FK). `surface` = the admin route
+// slug for that feature — matches the AdminTab `href` values in
+// apps/web/src/app/[tenant]/admin/_lib/access.ts (dashboard's href is '', the
+// admin root); 'roles' has no AdminTab yet (custom-role builder UI not built),
+// its surface is reserved as 'roles' to match the future /admin/roles route.
+
+const FEATURE_SURFACES: Record<string, string> = {
+  dashboard: '',
+  services: 'services',
+  windows: 'windows',
+  users: 'users',
+  media: 'media',
+  settings: 'settings',
+  theme: 'theme',
+  usage: 'usage',
+  roles: 'roles',
+};
+
+async function seedFeatures(): Promise<void> {
+  const keys = Object.keys(FEATURE_SURFACES) as Prisma.FeatureCreateInput['featureKey'][];
+  for (const featureKey of keys) {
+    await prisma.feature.upsert({
+      where: { featureKey },
+      update: { surface: FEATURE_SURFACES[featureKey] },
+      create: { featureKey, surface: FEATURE_SURFACES[featureKey] },
+    });
+  }
+  console.log(`✓ Feature registry (${keys.length}): ${keys.join(', ')}\n`);
+}
+
 async function main(): Promise<void> {
   console.log('🌱 Seeding CueLane dev database (2 tenants — Wave 7.6-T9 rich demo dataset)...\n');
+
+  await seedFeatures();
 
   for (const spec of [demoSpec, clinicSpec]) {
     await seedTenant(spec);

@@ -18,7 +18,7 @@ function ctxFor(overrides: Partial<Context>): Context {
 }
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 function employeeCallerFor(tenantId: string, userId: string) {
@@ -45,7 +45,7 @@ describe('dashboardRouter (Wave 7.7a-T2)', () => {
       data: { slug: `test-dboard-a-${Date.now()}`, companyName: 'Dboard A Co.', tagline: 'x', tier: 'premium' },
     });
     tenantAId = tenantA.id;
-    adminAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Admin A', role: 'admin', pin: 'x' } })).id;
+    adminAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Admin A', role: 'tenant_superadmin', pin: 'x' } })).id;
     employeeAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Emp A', role: 'employee', pin: 'x' } })).id;
     serviceAId = (
       await prismaRaw.service.create({ data: { tenantId: tenantAId, number: 1, name: 'Service A1', icon: 'A', color: '#111111', avgTime: 5 } })
@@ -55,7 +55,7 @@ describe('dashboardRouter (Wave 7.7a-T2)', () => {
       data: { slug: `test-dboard-b-${Date.now()}`, companyName: 'Dboard B Co.', tagline: 'x', tier: 'free' },
     });
     tenantBId = tenantB.id;
-    adminBId = (await prismaRaw.user.create({ data: { tenantId: tenantBId, name: 'Admin B', role: 'admin', pin: 'x' } })).id;
+    adminBId = (await prismaRaw.user.create({ data: { tenantId: tenantBId, name: 'Admin B', role: 'tenant_superadmin', pin: 'x' } })).id;
     serviceBId = (
       await prismaRaw.service.create({ data: { tenantId: tenantBId, number: 1, name: 'Service B1', icon: 'B', color: '#222222', avgTime: 5 } })
     ).id;

@@ -19,7 +19,7 @@ function ctxFor(overrides: Partial<Context>): Context {
 }
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 function employeeCallerFor(tenantId: string, userId: string) {
@@ -44,7 +44,7 @@ describe('userRouter (Wave 7.6-T4)', () => {
       data: { slug: `test-user-a-${Date.now()}`, companyName: 'User Tenant A', tagline: 'x', tier: 'free' },
     });
     tenantAId = tenantA.id;
-    adminAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Admin A', role: 'admin', pin: 'x' } })).id;
+    adminAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Admin A', role: 'tenant_superadmin', pin: 'x' } })).id;
     employeeAId = (await prismaRaw.user.create({ data: { tenantId: tenantAId, name: 'Emp A', role: 'employee', pin: 'x' } })).id;
     svcA1Id = (await prismaRaw.service.create({ data: { tenantId: tenantAId, number: 1, name: 'A Svc 1', icon: 'S', color: '#111111', avgTime: 5 } })).id;
     svcA2Id = (await prismaRaw.service.create({ data: { tenantId: tenantAId, number: 2, name: 'A Svc 2', icon: 'S', color: '#111111', avgTime: 5 } })).id;
@@ -53,7 +53,7 @@ describe('userRouter (Wave 7.6-T4)', () => {
       data: { slug: `test-user-b-${Date.now()}`, companyName: 'User Tenant B', tagline: 'x', tier: 'free' },
     });
     tenantBId = tenantB.id;
-    adminBId = (await prismaRaw.user.create({ data: { tenantId: tenantBId, name: 'Admin B', role: 'admin', pin: 'x' } })).id;
+    adminBId = (await prismaRaw.user.create({ data: { tenantId: tenantBId, name: 'Admin B', role: 'tenant_superadmin', pin: 'x' } })).id;
     svcBId = (await prismaRaw.service.create({ data: { tenantId: tenantBId, number: 1, name: 'B Svc 1', icon: 'S', color: '#111111', avgTime: 5 } })).id;
   });
 
@@ -130,9 +130,75 @@ describe('userRouter (Wave 7.6-T4)', () => {
 
   it('the shared createUserSchema rejects a super_admin role input before it ever reaches the router', async () => {
     const admin = adminCallerFor(tenantBId, adminBId);
-    const maliciousInput = { name: 'Mallory', role: Role.SuperAdmin, pin: '1234', services: [] } as unknown as Parameters<
+    const maliciousInput = { name: 'Mallory', role: Role.TenantManager, pin: '1234', services: [] } as unknown as Parameters<
       typeof admin.user.create
     >[0];
     await expect(admin.user.create(maliciousInput)).rejects.toBeDefined();
+  });
+
+  // RBAC Wave 2 (Task 3) — customRoleId assignment. Meaningful only on Role.Employee; the resolver
+  // (apps/web/src/lib/rbac/hasPermission.ts) never consults it for tenant_admin/tenant_superadmin.
+  // Uses tenant B (tenant A is already at its 10-user free-tier cap from the tests above).
+  describe('customRoleId assignment', () => {
+    let customRoleAId: string; // belongs to tenant A — used for the cross-tenant rejection case
+    let customRoleBId: string; // belongs to tenant B — the tenant these tests create users in
+
+    beforeAll(async () => {
+      customRoleAId = (
+        await prismaRaw.customRole.create({ data: { tenantId: tenantAId, name: `Viewer A ${Date.now()}`, preset: 'viewer' } })
+      ).id;
+      customRoleBId = (
+        await prismaRaw.customRole.create({ data: { tenantId: tenantBId, name: `Viewer B ${Date.now()}`, preset: 'viewer' } })
+      ).id;
+    });
+
+    it('assigning a valid tenant custom role to an employee persists customRoleId', async () => {
+      const adminB = adminCallerFor(tenantBId, adminBId);
+      const created = await adminB.user.create({
+        name: 'Custom-Role Employee',
+        role: Role.Employee,
+        pin: '1234',
+        services: [],
+        customRoleId: customRoleBId,
+      });
+      expect(created.customRoleId).toBe(customRoleBId);
+
+      const row = await prismaRaw.user.findUniqueOrThrow({ where: { id: created.id } });
+      expect(row.customRoleId).toBe(customRoleBId);
+    });
+
+    it('rejects a cross-tenant customRoleId', async () => {
+      const adminB = adminCallerFor(tenantBId, adminBId);
+      await expect(
+        adminB.user.create({ name: 'Sneaky Role', role: Role.Employee, pin: '1234', services: [], customRoleId: customRoleAId }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('forces customRoleId to null for a non-employee role even when the client supplies one', async () => {
+      const adminB = adminCallerFor(tenantBId, adminBId);
+      const created = await adminB.user.create({
+        name: 'Admin With Bogus Role',
+        role: Role.TenantAdmin,
+        pin: '1234',
+        services: [],
+        customRoleId: customRoleBId,
+      });
+      expect(created.customRoleId).toBeNull();
+
+      const row = await prismaRaw.user.findUniqueOrThrow({ where: { id: created.id } });
+      expect(row.customRoleId).toBeNull();
+    });
+
+    it('update can assign, then clear, a customRoleId on an existing employee', async () => {
+      const adminB = adminCallerFor(tenantBId, adminBId);
+      const created = await adminB.user.create({ name: 'Later Assigned', role: Role.Employee, pin: '1234', services: [] });
+      expect(created.customRoleId).toBeNull();
+
+      const assigned = await adminB.user.update({ id: created.id, customRoleId: customRoleBId });
+      expect(assigned.customRoleId).toBe(customRoleBId);
+
+      const cleared = await adminB.user.update({ id: created.id, customRoleId: null });
+      expect(cleared.customRoleId).toBeNull();
+    });
   });
 });

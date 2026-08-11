@@ -3,8 +3,14 @@ import superjson from 'superjson';
 import { z } from 'zod';
 import type { Context } from './context';
 import { rateLimiters } from '@/server/lib/rate-limit';
-import { prismaRaw, withTenantContext } from '@cuelane/db';
+import { prismaRaw, withTenantContext, type FeatureKey } from '@cuelane/db';
 import { Role } from '@cuelane/shared';
+import {
+  resolvePrincipal,
+  hasPermission,
+  OWNER_ONLY_FEATURES,
+  type PermissionAction,
+} from '@/lib/rbac';
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
@@ -90,11 +96,11 @@ export async function assertTenantActive(tenantId: string): Promise<void> {
 }
 
 export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  const isSuperAdmin = ctx.roles.includes(Role.SuperAdmin);
+  const isSuperAdmin = ctx.roles.includes(Role.TenantManager);
   if (!isSuperAdmin && ctx.tenantId == null) {
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'No tenant context in session.' });
   }
-  if (!ctx.roles.includes(Role.Admin)) {
+  if (!ctx.roles.includes(Role.TenantSuperadmin) && !ctx.roles.includes(Role.TenantAdmin)) {
     throw new TRPCError({ code: 'FORBIDDEN' });
   }
 
@@ -109,7 +115,77 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));
 });
 
-// Super Admin procedure — platform-level, cross-tenant, env-based credential (Role.SuperAdmin,
+// Matrix-governed procedure (Wave 1 — per-role / custom-role module view-access enforcement,
+// .ai_prompt/rbac.md Rule 34 Part B). A SUPERSET of adminProcedure: identical protected +
+// tenant-scoped + suspension + AsyncLocalStorage plumbing, but the flat Admin-role gate is
+// replaced by a per-(feature, action) permission check:
+//   - tenant_manager / tenant_superadmin → full access (short-circuit allow)
+//   - tenant_admin                       → full access EXCEPT OWNER_ONLY features (users/roles)
+//   - employee (+ optional customRoleId) → resolved from the role_permissions matrix (deny-by-default)
+// Fixed-tier admins short-circuit to allow BEFORE any DB principal read — critical because the
+// platform tenant_manager has NO user row (virtual credential identity), so resolvePrincipal must
+// never run for it. Existing admin/superadmin/tenant_admin callers keep IDENTICAL behavior to
+// adminProcedure; only matrix principals (employees holding a custom role) gain newly-scoped
+// access. Role comes from the session (L3), the matrix from the DB — never from client input.
+// resolvePrincipal reads the caller's OWN user row by session id via the unguarded prismaRaw (no
+// ALS tenant context is established yet at this point — same rationale as assertTenantActive).
+export const matrixProcedure = (feature: FeatureKey, action: PermissionAction) =>
+  protectedProcedure.use(async ({ ctx, next }) => {
+    const isPlatform = ctx.roles.includes(Role.TenantManager);
+    if (!isPlatform && ctx.tenantId == null) {
+      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'No tenant context in session.' });
+    }
+
+    const tenantId = ctx.tenantId;
+    const userId = ctx.userId;
+    if (tenantId == null || userId == null) {
+      throw new TRPCError({ code: 'UNAUTHORIZED' });
+    }
+
+    let allowed: boolean;
+    if (isPlatform || ctx.roles.includes(Role.TenantSuperadmin)) {
+      allowed = true;
+    } else if (ctx.roles.includes(Role.TenantAdmin)) {
+      allowed = !OWNER_ONLY_FEATURES.has(feature);
+    } else {
+      const principal = await resolvePrincipal(userId, prismaRaw);
+      allowed = hasPermission(principal, feature, action);
+    }
+    if (!allowed) {
+      throw new TRPCError({ code: 'FORBIDDEN' });
+    }
+
+    if (!isPlatform) {
+      await assertTenantActive(tenantId);
+    }
+    return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));
+  });
+
+// User-management procedure — protected, tenant-scoped, narrower than adminProcedure.
+// Gates user CRUD (create/update/delete/list) to the tenant OWNER (TenantSuperadmin) or the
+// platform TenantManager only — a plain TenantAdmin (below-owner tier) may NOT manage users,
+// per the tenant-RBAC standard (Billing + User-Management are owner-reserved surfaces).
+export const userManagementProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  const isSuperAdmin = ctx.roles.includes(Role.TenantManager);
+  if (!isSuperAdmin && ctx.tenantId == null) {
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'No tenant context in session.' });
+  }
+  if (!ctx.roles.includes(Role.TenantSuperadmin) && !isSuperAdmin) {
+    throw new TRPCError({ code: 'FORBIDDEN' });
+  }
+
+  const tenantId = ctx.tenantId;
+  const userId = ctx.userId;
+  if (tenantId == null || userId == null) {
+    throw new TRPCError({ code: 'UNAUTHORIZED' });
+  }
+  if (!isSuperAdmin) {
+    await assertTenantActive(tenantId);
+  }
+  return withTenantContext(tenantId, () => next({ ctx: { ...ctx, tenantId, userId } }));
+});
+
+// Super Admin procedure — platform-level, cross-tenant, env-based credential (Role.TenantManager,
 // tenantId=null in session — see auth/config.ts's 'super-admin-credentials' provider). Deliberately
 // does NOT wrap in `withTenantContext`: Super Admin operates GLOBALLY across every tenant, so
 // establishing a single tenant's AsyncLocalStorage context here would be wrong (it would either
@@ -118,7 +194,7 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
 // (unguarded), matching the tenant-guard GLOBAL_MODELS convention for Tenant/SystemAd/Subscription
 // and explicit `where: { tenantId }` filters for any per-tenant aggregate.
 export const superAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (!ctx.roles.includes(Role.SuperAdmin)) {
+  if (!ctx.roles.includes(Role.TenantManager)) {
     throw new TRPCError({ code: 'FORBIDDEN' });
   }
   return next({ ctx });

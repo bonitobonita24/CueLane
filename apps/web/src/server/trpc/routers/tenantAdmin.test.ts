@@ -18,7 +18,7 @@ function ctxFor(overrides: Partial<Context>): Context {
 }
 function adminCallerFor(tenantId: string, userId: string) {
   return createCaller(
-    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.Admin], tenantId }),
+    ctxFor({ session: { user: { id: userId } } as unknown as Context['session'], userId, roles: [Role.TenantSuperadmin], tenantId }),
   );
 }
 function employeeCallerFor(tenantId: string, userId: string) {
@@ -46,14 +46,14 @@ describe('tenantAdminRouter (Wave 7.6-T4)', () => {
       },
     });
     freeTenantId = freeTenant.id;
-    freeAdminId = (await prismaRaw.user.create({ data: { tenantId: freeTenantId, name: 'Admin', role: 'admin', pin: 'x' } })).id;
+    freeAdminId = (await prismaRaw.user.create({ data: { tenantId: freeTenantId, name: 'Admin', role: 'tenant_superadmin', pin: 'x' } })).id;
     freeEmployeeId = (await prismaRaw.user.create({ data: { tenantId: freeTenantId, name: 'Emp', role: 'employee', pin: 'x' } })).id;
 
     const premiumTenant = await prismaRaw.tenant.create({
       data: { slug: `test-tadmin-premium-${Date.now()}`, companyName: 'Premium Tadmin Co.', tagline: 'x', tier: 'premium' },
     });
     premiumTenantId = premiumTenant.id;
-    premiumAdminId = (await prismaRaw.user.create({ data: { tenantId: premiumTenantId, name: 'Admin', role: 'admin', pin: 'x' } })).id;
+    premiumAdminId = (await prismaRaw.user.create({ data: { tenantId: premiumTenantId, name: 'Admin', role: 'tenant_superadmin', pin: 'x' } })).id;
   });
 
   afterAll(async () => {

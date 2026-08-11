@@ -58,7 +58,7 @@ describe('auth E2E journey (Wave 7.9-T4): signup -> login -> password reset', ()
     const admin = await prismaRaw.user.findFirstOrThrow({
       where: { tenantId: tenant.id, name: 'E2E Admin' },
     });
-    expect(admin.role).toBe('admin');
+    expect(admin.role).toBe('tenant_superadmin');
 
     // ── Step 2: the new admin can authenticate — same check as the real
     //    'admin-credentials' Auth.js provider (server/auth/config.ts) ─────────
