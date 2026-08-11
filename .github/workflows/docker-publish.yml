@@ -1,8 +1,9 @@
 name: Build, Push & Deploy (staging)
 
 on:
-  push:
-    branches: [main]
+  # MANUAL-ONLY (Model B) — the push:[main] auto-deploy trigger is intentionally OFF until the
+  # CueLane staging Komodo stack + secrets are stood up and the owner explicitly enables staging.
+  # Re-enable Model A (auto-deploy on merge to main) by restoring:  push: { branches: [main] }
   workflow_dispatch:
     inputs:
       deploy_prod:
