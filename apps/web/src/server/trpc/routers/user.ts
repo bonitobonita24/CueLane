@@ -28,7 +28,11 @@ async function assertServicesBelongToTenant(
 }
 
 function serializeUser(
-  user: { id: string; tenantId: string; name: string; role: string; customRoleId: string | null; createdAt: Date },
+  // tenantId widened to `string | null` (D-RBAC-1): User.tenantId is nullable now that the platform
+  // tenant_manager is a real DB row with tenant_id=NULL. These procedures are tenant-scoped so the
+  // value is non-null at runtime, but the DB type is honest. The client never reads tenantId (see
+  // users-client.tsx) — no consumer ripple.
+  user: { id: string; tenantId: string | null; name: string; role: string; customRoleId: string | null; createdAt: Date },
   serviceIds: string[],
 ) {
   return {

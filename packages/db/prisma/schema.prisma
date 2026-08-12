@@ -158,7 +158,7 @@ model Window {
 
 model User {
   id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
+  tenantId  String?  @map("tenant_id")
   name      String
   role      UserRole @default(employee)
   // Stored hashed (bcrypt in production, SHA-256 dev hash in seed). See Part 5 auth layer.
@@ -168,7 +168,7 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant              Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customRole          CustomRole?          @relation(fields: [customRoleId], references: [id])
   userServices        UserService[]
   servedTickets       Ticket[]

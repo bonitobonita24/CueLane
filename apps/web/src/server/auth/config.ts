@@ -113,24 +113,25 @@ export const authConfig: NextAuthConfig = {
 
         const { email, password } = parsed.data;
 
-        const superAdminEmail = process.env['SUPER_ADMIN_EMAIL'];
-        const superAdminHash = process.env['SUPER_ADMIN_PASSWORD_HASH'];
+        // D-RBAC-1 (2026-08-12): the platform tenant_manager is now a real DB row
+        // (tenant_id=NULL), seeded from the Server-Setups vault account. Authenticate
+        // against that row instead of SUPER_ADMIN_* env values. prismaRaw = the sanctioned
+        // unguarded client (auth runs before any tenant context exists).
+        const manager = await prismaRaw.user.findFirst({
+          where: { name: email, role: Role.TenantManager, tenantId: null },
+          select: { id: true, name: true, pin: true },
+        });
+        if (manager == null) return null;
 
-        // Explicit null/empty checks required by @typescript-eslint/strict-boolean-expressions
-        if (superAdminEmail == null || superAdminEmail === '' || superAdminHash == null || superAdminHash === '') {
-          return null;
-        }
-        if (email !== superAdminEmail) return null;
-
-        const valid = await bcrypt.compare(password, superAdminHash);
+        const valid = await bcrypt.compare(password, manager.pin);
         if (!valid) return null;
 
         return {
-          id: 'super-admin',
-          name: 'Super Admin',
-          email: superAdminEmail,
+          id: manager.id,
+          name: manager.name,
+          email,
           tenantId: null,
-          tenantSlug: null, // Super Admin has no home tenant — exempt from the slug guard
+          tenantSlug: null, // platform manager has no home tenant — exempt from the slug guard
           roles: [Role.TenantManager],
         };
       },
