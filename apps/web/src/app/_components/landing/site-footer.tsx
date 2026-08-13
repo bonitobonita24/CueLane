@@ -28,7 +28,7 @@ export function SiteFooter() {
             <div className="flex flex-col gap-2">
               <span className="cl-label text-muted-foreground">Company</span>
               <span className="text-foreground/80">Powerbyte IT Solutions</span>
-              <span className="text-foreground/80">Lipa City, Philippines</span>
+              <span className="text-foreground/80">Calapan City, Oriental Mindoro PH</span>
             </div>
           </div>
         </div>

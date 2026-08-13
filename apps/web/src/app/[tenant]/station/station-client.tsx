@@ -59,6 +59,7 @@ export function StationClient({ tenantSlug, windows }: StationClientProps) {
   const [busy, setBusy] = useState(false);
   const [transferTarget, setTransferTarget] = useState<TicketRow | null>(null);
   const [isPremium, setIsPremium] = useState(false);
+  const [changeWindowOpen, setChangeWindowOpen] = useState(false);
 
   const { unlock, announce, muted, toggleMute } = useAnnounce();
   const gestureUnlockedRef = useRef(false);
@@ -323,8 +324,7 @@ export function StationClient({ tenantSlug, windows }: StationClientProps) {
           <Button variant="outline" size="sm" onClick={toggleMute} aria-pressed={muted}>
             {muted ? 'Unmute' : 'Mute'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => void selectWindow('')} disabled>
-            {/* Window switching is a fast-follow — deliberately disabled placeholder for now */}
+          <Button variant="ghost" size="sm" onClick={() => setChangeWindowOpen(true)} data-testid="open-change-window">
             Change Window
           </Button>
         </div>
@@ -437,6 +437,40 @@ export function StationClient({ tenantSlug, windows }: StationClientProps) {
         onCancel={() => setTransferTarget(null)}
         onConfirm={(toWindowId, returnAfterDone) => void handleTransfer(transferTarget!.id, toWindowId, returnAfterDone)}
       />
+
+      <Dialog open={changeWindowOpen} onOpenChange={setChangeWindowOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Window</DialogTitle>
+          </DialogHeader>
+          {windows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No windows configured for this tenant yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {windows.map((w) => (
+                <Button
+                  key={w.id}
+                  variant="outline"
+                  disabled={w.id === windowId}
+                  onClick={() => {
+                    void selectWindow(w.id);
+                    setChangeWindowOpen(false);
+                  }}
+                  data-testid={`change-window-${w.id}`}
+                >
+                  {w.name}
+                  {w.id === windowId ? ' (current)' : ''}
+                </Button>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeWindowOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

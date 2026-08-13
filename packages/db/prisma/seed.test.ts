@@ -10,8 +10,10 @@
 // `pnpm --filter @cuelane/db db:seed` runs) against the REAL dev Postgres DB, then inspects the
 // resulting rows via `prismaRaw` — same no-mocks convention as every other test in this repo.
 //
-// Wave 7.6-T9 — seed.ts now seeds the enriched `demo` tenant (8 services / 5 windows / 6 users /
-// 9 tickets) PLUS a second free-tier `clinic` tenant. This file only asserts `demo`'s counts
+// Wave 7.6-T9 — seed.ts now seeds the enriched `demo` tenant (8 services / 5 windows / 7 users /
+// 9 tickets) PLUS a second free-tier `clinic` tenant. (7 users = 1 tenant_superadmin + 1 tenant_admin
+// + 5 employees; the tenant_admin was added for the dev/demo quick-login rail.) This file only
+// asserts `demo`'s counts
 // (its own natural-key idempotency); `clinic`'s counts are covered by the Wave 7.6-T9 seed smoke
 // check (see docs/PRODUCT.md / STATE.md), not duplicated here.
 import { execFileSync } from 'node:child_process';
@@ -57,7 +59,7 @@ describe('prisma/seed.ts (T0 — real-cuid ids + idempotent reseed)', () => {
       for (const w of windows) expect(w.id).toMatch(CUID_RE);
 
       const users = await prismaRaw.user.findMany({ where: { tenantId: tenant.id } });
-      expect(users.length).toBe(6);
+      expect(users.length).toBe(7);
       for (const u of users) expect(u.id).toMatch(CUID_RE);
 
       const tickets = await prismaRaw.ticket.findMany({ where: { tenantId: tenant.id } });
