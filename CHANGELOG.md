@@ -4,6 +4,12 @@ All notable changes per release. A version is assigned at each push/merge to `ma
 entries are auto-derived from Conventional-Commit types. See
 `~/.claude/rules/release-changelog-discipline.md`.
 
+## v1.2.1 — 2026-08-13
+
+### [FIXED]
+- make @cuelane/* package.json readable by runtime user (fixes crash-loop) (`fff3823`)
+
+
 ## v1.2.0 — 2026-08-13
 
 ### [FEATURE]
