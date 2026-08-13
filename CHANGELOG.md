@@ -4,6 +4,15 @@ All notable changes per release. A version is assigned at each push/merge to `ma
 entries are auto-derived from Conventional-Commit types. See
 `~/.claude/rules/release-changelog-discipline.md`.
 
+## v1.1.0 — 2026-08-13
+
+### [FEATURE]
+- promote platform tenant_manager to a vault-backed DB user (D-RBAC-1) (`ec5e53a`)
+
+### [DOCS]
+- resolve D-RBAC-1, Free Theme tab, storage-origin; Rule-32 evidence (`98bd46f`)
+
+
 ## v1.0.0 — 2026-08-11
 
 ### [FEATURE]
