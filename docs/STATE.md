@@ -3,6 +3,48 @@
 _V32 memory-governance tracker. Auto-updated at every Smart Checkpoint. Migrated from
 `.cline/STATE.md` (Cline deprecated V31) on 2026-07-08 at framework sync V32.18 → V32.24._
 
+## D-RBAC-1 — platform `tenant_manager` promoted to a vault-backed DB user — DONE + VERIFIED (2026-08-12)
+
+Rule 32 Verifiable-Done evidence. Branch `feat/tenant-manager-db-user` (off `main`), LOCAL / HARD HOLD.
+Owner resolved D-RBAC-1 → promote (see `docs/DECISIONS_LOG.md` 2026-08-12). Dev container rebuilt off-branch
+(app+worker, `cuelane_dev_app` → localhost:41716, healthy).
+
+- **evidence.contract:** The platform `tenant_manager` (`tenantadmin@powerbyteitsolutions.com`, from
+  `Server-Setups/secrets/universal-login-credentials.enc.yaml`) is a real `users` row (`role=tenant_manager`,
+  `tenant_id=NULL`, real cuid id — not the virtual `id:'super-admin'`). The `super-admin-credentials` Auth.js
+  provider authenticates against that DB row (`findFirst` where `name=email, role=tenant_manager, tenantId=null`
+  → `bcrypt.compare(password, pin)`) instead of `SUPER_ADMIN_*` env values. `User.tenantId` is nullable to model
+  the cross-tenant platform user (non-destructive `ALTER COLUMN … DROP NOT NULL`); the one-owner partial-unique
+  index already scopes `WHERE tenant_id IS NOT NULL`. Seed hardened against the bcrypt-`$`-in-env footgun
+  (skips a non-bcrypt hash instead of persisting a broken credential). No code regression across the blast radius.
+- **evidence.check_command:**
+    ```
+    # migration + regenerate client (dev DB, direct port 41706)
+    pnpm --filter @cuelane/db exec prisma migrate dev --name tenant_manager_nullable_tenant --skip-seed
+    # full cache-off gate
+    pnpm exec turbo run typecheck lint build --force   # → 24 successful / 24
+    pnpm --filter @cuelane/web test                    # → 234 passed / 4 baseline env fails / 4 skipped
+    # dev rebuilt off-branch; app boots clean; live auth proof (no secret echoed):
+    #   provider query + bcrypt.compare(<vault plaintext>, row.pin)
+    ```
+- **evidence.captured_output:**
+    ```
+    Applying migration `20260812110713_tenant_manager_nullable_tenant`
+      → ALTER TABLE "users" ALTER COLUMN "tenant_id" DROP NOT NULL;
+    Tasks: 24 successful, 24 total          # typecheck + lint + build, cache-off
+    Tests: 4 failed | 234 passed | 4 skipped (242)   # 4 = SMTP/Valkey/MinIO env baseline, untouched code
+    platform tenant_manager row found: true (name=tenantadmin@…, role=tenant_manager, tenantId=null, id=cuid, count=1)
+    pin matches container SUPER_ADMIN_PASSWORD_HASH (byte-identical): true
+    GET /login → 200 ; GET /superadmin/dashboard (unauth) → 307 ; app "✓ Ready in 77ms" (no errors)
+    AUTH RESULT: PASS ✅ (vault password authenticates against the DB tenant_manager row via the exact provider logic)
+    seed guard proven: re-run with mangled env → "…not a bcrypt hash… skipping" (good pin preserved)
+    ```
+- **blast radius:** `serializeUser` (`server/trpc/routers/user.ts`) param widened `tenantId: string → string | null`
+  (DB column now nullable; client never reads it — `users-client.tsx:3`). No other consumer required change;
+  session `tenantId` + `Principal.tenantId` were already `string | null`.
+
+---
+
 ## RBAC Wave 3 — verify-all-pages per role — DONE + VERIFIED (2026-08-10 sess-7)
 
 Rule 32 Verifiable-Done evidence for the RBAC view-access retrofit (Rule 34 Part B) LIVE per-role verify.

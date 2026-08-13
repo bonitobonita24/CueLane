@@ -5,15 +5,13 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
 
 ## Open
 
-- [ ] **D-RBAC-1 — Platform admin identity model (raised during RBAC 3-tier retrofit, 2026-08-07).**
-  The retrofit keeps the platform `tenant_manager` as a **virtual env-credentials identity** (Auth.js
-  `super-admin-credentials`, `tenantId=NULL`, no DB user row) for the backbone pass — lowest risk, no auth-flow
-  rewrite. The fleet standard (`~/.claude/rules` universal-login vault) + Scenario 42 step 6 envision a **real DB
-  `tenant_manager` row** seeded from `tenantadmin@powerbyteitsolutions.com`.
-  - **Question for owner:** promote `tenant_manager` to a vault-backed DB user now, or keep it virtual until
-    multi-platform-admin is actually needed? Rolling the vault cred into an already-built app is owner-gated (HARD HOLD).
-  - **Impact if unanswered:** none — backbone proceeds with the virtual identity; DB value `tenant_manager` exists
-    but is unused in the users table. Fully reversible later.
+- [x] **D-RBAC-1 — Platform admin identity model (raised 2026-08-07; RESOLVED 2026-08-12 → promote to DB user).**
+  **Owner decided: promote `tenant_manager` to a vault-backed DB user.** The platform account
+  (`tenantadmin@powerbyteitsolutions.com`, from `Server-Setups/secrets/universal-login-credentials.enc.yaml`)
+  is now a real DB row (`role=tenant_manager`, `tenant_id=NULL`) instead of the virtual env-credentials identity.
+  Requires making `User.tenantId` nullable (the session/middleware layer already assumed `tenantId=null` for the
+  platform tier; the one-owner partial-unique index already scopes `WHERE tenant_id IS NOT NULL`). Built on branch
+  `feat/tenant-manager-db-user`, LOCAL / HARD HOLD. See `docs/DECISIONS_LOG.md` 2026-08-12 entry.
 
 - [x] **D-RBAC-3 — Custom-role permission matrix scope (raised 2026-08-07; RESOLVED 2026-08-08 → BUILD).**
   Owner approved **Full Rule 34 Part B this cycle** (supersedes the gate). Matrix + role-builder are being built
@@ -24,15 +22,12 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
     deterministic default (earliest-`createdAt` admin → `tenant_superadmin`); seed tenants have exactly one admin, so
     it is not currently ambiguous.
 
-- [ ] **Free-tier Theme tab visibility (raised Wave 7.7b, 2026-07-09).**
-  Wave 7.7b **un-gated the Theme tab for the Free tier** — Free tenants now see the Theme tab with the 8 presets
-  available, but the **custom color picker disabled** behind upgrade copy (Premium-only). This **reverses the
-  Wave 7.6-T7 decision**, which hid the *entire* Theme tab from Free tenants.
-  - Followed this wave's explicit brief ("Free tier = presets only, custom disabled w/ upgrade copy"), which implies
-    the tab is visible. Recorded in `docs/DECISIONS_LOG.md`.
-  - **Question for owner:** Is showing Free tenants the Theme tab (presets yes, custom no) the intended product
-    behavior, or should the whole tab stay hidden from Free (revert to 7.6-T7)?
-  - **Impact if unanswered:** cosmetic/product-positioning only; no functional or security impact. Loop proceeds.
+- [x] **Free-tier Theme tab visibility (raised Wave 7.7b, 2026-07-09; RESOLVED 2026-08-12 → show tab, presets yes).**
+  **Owner decided: show Free tenants the Theme tab (8 presets available), custom 9-color picker stays Premium-only.**
+  This **confirms the already-shipped Wave 7.7b behavior** — no code change needed: `admin/_lib/access.ts:42`
+  keeps `theme` OUT of `FREE_GATED_TAB_IDS`, and `access.test.ts:76` already asserts
+  `isTabGatedForTier('theme', TenantTier.Free) === false`. Decision closed; existing behavior is the intended
+  product behavior.
 
 - [ ] **Public storage origin for staging/prod Display media (raised Wave 7.7d, 2026-07-09).**
   The Big Display plays locally-uploaded media via a presigned URL fetched **by the browser**, which needs a
@@ -43,6 +38,9 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
     `client-body-size` at Phase-6 — only 60MB was load-tested in dev, which has no proxy.)
   - **Impact if unanswered:** **dev-only build is unaffected** (HARD HOLD = dev). Only blocks local-upload Display
     playback in staging/prod, which are owner-gated deploys anyway. Loop proceeds.
+  - **Owner note (2026-08-12): DEFERRED to deploy-time.** Kept open intentionally — the real S3/R2/CDN origin is
+    supplied when CueLane reaches its first staging/prod deploy. `.env.{staging,prod}.example` placeholders stay
+    `CHANGE_ME_public_storage_origin` until then.
 
 - [x] **Super Admin route path: `/super-admin` vs `/superadmin` (raised Wave 7.8, 2026-07-09; RESOLVED 2026-08-10 → `/superadmin`).**
   Owner decided: **match PRODUCT.md** (`/superadmin`, no hyphen). DONE this session — route directory

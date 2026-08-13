@@ -795,3 +795,56 @@ preset) + `user.test.ts` customRoleId block (assign / cross-tenant reject / non-
 
 **Pending:** Wave 3 (verify-all-pages per role via Playwright — employee-with-custom-role live login — + dev
 rebuild + evidence). D-RBAC-1 (virtual vs DB platform `tenant_manager`) stays open + non-blocking.
+
+---
+
+## 2026-08-12 — Owner resolves three open `[WHAT]`s (D-RBAC-1, Free Theme tab, storage origin)
+
+Owner answered the standing open decisions this session:
+
+- **D-RBAC-1 — platform `tenant_manager` identity → PROMOTE to a vault-backed DB user.** Supersedes the
+  virtual env-credentials identity used for the backbone pass. The canonical platform account
+  `tenantadmin@powerbyteitsolutions.com` (sole home: `Server-Setups/secrets/universal-login-credentials.enc.yaml`,
+  SOPS+age) is seeded as a real `users` row (`role=tenant_manager`, `tenant_id=NULL`). The
+  `super-admin-credentials` Auth.js provider now authenticates against that DB row instead of
+  `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD_HASH` env values. `User.tenantId` made **nullable** to model the
+  cross-tenant platform user — low blast radius: session `tenantId` and `Principal.tenantId` were already
+  `string | null`, and the one-owner index already scopes `WHERE tenant_id IS NOT NULL`. Built on branch
+  `feat/tenant-manager-db-user`, LOCAL / HARD HOLD (no push/deploy). Build detail in the follow-up entry.
+
+- **Free-tier Theme tab → SHOW the tab (8 presets), custom 9-color picker stays Premium-only.** Confirms the
+  already-shipped Wave 7.7b behavior; **no code change**. Closes the reversal question against Wave 7.6-T7.
+
+- **Public storage origin for staging/prod → DEFERRED to deploy-time.** No action now; the real S3/R2/CDN
+  origin is supplied at the first staging/prod deploy. `.env.{staging,prod}.example` placeholders remain.
+
+Note: `docs/PRODUCT.md` is human-owned (Rule 1) — any PRODUCT.md spec-line touch-up for these is left to the owner.
+
+---
+
+## 2026-08-12 — D-RBAC-1 BUILT: platform `tenant_manager` promoted to a vault-backed DB user
+
+Branch `feat/tenant-manager-db-user` (off `main`), LOCAL / HARD HOLD. Implements the D-RBAC-1 resolution above.
+
+- **Schema** — `User.tenantId` made nullable (`String?`) + relation optional (`Tenant?`); migration
+  `20260812110713_tenant_manager_nullable_tenant` = non-destructive `ALTER COLUMN "tenant_id" DROP NOT NULL`.
+  The `one_tenant_superadmin_per_tenant` partial-unique index already scopes `WHERE tenant_id IS NOT NULL`, so
+  a null-tenant platform row is unaffected.
+- **Seed** — new `seedPlatformManager()` (idempotent by `(name, tenantId=null, role=tenant_manager)`) upserts the
+  canonical platform account from env (`SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD_HASH`, sourced from the
+  Server-Setups vault); the hash is stored directly as `pin`. Hardened with a bcrypt-format guard that
+  **skips** (never persists) a mangled / `$$`-escaped hash — see lesson below.
+- **Provider** — `super-admin-credentials` (`server/auth/config.ts`) now authenticates against the DB row
+  (`prismaRaw.user.findFirst` where `name=email, role=tenant_manager, tenantId=null` → `bcrypt.compare(password, pin)`)
+  and returns the real DB cuid id, instead of comparing to `SUPER_ADMIN_*` env values and returning `id:'super-admin'`.
+  This also removes the prior special case where `resolvePrincipal('super-admin')` would have thrown (no user row).
+- **Blast radius** — only `serializeUser` needed widening (`tenantId: string → string | null`); session `tenantId`
+  and `Principal.tenantId` were already nullable. Full cache-off gate green (typecheck+lint+build 24/24; web suite
+  234 passed / 4 pre-existing env fails). Live auth proof PASS (vault password authenticates against the DB row).
+- **Lesson** — `seed.bcrypt-hash-env-mangled-by-bash-source-stores-garbage-pin` (global ledger): `source`-ing a
+  `.env` that holds a `$$`-escaped bcrypt hash shell-expands the `$` and stores a broken pin; pull the de-escaped
+  value from the running container instead.
+
+**Pending:** none for D-RBAC-1. Rolling the SAME promotion into staging/prod is a separate owner-gated re-seed at
+deploy-time (the universal-login-vault rollout is HARD HOLD per `~/.claude/CLAUDE.md`). Push/merge of this branch
+is owner-gated.

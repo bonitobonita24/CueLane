@@ -65,6 +65,36 @@ async function findOrUpsert<TFind, TResult>(
   return create();
 }
 
+/** Seed the platform tenant_manager (D-RBAC-1, 2026-08-12): a real DB user row with
+ *  tenant_id=NULL for the cross-tenant platform operator. Credentials come from env
+ *  (SUPER_ADMIN_EMAIL + SUPER_ADMIN_PASSWORD_HASH — sourced from Server-Setups vault),
+ *  never hardcoded. Idempotent by (name, tenantId=null). Skips with a warning if env is
+ *  absent so a plain dev seed still works. */
+async function seedPlatformManager(): Promise<void> {
+  const email = process.env['SUPER_ADMIN_EMAIL'];
+  const hash = process.env['SUPER_ADMIN_PASSWORD_HASH'];
+  if (email == null || email === '' || hash == null || hash === '') {
+    console.warn('[seed] SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD_HASH not set — skipping platform tenant_manager seed');
+    return;
+  }
+  // Guard the bcrypt-$-in-env footgun: a `$$`-escaped .env value or a bash-`source`d hash arrives
+  // mangled (the `$2a$10$…` sequences get shell-expanded). Refuse to persist a non-bcrypt string as
+  // the credential — a broken pin would silently fail every platform login. Run this seed from a
+  // context that provides the de-escaped hash (the app container's env, or a non-expanding loader).
+  if (!/^\$2[aby]\$/.test(hash)) {
+    console.warn('[seed] SUPER_ADMIN_PASSWORD_HASH is not a bcrypt hash (mangled / $$-escaped env?) — skipping platform tenant_manager seed to avoid storing a broken credential');
+    return;
+  }
+  const existing = await prisma.user.findFirst({ where: { name: email, tenantId: null, role: 'tenant_manager' } });
+  if (existing != null) {
+    await prisma.user.update({ where: { id: existing.id }, data: { pin: hash } });
+    console.log(`[seed] platform tenant_manager updated: ${email}`);
+    return;
+  }
+  await prisma.user.create({ data: { name: email, pin: hash, role: 'tenant_manager', tenantId: null } });
+  console.log(`[seed] platform tenant_manager created: ${email}`);
+}
+
 function todayKey(): string {
   const d = new Date();
   const y = d.getUTCFullYear();
@@ -458,6 +488,8 @@ async function seedFeatures(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log('🌱 Seeding CueLane dev database (2 tenants — Wave 7.6-T9 rich demo dataset)...\n');
+
+  await seedPlatformManager();
 
   await seedFeatures();
 
