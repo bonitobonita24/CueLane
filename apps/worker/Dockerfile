@@ -77,5 +77,10 @@ COPY --from=builder /app/packages/storage/node_modules ./packages/storage/node_m
 # Compiled worker entry point
 COPY --from=builder /app/apps/worker/dist          ./apps/worker/dist
 COPY --from=builder /app/apps/worker/package.json  ./apps/worker/
+# COPY brings these in as root:root 0600. The runtime user `worker` (uid 1001) must be able to
+# READ every @cuelane/* package.json + dist so Node can resolve the workspace `exports` (→ dist/
+# index.js). Without this, Node can't read the package.json, falls back to a nonexistent root
+# index.js, and the worker crash-loops with ERR_MODULE_NOT_FOUND. a+rX = read for all, +traverse dirs.
+RUN chmod -R a+rX /app/packages /app/apps/worker
 USER worker
 CMD ["node", "apps/worker/dist/index.js"]
