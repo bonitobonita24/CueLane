@@ -4,6 +4,19 @@ All notable changes per release. A version is assigned at each push/merge to `ma
 entries are auto-derived from Conventional-Commit types. See
 `~/.claude/rules/release-changelog-discipline.md`.
 
+## v1.2.0 — 2026-08-13
+
+### [FEATURE]
+- demo quick-login rail — one-click sign-in per RBAC tier (`ab8f3d3`)
+- Station "Change Window" — wire the placeholder button (DEFERRED #4) (`55567e3`)
+
+### [FIXED]
+- landing footer address → Calapan City (canonical company identity) (`f0e89c1`)
+
+### [CHORE]
+- couple local-dev rebuild + freshness check into staging/prod ship (`fc04405`)
+
+
 ## v1.1.0 — 2026-08-13
 
 ### [FEATURE]
