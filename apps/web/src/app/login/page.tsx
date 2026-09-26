@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@cuelane/ui';
 import { LoginForm } from './login-form';
 import { DemoQuickLogin } from './demo-quick-login';
+import { PowerbyteBrandMark } from '@/components/PowerbyteBrandMark';
 
 export const metadata: Metadata = {
   title: 'Sign in · CueLane',
@@ -61,6 +62,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <DemoQuickLogin tenantSlug={tenantSlug} />
           ) : null}
         </div>
+
+        <a
+          href="https://www.powerbyteitsolutions.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <span>by</span>
+          <PowerbyteBrandMark className="h-6" />
+        </a>
       </div>
     </main>
   );

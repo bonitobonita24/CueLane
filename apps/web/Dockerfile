@@ -1,7 +1,7 @@
 # Stage 1 — install dependencies
 FROM node:22-alpine AS deps
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 # Workspace-aware install: pnpm needs the workspace manifest + EVERY package's
 # package.json to resolve workspace:* deps and their transitive deps (e.g.
 # tailwindcss-animate declared in packages/ui). Copying only the root manifest
@@ -22,7 +22,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 # pnpm is required to run the build script; each FROM starts a fresh image so it
 # must be re-installed here (the deps stage's global pnpm does not carry over).
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -45,9 +45,11 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 # Monorepo standalone layout: Next traces the whole workspace, so the standalone
 # output lives at apps/web/.next/standalone/ with the entrypoint at apps/web/server.js
 # and hoisted node_modules at the standalone root. Copy that whole tree, then overlay
-# the static assets under apps/web/.next/static. There is no public/ dir in this app.
+# the static assets under apps/web/.next/static, plus apps/web/public (official Powerbyte
+# favicon kit + site.webmanifest + /brand logos) — standalone output does NOT include public/.
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 # Prisma query engine: Next's standalone output bundles @prisma/client into the
 # webpack server chunk but does NOT place the native engine (.so.node) on disk.
 # Prisma's runtime loader searches .next/server among other paths — drop the

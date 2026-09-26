@@ -29,6 +29,17 @@ const spaceMono = Space_Mono({
 export const metadata: Metadata = {
   title: 'CueLane',
   description: 'Smart Queue Management',
+  // Official Powerbyte favicon kit (apps/web/public, copied from Branding-Marketing-Framework
+  // brand-assets/official-logo/favicon). middleware.ts bypasses these paths (lib/static-paths.ts).
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  manifest: '/site.webmanifest',
 };
 
 export default function RootLayout({

@@ -51,6 +51,7 @@ import {
   SidebarTrigger,
 } from '@cuelane/ui/sidebar';
 import { APP_VERSION } from '../lib/app-version';
+import { PowerbyteBrandMark } from './PowerbyteBrandMark';
 
 export interface AppShellNavItem {
   /** Stable id — also the icon-map key. */
@@ -167,8 +168,9 @@ export function AppShell({
               href="https://www.powerbyteitsolutions.com/"
               target="_blank"
               rel="noopener noreferrer"
-              className="leading-tight transition-colors hover:text-sidebar-foreground hover:underline"
+              className="flex flex-col items-start gap-1 leading-tight transition-colors hover:text-sidebar-foreground hover:underline"
             >
+              <PowerbyteBrandMark />
               Developed by Powerbyte IT Solutions
             </a>
           </div>
