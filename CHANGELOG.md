@@ -4,6 +4,23 @@ All notable changes per release. A version is assigned at each push/merge to `ma
 entries are auto-derived from Conventional-Commit types. See
 `~/.claude/rules/release-changelog-discipline.md`.
 
+## v1.3.0 — 2026-09-27
+
+### [FEATURE]
+- adopt official Powerbyte favicon kit + theme-aware brand mark (`94ae10f`)
+
+### [FIXED]
+- derive sidebar APP_VERSION from package.json (was stuck at 1.0.0) (`7395a39`)
+- pin pnpm@10.0.0 in web + worker images (`4fddd50`)
+- repair .mcp.json — npx invocation + re-add context7/shadcn (`c522efa`)
+
+### [DOCS]
+- add TASK_QUEUE.md + 2026-09-27 session log (`0e862b1`)
+
+### [CHORE]
+- set dev-stack restart policy to "no" (never unless-stopped) (`63705c7`)
+
+
 ## v1.2.1 — 2026-08-13
 
 ### [FIXED]
