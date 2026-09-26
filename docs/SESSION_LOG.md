@@ -2,6 +2,15 @@
 
 Human-readable per-session accomplishment ledger (`session-log-discipline.md`). Newest on top.
 
+## 2026-09-27 (slot-27, cont.) — Full Auto: dark-sidebar logo contrast + staging-standup rebase
+
+**In your words:** resume, run in Full Auto, all tasks via Opus sub-agents across reboots; `[WHAT]`s → PENDING_DECISIONS, don't ask.
+
+✅ Done — **CUE-4** tenant dark-sidebar logo contrast: `PowerbyteBrandMark` now picks the DarkBG/WhiteBG variant by the rendered background's WCAG luminance (was a `.dark`-class swap that couldn't see tenant inline-CSS-var surfaces); branch `fix/tenant-sidebar-logo-contrast` `a18f9ff`, cache-off gate green (typecheck+lint 14/14, build 7/7), live light+dark screenshots. **CUE-6** rebased `chore/staging-standup` onto main (tip `e62f42a`; pnpm@10 pin `4fddd50` now an ancestor; staging compose config valid). Both LOCAL / HARD HOLD.
+💬 Decisions/notes — both un-gated queue items cleared. Owner note (not a blocker): tenant `ThemeVars` has no `--sidebar-background`, so a dark tenant sidebar isn't reachable via the Theme UI today — the CUE-4 fix is future-proof for when it is. Open `[WHAT]`s CUE-3 (storage origin, deploy-time) + CUE-7/D2 (email login) stay deferred.
+⏳ Next — queue is all owner-gated (staging live deploy is ready to ship on owner word; parked branches). No un-gated work → loop holds.
+⛔ Blocked — staging/prod deploy + branch merges (owner word); Phase-6 creds in CREDENTIALS.md.
+
 ## 2026-09-27 — Full Auto: fleet broadcasts (dev restart, official logo) + version drift fix
 
 **In your words:** resume, run in Full Auto, all tasks via Opus 5.5 sub-agents across reboots.
