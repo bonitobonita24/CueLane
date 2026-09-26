@@ -7,7 +7,7 @@
 # Stage 1 — install all dependencies (dev + prod, needed for tsc compilation)
 FROM node:22-alpine AS deps
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 # Copy workspace manifest + lockfile for deterministic install
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 # Copy each workspace package.json so pnpm can resolve workspace protocol
@@ -21,7 +21,7 @@ RUN pnpm install --frozen-lockfile
 # Stage 2 — build workspace packages + worker
 FROM node:22-alpine AS builder
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 # Carry node_modules from deps stage.
 # pnpm hoists all deps to the root node_modules; individual package dirs do NOT exist.
 COPY --from=deps /app/node_modules ./node_modules

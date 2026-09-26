@@ -1,7 +1,7 @@
 # Stage 1 — install dependencies
 FROM node:22-alpine AS deps
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 # Workspace-aware install: pnpm needs the workspace manifest + EVERY package's
 # package.json to resolve workspace:* deps and their transitive deps (e.g.
 # tailwindcss-animate declared in packages/ui). Copying only the root manifest
@@ -22,7 +22,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 # pnpm is required to run the build script; each FROM starts a fresh image so it
 # must be re-installed here (the deps stage's global pnpm does not carry over).
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
