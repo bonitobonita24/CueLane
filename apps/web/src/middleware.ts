@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { Role } from '@cuelane/shared';
 import { evaluateProtectedTenantAccess } from '@/server/auth/tenant-guard';
+import { isInternalPath } from '@/lib/static-paths';
 
 // Paths that do NOT need auth (kiosk + display are public-facing)
 const PUBLIC_TENANT_PATHS = ['/kiosk', '/display'];
@@ -16,22 +17,8 @@ const PROTECTED_TENANT_PATHS = ['/station', '/admin'];
 // Turnstile-protected public entry points (per inputs.yml)
 const TURNSTILE_PATHS = ['/login', '/register', '/forgot-password'];
 
-// Paths that bypass all tenant/auth middleware (Next.js internals + static assets).
-// IMPORTANT: Do NOT use pathname.includes('.') — it would bypass auth for any
-// URL path containing a dot (e.g. /superadmin/report.csv).
-// Instead, check for a file extension only at the END of the last path segment.
-const STATIC_EXT_RE = /\.\w{1,8}$/;
-
-function isInternalPath(pathname: string): boolean {
-  return (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/auth') ||
-    pathname === '/favicon.ico' ||
-    pathname === '/robots.txt' ||
-    pathname === '/sitemap.xml' ||
-    STATIC_EXT_RE.test(pathname)
-  );
-}
+// Paths that bypass all tenant/auth middleware (Next.js internals + public assets incl. the
+// official Powerbyte favicon kit, site.webmanifest and /brand/* logos) — see lib/static-paths.ts.
 
 // Non-async callback: no await inside, remove async to satisfy @typescript-eslint/require-await
 export default auth((req: NextRequest & { auth: unknown }) => {
@@ -142,8 +129,11 @@ export const config = {
      * Match all request paths EXCEPT:
      * - _next/static  (static files)
      * - _next/image   (image optimization)
-     * - favicon.ico
+     * - favicon.ico + the official Powerbyte favicon kit + site.webmanifest (apps/web/public)
+     * /brand/* logos are NOT excluded here (a tenant slug "brand" must keep auth on /brand/admin);
+     * they bypass inside the handler via isInternalPath (extension-required). Keep in sync with
+     * PUBLIC_ASSET_PATHS in lib/static-paths.ts — lib/static-paths.test.ts asserts this.
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|favicon-16x16\\.png|favicon-32x32\\.png|apple-touch-icon\\.png|android-chrome-192x192\\.png|android-chrome-512x512\\.png|site\\.webmanifest).*)',
   ],
 };

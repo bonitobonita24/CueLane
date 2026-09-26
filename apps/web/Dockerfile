@@ -45,9 +45,11 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 # Monorepo standalone layout: Next traces the whole workspace, so the standalone
 # output lives at apps/web/.next/standalone/ with the entrypoint at apps/web/server.js
 # and hoisted node_modules at the standalone root. Copy that whole tree, then overlay
-# the static assets under apps/web/.next/static. There is no public/ dir in this app.
+# the static assets under apps/web/.next/static, plus apps/web/public (official Powerbyte
+# favicon kit + site.webmanifest + /brand logos) — standalone output does NOT include public/.
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 # Prisma query engine: Next's standalone output bundles @prisma/client into the
 # webpack server chunk but does NOT place the native engine (.so.node) on disk.
 # Prisma's runtime loader searches .next/server among other paths — drop the
