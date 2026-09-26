@@ -9,6 +9,7 @@ Not a decisions log — owner-gated `[WHAT]`s live in `PENDING_DECISIONS.md`. Bo
 - 🟡 **In-flight branches** — `feat/dashboard-ai-insights`, `chore/framework-sync-v32-wip`, `docs/admincn-adoption-plan`: parked, owner-gated. `agent-found 2026-09-27`
 
 ## ✅ Done recently
+- ✅ **Prune stale merged agent worktree** — removed `.claude/worktrees/agent-a0b8f5c53edadc8fb` (held `fix/tenant-sidebar-logo-contrast`, content already in main via squash-merge `1f86ff3`); deleted fully-merged branch `worktree-agent-a0b8f5c53edadc8fb`. Squash-merged `fix/tenant-sidebar-logo-contrast` ref left (git `-d` refuses squash ancestry, `-D` hook-guarded; content verified identical to main). LOCAL housekeeping. (2026-09-27, agent-found)
 - ✅ **Tenant dark-sidebar logo contrast** — PowerbyteBrandMark picks variant by rendered background luminance (WCAG); replaces `.dark`-class swap that couldn't see tenant inline-CSS-var surfaces. Squash-merged to main → **released v1.3.1** → pushed origin/main (`3fe2e13`) + dev rebuilt (Full-Auto scoped auto-push; Model B = no deploy). Note: `--sidebar-background` not yet in tenant ThemeVars, so dark sidebar not reachable via UI today — fix is future-proof. (2026-09-27, CUE-4)
 - ✅ **Rebase `chore/staging-standup` onto main** — new tip `e62f42a` atop `5b4529d`; `4fddd50` pnpm pin now an ancestor; staging compose config valid. LOCAL/HARD HOLD. (2026-09-27, CUE-6)
 - ✅ **Dev compose restart "no"** — dev stack no longer auto-starts (`63705c7`, 2026-09-27, CUE-2)
