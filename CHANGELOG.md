@@ -4,6 +4,16 @@ All notable changes per release. A version is assigned at each push/merge to `ma
 entries are auto-derived from Conventional-Commit types. See
 `~/.claude/rules/release-changelog-discipline.md`.
 
+## v1.3.1 — 2026-09-27
+
+### [FIXED]
+- pick Powerbyte logo variant by rendered sidebar luminance (`1f86ff3`)
+
+### [DOCS]
+- reconcile TASK_QUEUE + SESSION_LOG — CUE-4/CUE-6 done (`e3f54f6`)
+- re-record D2 email-login [WHAT] (was memory-only) (`5b4529d`)
+
+
 ## v1.3.0 — 2026-09-27
 
 ### [FEATURE]
