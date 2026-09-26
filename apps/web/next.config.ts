@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import packageJson from './package.json';
 
 // Wave 7.7d — the Big Display video panel plays local (uploaded) media via a presigned MinIO/S3
 // URL fetched by the BROWSER (`<video src>`), which needs `media-src` to include the storage
@@ -59,6 +60,13 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Bake the app version into the build from apps/web/package.json "version" (the field
+  // `gen-release-notes --apply` rewrites on every release), so the sidebar-footer tag
+  // (src/lib/app-version.ts) can never drift from the released version. Inlined at build time
+  // as a string literal — package.json itself is never shipped to the client bundle.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: packageJson.version,
+  },
   async headers() {
     return [
       {
