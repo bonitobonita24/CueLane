@@ -48,7 +48,7 @@ services:
       dockerfile: apps/web/Dockerfile
     image: cuelane:dev-latest
     container_name: cuelane_dev_app
-    restart: unless-stopped
+    restart: "no"
     env_file: .env.dev
     environment:
       <<: *cuelane-runtime-env
@@ -82,7 +82,7 @@ services:
       dockerfile: apps/worker/Dockerfile
     image: cuelane-worker:dev-latest
     container_name: cuelane_dev_worker
-    restart: unless-stopped
+    restart: "no"
     env_file: .env.dev
     environment:
       <<: *cuelane-runtime-env

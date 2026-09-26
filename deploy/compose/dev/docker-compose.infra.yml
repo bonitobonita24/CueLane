@@ -25,7 +25,7 @@ services:
   # ── PostgreSQL 16 ────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    restart: unless-stopped
+    restart: "no"
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -49,7 +49,7 @@ services:
   # App uses DATABASE_URL via :41707; migrations use DIRECT_URL via :41706.
   pgbouncer:
     image: edoburu/pgbouncer:latest
-    restart: unless-stopped
+    restart: "no"
     environment:
       DATABASE_URL: "postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}"
       MAX_CLIENT_CONN: "100"
@@ -74,7 +74,7 @@ services:
   # ── Valkey 7 (Redis-compatible cache + pub/sub) ───────────────────────
   valkey:
     image: valkey/valkey:7-alpine
-    restart: unless-stopped
+    restart: "no"
     command: ["valkey-server", "--requirepass", "${REDIS_PASSWORD}", "--bind", "0.0.0.0"]
     environment:
       # REDIS_PASSWORD must be in env so the healthcheck shell can read it via $$REDIS_PASSWORD
@@ -94,7 +94,7 @@ services:
   # ── MinIO (S3-compatible dev object storage) ──────────────────────────
   minio:
     image: minio/minio:latest
-    restart: unless-stopped
+    restart: "no"
     command: ["server", "/data", "--console-address", ":9001", "--address", "0.0.0.0:9000"]
     environment:
       MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY}
@@ -140,7 +140,7 @@ services:
   # ── MailHog (dev SMTP intercept + web UI) ─────────────────────────────
   mailhog:
     image: mailhog/mailhog:latest
-    restart: unless-stopped
+    restart: "no"
     ports:
       - "${SMTP_PORT:-41711}:1025"
       - "${SMTP_UI_PORT:-41712}:8025"
@@ -150,7 +150,7 @@ services:
   # ── pgAdmin 4 (Postgres GUI) ──────────────────────────────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
-    restart: unless-stopped
+    restart: "no"
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
