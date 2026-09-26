@@ -42,6 +42,12 @@ When answered, back-port to `docs/PRODUCT.md` + `docs/DECISIONS_LOG.md` before a
     supplied when CueLane reaches its first staging/prod deploy. `.env.{staging,prod}.example` placeholders stay
     `CHANGE_ME_public_storage_origin` until then.
 
+- [ ] **D2 — Email-based login (re-recorded 2026-09-27; previously tracked only in session memory).**
+  Is email login (in addition to the current name + PIN tenant login) a real product requirement?
+  - **Default until answered:** no change — name+PIN tenant login stays; the platform `tenant_manager` already uses email.
+  - **Impact if unanswered:** none on the current build; only matters if a tenant needs email/password or magic-link sign-in.
+  - Board: Squirlnote CUE-7 (`planning`+`decision`).
+
 - [x] **Super Admin route path: `/super-admin` vs `/superadmin` (raised Wave 7.8, 2026-07-09; RESOLVED 2026-08-10 → `/superadmin`).**
   Owner decided: **match PRODUCT.md** (`/superadmin`, no hyphen). DONE this session — route directory
   `app/super-admin` → `app/superadmin`, middleware + login-form URL strings updated (internal provider id
