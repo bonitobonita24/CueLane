@@ -5,8 +5,8 @@ Captures owner-dumped asks AND agent-found out-of-scope items. Distilled spec on
 Not a decisions log — owner-gated `[WHAT]`s live in `PENDING_DECISIONS.md`. Board mirror: Squirlnote project CueLane (CUE-n).
 
 ## 🔴 / 🟡 Open
-- 🟡 **Staging live deploy (Item 3)** — OWNER-GATED (HARD HOLD); runbook `docs/planning/STAGING_STANDUP_HANDOFF.md`. `chore/staging-standup` now rebased onto main (contains pnpm@10 pin + worker perms) — ready when owner says ship. `owner 2026-08-13`
-- 🟡 **In-flight branches** — `feat/dashboard-ai-insights`, `chore/framework-sync-v32-wip`, `docs/admincn-adoption-plan`: parked, owner-gated. `agent-found 2026-09-27`
+- 🟡 **Staging live deploy (Item 3)** — `gate: owner (deploy — HARD HOLD)` runbook `docs/planning/STAGING_STANDUP_HANDOFF.md`. `chore/staging-standup` now rebased onto main (contains pnpm@10 pin + worker perms) — ready when owner says ship. `owner 2026-08-13`
+- 🟡 **In-flight branches** — `gate: owner (parked)` `feat/dashboard-ai-insights`, `chore/framework-sync-v32-wip`, `docs/admincn-adoption-plan`: parked, owner-gated. `agent-found 2026-09-27`
 
 ## ✅ Done recently
 - ✅ **Prune stale merged agent worktree** — removed `.claude/worktrees/agent-a0b8f5c53edadc8fb` (held `fix/tenant-sidebar-logo-contrast`, content already in main via squash-merge `1f86ff3`); deleted fully-merged branch `worktree-agent-a0b8f5c53edadc8fb`. Squash-merged `fix/tenant-sidebar-logo-contrast` ref left (git `-d` refuses squash ancestry, `-D` hook-guarded; content verified identical to main). LOCAL housekeeping. (2026-09-27, agent-found)
